@@ -28,7 +28,7 @@ This document provides the complete epic and story breakdown for thesis, decompo
 - FR13: Driver can check out by having their QR code scanned by the attendant.
 - FR14: Attendant can check out a vehicle by scanning the driver's QR code (or the session QR for walk-ins)
 - FR15: System calculates the parking fee based on the lot's active pricing (SESSION or HOURLY mode).
-- FR16: System updates current_available count on check-in and check-out (via Supabase Realtime).
+- FR16: System updates current_available count on check-in and check-out and broadcasts availability updates through FastAPI-managed realtime delivery.
 - FR17: Attendant can record a cash payment for a parking session
 - FR18: Driver can pay for a parking session online (MVP scope: simulated flow).
 - FR19: System creates a Payment record with amount, method, and status
@@ -56,8 +56,8 @@ This document provides the complete epic and story breakdown for thesis, decompo
 - FR41: Admin can approve or reject lot registrations from Lot Owners
 - FR42: Admin can approve or reject lease requests from Operators
 - FR43: Admin can search, view, activate, or deactivate user accounts
-- FR44: User can register an account via Supabase Auth (email/password or Google sign-in)
-- FR45: User can log in via Supabase Auth and access role-appropriate features. Authentication is handled client-side via the Supabase SDK
+- FR44: User can register an account through FastAPI using email and password, with account data stored in PostgreSQL
+- FR45: User can log in through FastAPI and access role-appropriate features. Authentication is handled by the backend and consumed by the mobile client via API tokens
 - FR46: Driver can register vehicles with license plate, type, brand, color, and photos
 - FR47: System can send in-app notifications to users (Phase 2 scope)
 - FR48: User can view their notification list and mark notifications as read (Phase 2 scope)
@@ -67,29 +67,29 @@ This document provides the complete epic and story breakdown for thesis, decompo
 - NFR1: Map screen loads with lot markers and availability data within 3 seconds
 - NFR2: QR code scanning and check-in/out confirmation completes within 5 seconds
 - NFR3: API responses for CRUD operations return within 1 second under normal load
-- NFR4: current_available updates propagate to the map in real-time via Supabase Realtime
+- NFR4: current_available updates propagate to the map in near real time via FastAPI WebSocket or SSE broadcasting
 - NFR5: All API communication uses HTTPS (TLS 1.2+)
-- NFR6: User authentication and password management handled by Supabase Auth, proxied through FastAPI
-- NFR7: Authentication uses Supabase Auth JWTs. All client auth flows go through FastAPI endpoints.
+- NFR6: User authentication and password management are handled by FastAPI using secure password hashing and backend-issued tokens
+- NFR7: All client auth flows go through FastAPI endpoints. The mobile app never talks directly to the database or third-party auth services
 - NFR8: QR codes for parking sessions are unique, non-guessable, and single-use per session
-- NFR9: Role-based access control enforced at both FastAPI endpoint level and Supabase RLS at the database level.
-- NFR10: Payment data is not stored locally; payment processing delegated to Edge Functions.
-- NFR11: Backend communicates with Supabase via its official client SDK or direct PostgreSQL connection.
-- NFR12: Payment processing integrates with Stripe and/or Momo via Supabase Edge Functions.
+- NFR9: Role-based access control is enforced in FastAPI route dependencies, service-layer checks, and filtered database access patterns
+- NFR10: Payment data is not stored locally; MVP online payment is simulated in the backend and future gateway integrations live in FastAPI services
+- NFR11: Backend communicates directly with PostgreSQL using the existing backend stack and migration tooling
+- NFR12: Future payment processing integrates with Stripe and/or Momo through FastAPI services or webhook handlers
 - NFR13: Map display integrates with Mapbox as primary provider.
-- NFR14: Image storage (vehicle photos, lot covers) uses Supabase Storage.
+- NFR14: Image storage (vehicle photos, lot covers, ownership documents) uses Cloudinary via FastAPI-managed uploads.
 - NFR15: No data loss on parking sessions — check-in/check-out operations must be atomic.
-- NFR16: Booking expiration runs reliably (cron job or Supabase scheduled function).
+- NFR16: Booking expiration runs reliably through backend-managed scheduled jobs or worker execution.
 - NFR17: App handles network errors gracefully with user-friendly error messages.
 
 ### Additional Requirements
 
 - Starter Template: Backend is built upon `fastapi-boilerplate` connected via API gateways, which will define Epic 1 logic for initial setup.
 - Infrastructure setup requirement: Mobile client is primarily deployed on Expo Go for Android API 24+. Backend runs on local Docker Compose. 
-- Integration requirement: Realtime integration with Supabase for the Websocket connections to propagate `current_available`.
-- Architecture constraint: All logic must run through FastAPI server gateway, keeping the mobile client thin. Clients never talk directly to Supabase PostgREST or Auth.
-- Supabase Integration requirement: Uses service_role key on FastAPI to bypass RLS, with proper endpoint RBAC checks (RLS acts as defense-in-depth).
-- Database constraint: 23 tables defined in the ERD must be migrated to Supabase.
+- Integration requirement: Realtime integration is implemented in FastAPI using WebSocket or SSE to propagate `current_available`.
+- Architecture constraint: All logic must run through the FastAPI server gateway, keeping the mobile client thin. Clients never talk directly to PostgreSQL or Cloudinary.
+- Backend constraint: The existing `backend/` project is mandatory and must be adapted rather than replaced.
+- Database constraint: 23 tables defined in the ERD must be migrated through the backend Alembic workflow into PostgreSQL.
 
 ### UX Design Requirements
 
@@ -114,7 +114,7 @@ N/A
 * **Given** I am on the registration screen
 * **When** I enter a valid email and a secure password and submit
 * **Then** my account is created in the database atomically via Postgres Trigger
-* **And** the API uses non-blocking async calls to the Supabase client
+* **And** the API uses the existing FastAPI backend stack to create the user and issue tokens
 * **And** I am automatically logged in.
 
 #### Story 1.2: User Login

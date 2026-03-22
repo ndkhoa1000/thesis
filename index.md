@@ -8,9 +8,17 @@
 
 ## Supporting Documentation
 
-- **[usecase.md](./doc/usecase.md)** - Functional use case diagrams and actor interactions (PlantUML).
-- **[erd.md](./doc/erd.md)** - Detailed database entity-relationship diagrams and normalization rules.
-- **[reference.md](./doc/reference.md)** - Vietnamese summary of application actors, journeys, and main flows.
+- **[usecase.md](./project-docs/usecase.md)** - Functional use case diagrams and actor interactions (PlantUML).
+- **[erd.md](./project-docs/erd.md)** - Detailed database entity-relationship diagrams and normalization rules.
+- **[reference.md](./project-docs/reference.md)** - Vietnamese summary of application actors, journeys, and main flows.
+
+## Current Technical Direction
+
+- **Frontend:** React Native mobile app with Expo.
+- **Backend:** Existing FastAPI backend in `backend/`, managed with `uv` and used as the mandatory application server.
+- **Database:** PostgreSQL.
+- **Media storage:** Cloudinary.
+- **Integration rule:** Mobile communicates only with FastAPI. Supabase is excluded from the project architecture.
 
 ---
 *Generated via `bmad-index-docs`*

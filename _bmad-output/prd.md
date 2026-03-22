@@ -15,7 +15,7 @@ classification:
 techStack:
   frontend: React Native + NativeWind
   backend: FastAPI Monolith
-  database: Supabase Cloud (Managed via MCP)
+  database: PostgreSQL
 ---
 
 # Product Requirements Document - Smart Parking Management System
@@ -45,7 +45,7 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 | **Domain** | Transportation / Urban Mobility |
 | **Complexity** | Medium |
 | **Project Context** | Brownfield (existing documentation: use cases, ERD, user stories) |
-| **Tech Stack** | React Native (NativeWind+Zustand) → FastAPI Monolith → Supabase Cloud |
+| **Tech Stack** | React Native (Expo + NativeWind) → FastAPI Monolith (uv) → PostgreSQL + Cloudinary |
 | **Scope** | Thesis project — proof of concept with demo |
 
 > **Terminology note:** The PRD uses **Operator** to refer to the business entity that leases and runs a parking lot. In the ERD and database schema, the same role is modeled as the `Manager` entity with `User.role = MANAGER`. These terms are interchangeable — "Operator" is the product-facing name, "Manager" is the data-model name.
@@ -87,7 +87,7 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 **Approach:** Problem-solving MVP — prove that the core driver-attendant flow (find → check-in → check-out → pay) works end-to-end on mobile, replacing the kiosk/NFC model.
 
-**Resource:** Solo developer (thesis project). One React Native app, one FastAPI backend, one Supabase database.
+**Resource:** Solo developer (thesis project). One React Native app, one FastAPI backend already set up from `fastapi-boilerplate`, one PostgreSQL database, and Cloudinary for image storage.
 
 ### MVP Feature Set (Phase 1)
 
@@ -282,7 +282,7 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 - **FR13:** Driver can check out by having their QR code scanned by the attendant (QR is in `CHECKOUT` state)
 - **FR14:** Attendant can check out a vehicle by scanning the driver's QR code (or the session QR for walk-ins)
 - **FR15:** System calculates the parking fee based on the lot's active pricing. The `Pricing` table uses a `pricing_mode` field supporting: **SESSION** (flat-rate per session), **HOURLY**, **DAILY**, **MONTHLY**, and **CUSTOM**. MVP implements SESSION and HOURLY; other modes are Phase Expansion
-- **FR16:** System updates `current_available` count on check-in and check-out (via Supabase Realtime for instant map updates)
+- **FR16:** System updates `current_available` count on check-in and check-out and pushes fresh availability to connected clients through FastAPI-managed realtime updates
 
 ### Payment
 
@@ -337,8 +337,8 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 
 ### User Management & Authentication
 
-- **FR44:** User can register an account via Supabase Auth (email/password or Google sign-in)
-- **FR45:** User can log in via Supabase Auth and access role-appropriate features (Driver, Attendant, Operator, LotOwner, Admin). Authentication is handled client-side via the Supabase SDK
+- **FR44:** User can register an account through FastAPI using email and password. Account records are stored in PostgreSQL and issued API tokens by the backend
+- **FR45:** User can log in through FastAPI and access role-appropriate features (Driver, Attendant, Operator, LotOwner, Admin). Authentication is handled by the backend; the mobile app only stores and sends backend-issued tokens
 - **FR46:** Driver can register vehicles with license plate, type, brand, color, and photos
 
 ### Notifications (Phase 2)
@@ -353,28 +353,28 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 - **NFR1:** Map screen loads with lot markers and availability data within 3 seconds
 - **NFR2:** QR code scanning and check-in/out confirmation completes within 5 seconds
 - **NFR3:** API responses for CRUD operations return within 1 second under normal load
-- **NFR4:** `current_available` updates propagate to the map in real-time via Supabase Realtime (sub-second for connected clients)
+- **NFR4:** `current_available` updates propagate to the map in near real time via FastAPI WebSocket or SSE broadcasting (sub-second target for connected clients)
 
 ### Security
 
 - **NFR5:** All API communication uses HTTPS (TLS 1.2+)
-- **NFR6:** User authentication and password management handled by Supabase Auth, proxied through FastAPI
-- **NFR7:** Authentication uses Supabase Auth JWTs. All client auth flows (login, register, Google sign-in) go through FastAPI endpoints that proxy to Supabase Auth
+- **NFR6:** User authentication and password management are handled directly by the FastAPI backend using secure password hashing and token issuance
+- **NFR7:** All client auth flows (register, login, refresh, logout) go through FastAPI endpoints. The mobile app never talks directly to the database or any third-party auth provider
 - **NFR8:** QR codes for parking sessions are unique, non-guessable, and single-use per session
-- **NFR9:** Role-based access control enforced at both FastAPI endpoint level (`require_role()`) and Supabase RLS at the database level (defense-in-depth)
-- **NFR10:** Payment data is not stored locally; payment processing delegated to Stripe/Momo via Edge Functions
+- **NFR9:** Role-based access control is enforced at the FastAPI endpoint and service layers, with database ownership checks implemented in application queries and transaction boundaries
+- **NFR10:** Payment data is not stored locally on the device; payment processing is handled by the backend, with MVP using a simulated online flow and future gateway integrations managed in FastAPI services
 
 ### Integration
 
-- **NFR11:** Backend communicates with Supabase via its official client SDK or direct PostgreSQL connection
-- **NFR12:** Payment processing integrates with Stripe and/or Momo via Supabase Edge Functions
+- **NFR11:** Backend communicates with PostgreSQL through the existing FastAPI backend stack and migration tooling already present in the repository
+- **NFR12:** Future payment processing integrates with Stripe and/or Momo through backend service modules or webhook handlers inside FastAPI
 - **NFR13:** Map display integrates with Mapbox as primary provider; Google Maps as backup if Mapbox implementation is problematic
-- **NFR14:** Image storage (vehicle photos, lot covers) uses Supabase Storage
+- **NFR14:** Image storage (vehicle photos, lot covers, ownership documents) uses Cloudinary, with uploads brokered by FastAPI
 
 ### Reliability
 
 - **NFR15:** No data loss on parking sessions — check-in/check-out operations must be atomic
-- **NFR16:** Booking expiration runs reliably (cron job or Supabase scheduled function)
+- **NFR16:** Booking expiration runs reliably through backend-managed scheduled jobs or database-backed worker execution
 - **NFR17:** App handles network errors gracefully with user-friendly error messages
 
 ---
