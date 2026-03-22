@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from uuid6 import uuid7
 
 from ..core.db.database import Base
+from .enums import UserRole
 
 
 class User(Base):
@@ -15,9 +16,13 @@ class User(Base):
     id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True, init=False)
 
     name: Mapped[str] = mapped_column(String(30))
-    username: Mapped[str] = mapped_column(String(20), unique=True, index=True)
-    email: Mapped[str] = mapped_column(String(50), unique=True, index=True)
-    hashed_password: Mapped[str] = mapped_column(String)
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(15), default=None)
+    avatar: Mapped[str | None] = mapped_column(String(255), default=None)
+    role: Mapped[str] = mapped_column(String(20), default=UserRole.DRIVER.value)
+    is_active: Mapped[bool] = mapped_column(default=True)
 
     profile_image_url: Mapped[str] = mapped_column(String, default="https://profileimageurl.com")
     uuid: Mapped[uuid_pkg.UUID] = mapped_column(UUID(as_uuid=True), default_factory=uuid7, unique=True)
