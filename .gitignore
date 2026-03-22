@@ -1,0 +1,23 @@
+_bmad/*
+.agent/skills
+.gemini/skills
+.github/skills
+
+# Node / React Native
+node_modules/
+npm-debug.log
+yarn-error.log
+.expo/
+
+# Python FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.pytest_cache/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
