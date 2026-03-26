@@ -9,6 +9,12 @@ from .tasks import router as tasks_router
 from .tiers import router as tiers_router
 from .users import router as users_router
 
+# --- Smart Parking Domain Routers ---
+from .lots import router as lots_router
+from .sessions import router as sessions_router
+from .bookings import router as bookings_router
+from .payments import router as payments_router
+
 router = APIRouter(prefix="/v1")
 router.include_router(health_router)
 router.include_router(login_router)
@@ -18,3 +24,9 @@ router.include_router(posts_router)
 router.include_router(tasks_router)
 router.include_router(tiers_router)
 router.include_router(rate_limits_router)
+
+# --- Smart Parking Domain Routes ---
+router.include_router(lots_router)
+router.include_router(sessions_router)
+router.include_router(bookings_router)
+router.include_router(payments_router)

@@ -13,7 +13,7 @@ classification:
   complexity: medium
   projectContext: brownfield
 techStack:
-  frontend: React Native + NativeWind
+  frontend: Flutter
   backend: FastAPI Monolith
   database: PostgreSQL
 ---
@@ -41,11 +41,11 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 | Dimension | Value |
 |-----------|-------|
-| **Project Type** | Mobile App (React Native) |
+| **Project Type** | Mobile App (Flutter) |
 | **Domain** | Transportation / Urban Mobility |
 | **Complexity** | Medium |
 | **Project Context** | Brownfield (existing documentation: use cases, ERD, user stories) |
-| **Tech Stack** | React Native (Expo + NativeWind) → FastAPI Monolith (uv) → PostgreSQL + Cloudinary |
+| **Tech Stack** | Flutter → FastAPI Monolith (uv) → PostgreSQL + Cloudinary |
 | **Scope** | Thesis project — proof of concept with demo |
 
 > **Terminology note:** The PRD uses **Operator** to refer to the business entity that leases and runs a parking lot. In the ERD and database schema, the same role is modeled as the `Manager` entity with `User.role = MANAGER`. These terms are interchangeable — "Operator" is the product-facing name, "Manager" is the data-model name.
@@ -87,7 +87,7 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 **Approach:** Problem-solving MVP — prove that the core driver-attendant flow (find → check-in → check-out → pay) works end-to-end on mobile, replacing the kiosk/NFC model.
 
-**Resource:** Solo developer (thesis project). One React Native app, one FastAPI backend already set up from `fastapi-boilerplate`, one PostgreSQL database, and Cloudinary for image storage.
+**Resource:** Solo developer (thesis project). One Flutter app, one FastAPI backend already set up from `fastapi-boilerplate`, one PostgreSQL database, and Cloudinary for image storage.
 
 ### MVP Feature Set (Phase 1)
 
@@ -138,11 +138,11 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| **QR scanning reliability** | Core flow breaks if scan fails | Use proven library (expo-camera / react-native-vision-camera). Fallback: manual plate entry |
+| **QR scanning reliability** | Core flow breaks if scan fails | Use a proven Flutter scanner such as `mobile_scanner`. Fallback: manual plate entry |
 | **Real-time availability accuracy** | Driver sees wrong data, loses trust | `current_available` updated at check-in/out via API. Acceptable latency for thesis demo |
 | **Single developer bandwidth** | Can't finish all features | P1 features first. P3 features only if time allows. Thesis demo focuses on P1+P2 partial |
 | **Payment integration complexity** | Stripe/Momo requires API keys + testing | Basic mock payment for thesis. Real integration when API keys provided |
-| **Expo Go limitations** | Some native modules (NFC) won't work in Expo Go | NFC deferred to dev build phase. MVP uses QR only |
+| **Flutter plugin configuration complexity** | Some capabilities such as NFC or advanced camera integrations need platform-specific setup | Thesis MVP stays with QR-based mobile flow first; advanced plugins are deferred |
 
 ## User Journeys
 
@@ -223,11 +223,13 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 | Aspect | Decision |
 |--------|----------|
-| **Framework** | React Native (Expo) |
+| **Framework** | Flutter |
 | **Primary target** | Android (testing platform) |
 | **iOS** | Optional / future |
-| **Distribution** | Expo Go dev builds / APK — no store publishing |
+| **Distribution** | Android APK for thesis demo — no store publishing |
 | **Minimum Android** | API 24+ (Android 7.0) |
+
+Flutter is selected because it allows the same frontend codebase to be extended to Android, iOS, web, or desktop in later phases. However, to keep the thesis scope manageable, the current implementation and demo remain focused on the mobile platform.
 
 ### Device Permissions & Features
 
@@ -250,11 +252,11 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 | Phase | Type | Implementation |
 |-------|------|----------------|
 | **MVP** | In-app notifications | Query `Notification` table, display in-app notification list |
-| **Later** | Push notifications | Expo Notifications API or Firebase Cloud Messaging |
+| **Later** | Push notifications | Firebase Cloud Messaging or `flutter_local_notifications` |
 
 ### Implementation Considerations
 
-- **Expo Go compatibility** — Avoid native modules that require custom dev builds during early development. NFC will require a dev build when added.
+- **Flutter plugin setup** — Some plugins require Android and iOS configuration during integration. NFC and other advanced native capabilities remain outside the MVP and are deferred.
 - **Two app experiences in one** — Driver and Attendant are different user flows within the same app, role-switched via `User.role`. Operator/LotOwner/Admin flows also in-app (simpler CRUD screens).
 - **Core features first** — QR scanning, map, check-in/out, payment must work end-to-end before adding NFC, push notifications, biometrics.
 

@@ -85,7 +85,7 @@ This document provides the complete epic and story breakdown for thesis, decompo
 ### Additional Requirements
 
 - Starter Template: Backend is built upon `fastapi-boilerplate` connected via API gateways, which will define Epic 1 logic for initial setup.
-- Infrastructure setup requirement: Mobile client is primarily deployed on Expo Go for Android API 24+. Backend runs on local Docker Compose. 
+- Infrastructure setup requirement: Mobile client is primarily deployed as a Flutter Android build for thesis demo on Android API 24+. Backend runs on local Docker Compose. 
 - Integration requirement: Realtime integration is implemented in FastAPI using WebSocket or SSE to propagate `current_available`.
 - Architecture constraint: All logic must run through the FastAPI server gateway, keeping the mobile client thin. Clients never talk directly to PostgreSQL or Cloudinary.
 - Backend constraint: The existing `backend/` project is mandatory and must be adapted rather than replaced.
