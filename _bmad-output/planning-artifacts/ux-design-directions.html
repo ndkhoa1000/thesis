@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Parking - Design Directions</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&display=swap');
+        body { font-family: 'Inter', sans-serif; margin: 0; padding: 40px; background: #e5e7eb; display: flex; gap: 80px; justify-content: center; align-items: center; min-height: 100vh;}
+        
+        .direction-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px;}
+        .direction-title { font-size: 24px; font-weight: 900; color: #1f2937; text-align: center;}
+        .direction-desc { font-size: 16px; color: #4b5563; max-width: 375px; text-align: center;}
+
+        .phone { width: 375px; height: 812px; border-radius: 40px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); position: relative; border: 12px solid #1f2937; background: black;}
+        
+        /* App 1: Attendant (Dark, Dense, Tech Blue / Green flash) */
+        .attendant-app { background: #121212; color: white; display: flex; flex-direction: column; height: 100%; transition: background 0.1s; }
+        .a-header { padding: 60px 20px 20px; text-align: center; background: #1A73E8; font-weight: 900; font-size: 24px; letter-spacing: 2px; }
+        .a-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; text-align: center; }
+        .a-plate { font-size: 56px; font-weight: 900; letter-spacing: -2px; line-height: 1; margin: 20px 0; }
+        .a-price { font-size: 40px; color: #00E676; font-weight: 900; }
+        .a-swipe-zone { background: #222; padding: 40px 20px; margin-top: auto; text-align: center; border-top: 1px solid #333;}
+        .a-btn { background: #333; padding: 24px; text-align: center; font-size: 20px; font-weight: 900; cursor: pointer; user-select: none; border-radius: 100px; border: 2px solid #555;}
+        
+        /* The Extreme Visual State */
+        .flash-green { background: #00E676 !important; color: black !important; }
+        .flash-green * { color: black !important; background: transparent !important; border-color: transparent !important;}
+
+        /* App 2: Driver (Light, Airy, Floating) */
+        .driver-app { background: #f3f4f6; color: #1f2937; position: relative; height: 100%; }
+        .d-header { position: absolute; top: 0; left: 0; right: 0; padding: 60px 24px 20px; z-index: 10;}
+        .d-search { background: white; padding: 16px 20px; border-radius: 100px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-weight: 600; color: #6b7280; display: flex; align-items: center; gap: 12px;}
+        .d-search-icon { width: 20px; height: 20px; background: #1A73E8; border-radius: 50%; opacity: 0.5;}
+        
+        .d-map { background: #e0e7ff; height: 100%; width: 100%; display: flex; justify-content: center; align-items: center; position: absolute; top:0; left:0;}
+        .map-lines { position: absolute; width: 100%; height: 100%; background-image: radial-gradient(#cbd5e1 2px, transparent 2px); background-size: 30px 30px;}
+        
+        .d-pin { position: absolute; width: 48px; height: 48px; background: #00E676; border-radius: 50% 50% 50% 0; border: 4px solid white; box-shadow: 0 8px 15px rgba(0,0,0,0.15); display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 18px; color: white; transform: rotate(-45deg); cursor: pointer; transition: transform 0.2s;}
+        .d-pin span { transform: rotate(45deg); }
+        .d-pin:hover { transform: rotate(-45deg) scale(1.1); }
+        .d-pin.full { background: #D50000; top: 35%; left: 55%; }
+        .d-pin.avail { top: 50%; left: 30%; background: #1A73E8; z-index: 5;}
+        
+        .d-bottom-sheet { position: absolute; bottom: 30px; left: 24px; right: 24px; background: white; padding: 24px; border-radius: 32px; box-shadow: 0 20px 40px rgba(0,0,0,0.15); z-index: 10;}
+        .d-tag { display: inline-block; background: #eff6ff; color: #1A73E8; font-size: 12px; font-weight: 900; padding: 6px 12px; border-radius: 100px; margin-bottom: 12px;}
+        .d-title { font-size: 24px; font-weight: 900; margin-bottom: 8px; letter-spacing: -0.5px;}
+        .d-sub { color: #6b7280; margin-bottom: 24px; font-size: 15px; font-weight: 600;}
+        .d-btn { background: #1A73E8; color: white; padding: 18px; border-radius: 16px; text-align: center; font-weight: 900; font-size: 18px; cursor: pointer; transition: background 0.2s; box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);}
+        .d-btn:hover { background: #0F62FE; }
+    </style>
+</head>
+<body>
+
+    <!-- Direction 1: Attendant Core Experience -->
+    <div class="direction-wrapper">
+        <div class="direction-title">Direction A: Operations App</div>
+        <div class="direction-desc">Dense, Edge-to-Edge Dark Mode with Extreme Visual States. Click "SIMULATE SCAN" to see the 5-sec SLA flow.</div>
+        <div class="phone">
+            <div class="attendant-app" id="attendant">
+                <div class="a-header" id="a-header">STANDBY MODE</div>
+                <div class="a-content">
+                    <div style="color: #666; font-size: 20px; font-weight: 600;" id="a-status-text">SCAN QR / NFC</div>
+                    <div class="a-plate" id="plate">--</div>
+                    <div class="a-price" id="price"></div>
+                </div>
+                <div class="a-swipe-zone">
+                    <div class="a-btn" onclick="simulateScan()">TAP TO SIMULATE SCAN</div>
+                    <div style="color: #666; font-size: 14px; font-weight: 600; margin-top: 16px;">(Imagine swiping left/right in real app)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Direction 2: Driver Core Experience -->
+    <div class="direction-wrapper">
+        <div class="direction-title">Direction B: Consumer App</div>
+        <div class="direction-desc">Airy, Floating White Space with Color-Coded Pins and Massive Bottom Actions.</div>
+        <div class="phone">
+            <div class="driver-app">
+                <div class="d-map">
+                    <div class="map-lines"></div>
+                    <div class="d-pin avail"><span>24</span></div>
+                    <div class="d-pin full"><span>0</span></div>
+                </div>
+                
+                <div class="d-header">
+                    <div class="d-search">
+                        <div class="d-search-icon"></div>
+                        Where to park?
+                    </div>
+                </div>
+
+                <div class="d-bottom-sheet">
+                    <div class="d-tag">AVAILABLE</div>
+                    <div class="d-title">Vincom Center Lot</div>
+                    <div class="d-sub">500m away • 5,000đ/hour</div>
+                    <div class="d-btn">Navigate & Book</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function simulateScan() {
+            const app = document.getElementById('attendant');
+            const header = document.getElementById('a-header');
+            const plate = document.getElementById('plate');
+            const price = document.getElementById('price');
+            const statusText = document.getElementById('a-status-text');
+            
+            // Multisensory Explosion Simulation (Green Flash)
+            app.classList.add('flash-green');
+            header.innerText = 'CHECK-IN SUCCESS';
+            statusText.innerText = 'VEHICLE RECORDED';
+            plate.innerText = '59A-123.45';
+            price.innerText = '0đ';
+            
+            // Cooldown UI (Greyed out)
+            setTimeout(() => {
+                app.classList.remove('flash-green');
+                app.style.background = '#222';
+                header.style.background = '#444';
+                header.innerText = 'COOLDOWN (2s)';
+                statusText.innerText = 'LOCKING LENS...';
+                
+                // Return to Ready (Standby Mode)
+                setTimeout(() => {
+                    app.style.background = '#121212';
+                    header.style.background = '#1A73E8';
+                    header.innerText = 'STANDBY MODE';
+                    statusText.innerText = 'SCAN QR / NFC';
+                    plate.innerText = '--';
+                    price.innerText = '';
+                }, 2000);
+            }, 600); // Hold flash for 600ms
+        }
+    </script>
+</body>
+</html>
