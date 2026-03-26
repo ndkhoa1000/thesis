@@ -15,13 +15,14 @@ so that I can lease lots and manage parking operations without creating a separa
 1. Given I am authenticated with a public account, when I open the Operator application flow, then I can submit the business and verification information required by the platform.
 2. The system stores the Operator application as a pending review tied to my existing public account instead of creating a second public user account.
 3. An Admin can review the pending Operator application and approve or reject it.
-4. After approval, the same public account gains Operator capability and can access Operator-only features.
+4. After approval, the same public account gains Operator capability through a linked `manager` record and can access Operator-only features, with `user.role` allowed to move to `MANAGER` as the primary public workspace.
 5. The approved Operator account can later create separate Attendant accounts without converting the public account itself into an Attendant login.
 6. If the application is rejected, the account remains usable as Driver and the rejection result is visible to the applicant.
 
 ## Implementation Clarifications
 
 - This story extends the existing public account model. Do not create a second public login for Operator.
+- The current schema represents Operator capability on the same public identity by adding a `manager` row tied to the same `user`; `user.role` may be updated to `MANAGER` as the primary public workspace, but existing public capabilities must remain attached to that same `user`.
 - The approval workflow should fit the same FastAPI-owned authentication and RBAC model used elsewhere in the project.
 - The application record should preserve enough business-verification metadata for Admin review and future audits.
 - This story should enable Operator capability expansion only; it should not yet implement lot configuration, pricing, or attendant account-provisioning screens from Epic 3.
@@ -37,7 +38,7 @@ so that I can lease lots and manage parking operations without creating a separa
 - [ ] Task 2: Implement backend persistence and review flow (AC: 2, 3, 4, 6)
   - [ ] Add the required API endpoints for creating an Operator application and for Admin review actions.
   - [ ] Persist application state with at least pending, approved, and rejected statuses.
-  - [ ] Update the same public account with Operator capability only after successful Admin approval.
+  - [ ] Update the same public account with Operator capability only after successful Admin approval by creating the linked `manager` record on the same `user` identity.
   - [ ] Keep approval and capability-grant operations atomic to avoid half-approved states.
 
 - [ ] Task 3: Extend authorization and future-operator readiness (AC: 4, 5)
@@ -66,7 +67,7 @@ so that I can lease lots and manage parking operations without creating a separa
 ### Domain Constraints To Respect
 
 - Public signup remains Driver-first; this story must not reopen account creation semantics.
-- Operator is a capability added to the same public account after review.
+- Operator is a capability added to the same public account after review through the `manager` table, while `user.role` serves as the current primary public workspace.
 - Admin approval is required before any Operator-only action becomes available.
 - Attendant remains a separate account and must not be represented as a mode-switch on the Operator's public account.
 

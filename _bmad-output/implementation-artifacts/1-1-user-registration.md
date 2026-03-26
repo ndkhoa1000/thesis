@@ -1,6 +1,6 @@
 # Story 1.1: User Registration
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,37 +28,37 @@ so that I can create a personal profile on the smart parking platform.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define the thesis-specific registration contract on top of the existing backend auth stack (AC: 1, 2, 3, 4)
-  - [ ] Add or update request/response schemas for a mobile-friendly registration endpoint under `backend/src/app/schemas` and `backend/src/app/core/schemas.py`.
-  - [ ] Decide how `username` and `name` are satisfied for MVP registration: generated server-side, derived from email, or made optional through schema/model changes.
-  - [ ] Ensure the response model excludes sensitive fields and exposes only the auth payload and any safe user summary needed immediately after signup.
+- [x] Task 1: Define the thesis-specific registration contract on top of the existing backend auth stack (AC: 1, 2, 3, 4)
+  - [x] Add or update request/response schemas for a mobile-friendly registration endpoint under `backend/src/app/schemas` and `backend/src/app/core/schemas.py`.
+  - [x] Decide how `username` and `name` are satisfied for MVP registration: generated server-side, derived from email, or made optional through schema/model changes.
+  - [x] Ensure the response model excludes sensitive fields and exposes only the auth payload and any safe user summary needed immediately after signup.
 
-- [ ] Task 2: Implement backend registration using existing reusable auth pieces instead of rewriting them (AC: 1, 2, 4)
-  - [ ] Add `/api/v1/auth/register` or an equivalent auth-owned endpoint in `backend/src/app/api/v1` while preserving the existing router organization.
-  - [ ] Register any new auth route module in `backend/src/app/api/v1/__init__.py` so the endpoint is reachable through the application router.
-  - [ ] Reuse `crud_users.exists`, `crud_users.create`, `get_password_hash`, `create_access_token`, and `create_refresh_token`.
-  - [ ] Persist users with safe defaults for thesis MVP such as `role=DRIVER` and `is_active=True`.
-  - [ ] Create the related `driver` row atomically with the new user row so downstream driver-owned features do not fail on missing profile records.
-  - [ ] Return duplicate email and duplicate username failures with the same error style already used by the backend exception layer.
-  - [ ] Do not break the existing `/api/v1/user` boilerplate endpoint unless the implementation intentionally migrates it with test coverage.
+- [x] Task 2: Implement backend registration using existing reusable auth pieces instead of rewriting them (AC: 1, 2, 4)
+  - [x] Add `/api/v1/auth/register` or an equivalent auth-owned endpoint in `backend/src/app/api/v1` while preserving the existing router organization.
+  - [x] Register any new auth route module in `backend/src/app/api/v1/__init__.py` so the endpoint is reachable through the application router.
+  - [x] Reuse `crud_users.exists`, `crud_users.create`, `get_password_hash`, `create_access_token`, and `create_refresh_token`.
+  - [x] Persist users with safe defaults for thesis MVP such as `role=DRIVER` and `is_active=True`.
+  - [x] Create the related `driver` row atomically with the new user row so downstream driver-owned features do not fail on missing profile records.
+  - [x] Return duplicate email and duplicate username failures with the same error style already used by the backend exception layer.
+  - [x] Do not break the existing `/api/v1/user` boilerplate endpoint unless the implementation intentionally migrates it with test coverage.
 
-- [ ] Task 3: Resolve token transport so Flutter can stay aligned with architecture (AC: 2, 3)
-  - [ ] Compare the current login implementation, which returns an access token and stores refresh token in a secure cookie, against the architecture requirement that mobile stores auth tokens on-device.
-  - [ ] Pick one consistent strategy for both register and login before coding the mobile flow.
-  - [ ] If keeping cookie-based refresh, confirm the Flutter client can capture and reuse that cookie intentionally and make the cookie security settings environment-aware for local HTTP development.
-  - [ ] If switching to device-stored refresh tokens, update both register and login contracts together instead of patching registration only.
+- [x] Task 3: Resolve token transport so Flutter can stay aligned with architecture (AC: 2, 3)
+  - [x] Compare the current login implementation, which returns an access token and stores refresh token in a secure cookie, against the architecture requirement that mobile stores auth tokens on-device.
+  - [x] Pick one consistent strategy for both register and login before coding the mobile flow.
+  - [x] If keeping cookie-based refresh, confirm the Flutter client can capture and reuse that cookie intentionally and make the cookie security settings environment-aware for local HTTP development.
+  - [x] If switching to device-stored refresh tokens, update both register and login contracts together instead of patching registration only.
 
-- [ ] Task 4: Add the minimum mobile auth foundation required for registration and automatic login (AC: 1, 3)
-  - [ ] Add the dependencies needed for backend auth integration, expected at minimum to include `dio` and `flutter_secure_storage`.
-  - [ ] Introduce a minimal mobile auth structure under `mobile/lib` for API client, token persistence, and registration flow.
-  - [ ] Replace the single-screen bootstrap entry behavior with an auth gate that can show a registration screen first and enter an authenticated placeholder state after success.
-  - [ ] Keep the existing Mapbox proof-of-concept runnable, but do not let Story 1.1 expand into full map or lot integration.
+- [x] Task 4: Add the minimum mobile auth foundation required for registration and automatic login (AC: 1, 3)
+  - [x] Add the dependencies needed for backend auth integration, expected at minimum to include `dio` and `flutter_secure_storage`.
+  - [x] Introduce a minimal mobile auth structure under `mobile/lib` for API client, token persistence, and registration flow.
+  - [x] Replace the single-screen bootstrap entry behavior with an auth gate that can show a registration screen first and enter an authenticated placeholder state after success.
+  - [x] Keep the existing Mapbox proof-of-concept runnable, but do not let Story 1.1 expand into full map or lot integration.
 
-- [ ] Task 5: Test the backend and mobile registration flow at the right layers (AC: 1, 2, 3)
-  - [ ] Add backend tests for successful registration, duplicate email, duplicate username, password hashing, driver-row provisioning, and auth token issuance.
-  - [ ] Reuse the current testing style in `backend/tests/test_user.py` and shared fixtures in `backend/tests/conftest.py` where practical.
-  - [ ] Add at least one mobile test for registration form behavior or auth service success handling.
-  - [ ] Verify the final backend contract from Swagger/OpenAPI before wiring the mobile request payload.
+- [x] Task 5: Test the backend and mobile registration flow at the right layers (AC: 1, 2, 3)
+  - [x] Add backend tests for successful registration, duplicate email, duplicate username, password hashing, driver-row provisioning, and auth token issuance.
+  - [x] Reuse the current testing style in `backend/tests/test_user.py` and shared fixtures in `backend/tests/conftest.py` where practical.
+  - [x] Add at least one mobile test for registration form behavior or auth service success handling.
+  - [x] Verify the final backend contract from Swagger/OpenAPI before wiring the mobile request payload.
 
 ## Dev Notes
 
@@ -168,6 +168,9 @@ GPT-5.4
 
 - Backend auth baseline reviewed before story creation.
 - Epic wording conflict on "Postgres Trigger" reviewed against architecture and ERD.
+- Backend tests executed in compose `pytest` service with editable project install and `pytest-asyncio`.
+- Backend health and registration were smoke-tested inside the running `web` container using `fastapi.testclient`.
+- Flutter auth bootstrap was verified with `flutter test test/widget_test.dart`.
 
 ### Completion Notes List
 
@@ -176,7 +179,31 @@ GPT-5.4
 - Story includes token transport decision as an explicit task to prevent mobile/backend contract drift.
 - Story validation added missing guidance for router registration, `driver` subtable provisioning, local cookie behavior, and markdown link references.
 - Story clarified that public signup creates Driver capability only; LotOwner and Operator upgrades are deferred to separate follow-up stories.
+- Implemented `/api/v1/auth/register` with generated profile data, atomic `user` + `driver` creation, and immediate token return.
+- Updated login/refresh/logout token handling toward a mobile-friendly token-body contract while preserving refresh fallback compatibility.
+- Added backend auth coverage in `backend/tests/test_auth.py` and verified it alongside the existing `backend/tests/test_user.py` suite in container.
+- Added a minimal Flutter auth shell with Dio API client, secure token store, auth gate, register screen, and authenticated placeholder preserving the map proof-of-concept.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/1-1-user-registration.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/auth.py`
+- `backend/src/app/api/v1/__init__.py`
+- `backend/src/app/api/v1/login.py`
+- `backend/src/app/api/v1/logout.py`
+- `backend/src/app/core/schemas.py`
+- `backend/src/app/schemas/user.py`
+- `backend/tests/test_auth.py`
+- `mobile/pubspec.yaml`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/core/network/api_client.dart`
+- `mobile/lib/src/core/auth/token_store.dart`
+- `mobile/lib/src/features/auth/data/auth_service.dart`
+- `mobile/lib/src/features/auth/presentation/auth_gate.dart`
+- `mobile/lib/src/features/auth/presentation/register_screen.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-26: Implemented Story 1.1 across backend auth registration and Flutter auth bootstrap; verified backend tests, health smoke test, registration smoke test, and Flutter widget test.

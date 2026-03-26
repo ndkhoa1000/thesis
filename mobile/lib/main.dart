@@ -3,17 +3,29 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'src/core/auth/token_store.dart';
+import 'src/core/network/api_client.dart';
+import 'src/features/auth/data/auth_service.dart';
+import 'src/features/auth/presentation/auth_gate.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
-  final accessToken = dotenv.env['ACCESS_TOKEN'];
+  final mapboxToken =
+      dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dotenv.env['ACCESS_TOKEN'];
 
-  if (accessToken == null || accessToken.isEmpty) {
-    throw StateError('Missing ACCESS_TOKEN in .env');
+  if (mapboxToken != null && mapboxToken.isNotEmpty) {
+    MapboxOptions.setAccessToken(mapboxToken);
   }
 
-  MapboxOptions.setAccessToken(accessToken);
-  runApp(const MyApp());
+  runApp(
+    MyApp(
+      authService: BackendAuthService(
+        apiClient: ApiClient(),
+        tokenStore: SecureTokenStore(),
+      ),
+    ),
+  );
 }
 
 // ======================= MOCK DATA =======================
@@ -75,7 +87,9 @@ final List<ParkingLot> mockParkingLots = [
 // =========================================================
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.authService});
+
+  final AuthService authService;
 
   @override
   Widget build(BuildContext context) {
@@ -85,8 +99,37 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
-      home: const MapScreen(),
+      home: AuthGate(
+        authService: authService,
+        authenticatedBuilder: (_) => const AuthenticatedHome(),
+      ),
     );
+  }
+}
+
+class AuthenticatedHome extends StatelessWidget {
+  const AuthenticatedHome({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final mapboxToken =
+        dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dotenv.env['ACCESS_TOKEN'];
+    if (mapboxToken == null || mapboxToken.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('ParkingApp')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Đăng ký thành công. Hãy thêm MAPBOX_ACCESS_TOKEN vào mobile/.env để bật bản đồ thử nghiệm.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return const MapScreen();
   }
 }
 

@@ -49,13 +49,15 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 | **Scope** | Thesis project — proof of concept with demo |
 
 > **Terminology note:** The PRD uses **Operator** to refer to the business entity that leases and runs a parking lot. In the ERD and database schema, the same role is modeled as the `Manager` entity with `User.role = MANAGER`. These terms are interchangeable — "Operator" is the product-facing name, "Manager" is the data-model name.
+>
+> **Schema compatibility note:** The current backend schema stores one `user` identity plus role-specific rows in tables such as `driver`, `lot_owner`, and `manager`. In this document, "same account" means the same `user` credentials and identity. Public capabilities are granted by adding those role-specific rows to the same `user`, while `user.role` remains the primary active public workspace for compatibility with the current schema and existing RBAC helpers.
 
 ## Roles & Account Model
 
-- **Driver (default public account):** Any user who registers through the public app flow is created as a `Driver` by default.
-- **LotOwner capability:** A public account that starts as `Driver` can later apply to become a `LotOwner`. Once approved, the same account gains the ability to register lots, submit ownership documents, and post lots for lease.
-- **Operator capability:** A public account that starts as `Driver` can later apply to become an `Operator`. Once approved, the same account gains the ability to lease lots, configure operations, and manage attendants.
-- **Shared public-account model:** `Driver`, `LotOwner`, and `Operator` are treated as capabilities on the same public account lifecycle. They are not modeled as isolated login identities that require separate credentials.
+- **Driver (default public account):** Any user who registers through the public app flow is created as a `Driver` by default, with `user.role = DRIVER` and a linked `driver` row.
+- **LotOwner capability:** A public account that starts as `Driver` can later apply to become a `LotOwner`. Once approved, the same `user` identity gains a linked `lot_owner` record and may switch `user.role` to `LOT_OWNER` as its current primary public workspace without losing Driver access.
+- **Operator capability:** A public account that starts as `Driver` can later apply to become an `Operator`. Once approved, the same `user` identity gains a linked `manager` record and may switch `user.role` to `MANAGER` as its current primary public workspace without losing Driver access.
+- **Shared public-account model:** `Driver`, `LotOwner`, and `Operator` share one credentialed public `user` account. The capability set is inferred from role-specific records tied to that `user`, while `user.role` tracks the currently active primary public workspace for compatibility with the existing schema.
 - **Attendant account:** `Attendant` is always a separate account created and provisioned by an `Operator`. It is not added as an extra capability on the public Driver/LotOwner/Operator account. A user acting as an attendant must sign out and sign back in with dedicated Attendant credentials.
 - **Admin account:** `Admin` is always a separate privileged account managed outside the public signup flow.
 
@@ -189,7 +191,7 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 **Journey:**
 1. Lan already has a public account and applies to become an Operator → Admin approves the operator capability.
-2. Lease approved by Admin → Lan accesses her lot in the operator workspace of the same account.
+2. Lease approved by Admin → Lan accesses her lot in the operator workspace of the same public identity, resolved through the linked `manager` capability record and current primary role.
 3. Configures lot: sets capacity (60 motorbikes, 10 cars), hours (6AM–10PM), uploads photos, writes description and policies.
 4. Sets pricing: motorbike 3,000₫/session (day), 8,000₫/session (night); car 15,000₫/hr.
 5. A holiday is coming → posts announcement: "Tết holiday hours: 8AM–6PM, expect high demand."
@@ -203,7 +205,7 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 **Journey:**
 1. Registers on the platform as a public user and starts as a Driver account.
 2. Applies to become a LotOwner → uploads ownership proof and required business documents.
-3. Admin approves the LotOwner capability on the same account.
+3. Admin approves the LotOwner capability on the same `user` identity by attaching the `lot_owner` record and updating the current primary public role as needed.
 4. Registers his parking lot: address, coordinates, photos, description → submits for Admin approval.
 5. Admin approves → lot appears on the platform with APPROVED status.
 6. Posts the lot for lease: monthly fee 15M₫, minimum 6-month contract.

@@ -1,9 +1,24 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from ..core.schemas import PersistentDeletion, TimestampSchema, UUIDSchema
+from ..models.enums import UserRole
+
+
+def _validate_password_strength(password: str) -> str:
+    if len(password) < 8:
+        raise ValueError("Password must be at least 8 characters long")
+    if not any(character.islower() for character in password):
+        raise ValueError("Password must include at least one lowercase letter")
+    if not any(character.isupper() for character in password):
+        raise ValueError("Password must include at least one uppercase letter")
+    if not any(character.isdigit() for character in password):
+        raise ValueError("Password must include at least one digit")
+    if not any(not character.isalnum() for character in password):
+        raise ValueError("Password must include at least one special character")
+    return password
 
 
 class UserBase(BaseModel):
@@ -32,11 +47,30 @@ class UserRead(BaseModel):
 class UserCreate(UserBase):
     model_config = ConfigDict(extra="forbid")
 
-    password: Annotated[str, Field(pattern=r"^.{8,}|[0-9]+|[A-Z]+|[a-z]+|[^a-zA-Z0-9]+$", examples=["Str1ngst!"])]
+    password: Annotated[str, Field(min_length=8, examples=["Str1ngst!"])]
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return _validate_password_strength(value)
 
 
 class UserCreateInternal(UserBase):
     hashed_password: str
+    role: str = UserRole.DRIVER.value
+    is_active: bool = True
+
+
+class UserRegister(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: Annotated[EmailStr, Field(examples=["user.userson@example.com"])]
+    password: Annotated[str, Field(min_length=8, examples=["Str1ngst!"])]
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        return _validate_password_strength(value)
 
 
 class UserUpdate(BaseModel):

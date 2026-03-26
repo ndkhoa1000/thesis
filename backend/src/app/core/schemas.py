@@ -62,7 +62,13 @@ class PersistentDeletion(BaseModel):
 # -------------- token --------------
 class Token(BaseModel):
     access_token: str
+    refresh_token: str | None = None
     token_type: str
+    user: dict[str, Any] | None = None
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 
 class TokenData(BaseModel):

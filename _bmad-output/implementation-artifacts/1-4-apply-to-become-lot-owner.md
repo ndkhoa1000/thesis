@@ -15,12 +15,13 @@ so that I can register parking lots and post them for lease without creating a s
 1. Given I am authenticated with a public account, when I open the LotOwner application flow, then I can submit the ownership and verification information required by the platform.
 2. The system stores the LotOwner application as a pending review tied to my existing public account instead of creating a second public user account.
 3. An Admin can review the pending LotOwner application and approve or reject it.
-4. After approval, the same public account gains LotOwner capability and can access LotOwner-only features.
+4. After approval, the same public account gains LotOwner capability through a linked `lot_owner` record and can access LotOwner-only features, with `user.role` allowed to move to `LOT_OWNER` as the primary public workspace.
 5. If the application is rejected, the account remains usable as Driver and the rejection result is visible to the applicant.
 
 ## Implementation Clarifications
 
 - This story extends the existing public account model. Do not create a second public login for LotOwner.
+- The current schema represents capability on the same public identity by adding a `lot_owner` row tied to the same `user`; `user.role` may be updated to `LOT_OWNER` as the primary public workspace, but the existing `driver` capability must not be deleted.
 - The approval workflow should fit the same FastAPI-owned authentication and RBAC model used elsewhere in the project.
 - The application record should preserve enough document and status metadata for Admin review and future audits.
 - This story should enable capability expansion only; it should not yet implement the full parking-lot registration UI from Epic 2.
@@ -36,7 +37,7 @@ so that I can register parking lots and post them for lease without creating a s
 - [ ] Task 2: Implement backend persistence and review flow (AC: 2, 3, 4, 5)
   - [ ] Add the required API endpoints for creating a LotOwner application and for Admin review actions.
   - [ ] Persist application state with at least pending, approved, and rejected statuses.
-  - [ ] Update the same public account with LotOwner capability only after successful Admin approval.
+  - [ ] Update the same public account with LotOwner capability only after successful Admin approval by creating the linked `lot_owner` record on the same `user` identity.
   - [ ] Keep approval and capability-grant operations atomic to avoid half-approved states.
 
 - [ ] Task 3: Extend authorization and account resolution rules (AC: 3, 4)
@@ -65,7 +66,7 @@ so that I can register parking lots and post them for lease without creating a s
 ### Domain Constraints To Respect
 
 - Public signup remains Driver-first; this story must not reopen account creation semantics.
-- LotOwner is a capability added to the same public account after review.
+- LotOwner is a capability added to the same public account after review through the `lot_owner` table, while `user.role` serves as the current primary public workspace.
 - Admin approval is required before any LotOwner-only action becomes available.
 - Do not use this story to implement separate Admin provisioning or Attendant-account behavior.
 

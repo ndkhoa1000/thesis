@@ -41,6 +41,8 @@ The system uses a three-part architecture:
 ```
 
 > **Terminology:** “Operator” is the product term. The data model may still use `Manager` for the same business role.
+>
+> **Capability-model note:** Public-user experiences are modeled on one shared `user` identity. The current schema does not store a list of capabilities on the `user` row itself. Instead, public capabilities are represented by linked rows in role-specific tables such as `driver`, `lot_owner`, and `manager`, while `user.role` stores the current primary public workspace for compatibility with the existing schema and route guards.
 
 ---
 
@@ -73,7 +75,7 @@ Suggested mobile libraries remain:
 The backend in [backend](../backend) is mandatory and becomes the system entry point for:
 
 - Authentication and token lifecycle
-- Role-based authorization
+- Capability-aware authorization built on top of the current primary-role field
 - Parking lot search and detail APIs
 - Check-in and check-out workflows
 - Booking expiration and slot accounting
@@ -82,6 +84,13 @@ The backend in [backend](../backend) is mandatory and becomes the system entry p
 - Realtime updates over WebSocket or SSE
 
 The backend is already scaffolded from `fastapi-boilerplate`. The implementation strategy is to **reuse the existing project structure** and replace generic starter-domain modules with parking-domain modules incrementally.
+
+Public-account resolution must follow these rules:
+
+- One public `user` identity can accumulate multiple public capabilities over time.
+- The capability set is derived from linked `driver`, `lot_owner`, and `manager` rows.
+- `user.role` is retained as the current primary public workspace to stay compatible with the existing schema and role checks.
+- `Attendant` and `Admin` remain separate-account flows and are not part of the shared public-capability model.
 
 ### 2.3 Database
 
@@ -120,7 +129,11 @@ Authentication is backend-owned.
 - FastAPI issues access and refresh tokens.
 - The mobile client stores tokens with `flutter_secure_storage`.
 
-Authorization is enforced in FastAPI via role-aware dependencies such as `get_current_user()` and `require_role()`.
+Authorization is enforced in FastAPI through identity checks plus capability resolution.
+
+- For the current schema, `user.role` remains the primary-role shortcut used by existing dependencies.
+- Public-account authorization should progressively evolve toward checking the linked capability rows (`driver`, `lot_owner`, `manager`) instead of treating `user.role` as the complete capability set.
+- `Attendant` and `Admin` authorization remains exclusive-role based because those are separate account types.
 
 **Security principles:**
 

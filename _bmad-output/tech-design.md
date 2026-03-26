@@ -100,20 +100,46 @@ The following operations must be transactional:
 
 Authentication is handled fully by FastAPI.
 
+### 4.0 Account and Capability Model
+
+The auth design must stay compatible with the current backend schema.
+
+- One credentialed public `user` identity is the base account for public users.
+- Public capabilities are represented by linked rows in `driver`, `lot_owner`, and `manager` tables.
+- `user.role` remains the current primary public workspace used by existing RBAC helpers and compatibility checks.
+- `Attendant` and `Admin` remain separate account types with separate login sessions; they are not part of the shared public-capability model.
+
 ### 4.1 Registration
 
 1. Client submits email and password to `/auth/register`.
 2. FastAPI validates uniqueness and password policy.
-3. FastAPI hashes password and creates the user row.
-4. Optional role-profile rows are created depending on onboarding flow.
+3. FastAPI hashes password and creates the `user` row with `user.role = DRIVER`.
+4. FastAPI creates the linked `driver` row on the same public identity.
 5. FastAPI returns access and refresh tokens.
 
 ### 4.2 Login
 
 1. Client posts credentials to `/auth/login`.
 2. FastAPI verifies password hash.
-3. FastAPI returns signed tokens.
-4. Mobile stores tokens in `flutter_secure_storage`.
+3. FastAPI resolves the authenticated identity as one `user` plus its linked capability rows.
+4. FastAPI returns signed tokens together with a safe user summary and the current primary role.
+5. Mobile stores tokens in `flutter_secure_storage`.
+
+Login response design should support later workspace-aware UX:
+
+- `user.role` indicates the current primary public workspace for compatibility with existing route guards.
+- Presence of linked `driver`, `lot_owner`, and `manager` rows determines which public workspaces the user is allowed to enter.
+- `Attendant` and `Admin` logins stay exclusive-role sessions and do not participate in public workspace switching.
+
+### 4.2.1 Workspace Resolution
+
+After login, the mobile client should determine the first screen from the account model:
+
+1. If the account is `ATTENDANT` or `ADMIN`, route to the dedicated attendant or admin flow.
+2. Otherwise treat the account as a public identity.
+3. Use `user.role` as the default public workspace on entry.
+4. Allow switching only to public workspaces backed by linked capability rows on the same `user` identity.
+5. Do not require re-authentication when switching between public Driver, LotOwner, and Operator workspaces on the same identity.
 
 ### 4.3 Authorization
 
@@ -128,6 +154,11 @@ Authorization is enforced in:
 1. route dependencies
 2. service-layer ownership checks
 3. filtered repository queries
+
+Authorization rules should evolve in two layers:
+
+- Compatibility layer: existing code may still read `user.role` for the current primary workspace.
+- Capability layer: public-role access should increasingly verify linked `driver`, `lot_owner`, and `manager` records on the same `user` identity instead of assuming `user.role` is the full capability set.
 
 ---
 

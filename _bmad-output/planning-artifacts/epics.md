@@ -128,8 +128,8 @@ N/A
 **Acceptance Criteria:**
 * **Given** I am on the login screen
 * **When** I enter my correct email and password
-* **Then** I am authenticated and navigated to the workspace allowed by that account type
-* **And** public accounts can access Driver, LotOwner, and Operator capabilities granted to the same account
+* **Then** I am authenticated as one public `user` identity and navigated to the workspace indicated by its current primary role
+* **And** public accounts can access any approved Driver, LotOwner, and Operator workspaces linked to that same `user` identity through capability records
 * **And** Attendant and Admin accounts log in through separate credentials rather than switching from a public account session.
 
 #### Story 1.3: Manage License Plates
@@ -151,7 +151,7 @@ N/A
 * **Given** I am authenticated with a public account
 * **When** I submit the required ownership and verification documents
 * **Then** the system creates a pending LotOwner application linked to my existing account
-* **And** after Admin approval, my same account gains LotOwner capability.
+* **And** after Admin approval, the same `user` identity gains a linked `lot_owner` capability record and may update `user.role` to `LOT_OWNER` as its primary public workspace.
 
 #### Story 1.5: Apply to Become Operator
 **As a** Driver,
@@ -162,7 +162,7 @@ N/A
 * **Given** I am authenticated with a public account
 * **When** I submit the required business and verification documents
 * **Then** the system creates a pending Operator application linked to my existing account
-* **And** after Admin approval, my same account gains Operator capability.
+* **And** after Admin approval, the same `user` identity gains a linked `manager` capability record and may update `user.role` to `MANAGER` as its primary public workspace.
 
 ### Epic 2: Platform Inventory & Approvals
 **Goal:** Lot Owners can register their properties and Admin can approve them, establishing the supply of parking lots.
