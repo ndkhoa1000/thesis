@@ -1,6 +1,6 @@
 # Story 1.2: User Login
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,32 +28,32 @@ so that I can access the parking platform features securely.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define the login and session contract for the shared public-account model (AC: 1, 2, 3, 5)
-  - [ ] Confirm the login response shape includes token data plus a safe user summary suitable for mobile session restoration.
-  - [ ] Decide how capability availability is exposed for public users: explicit capability flags, linked-profile summary, or equivalent typed fields.
-  - [ ] Keep the contract compatible with the current `user.role` field while avoiding the assumption that it is the complete capability set.
+- [x] Task 1: Define the login and session contract for the shared public-account model (AC: 1, 2, 3, 5)
+  - [x] Confirm the login response shape includes token data plus a safe user summary suitable for mobile session restoration.
+  - [x] Decide how capability availability is exposed for public users: explicit capability flags, linked-profile summary, or equivalent typed fields.
+  - [x] Keep the contract compatible with the current `user.role` field while avoiding the assumption that it is the complete capability set.
 
-- [ ] Task 2: Implement backend login resolution for public and separate-account flows (AC: 1, 2, 3, 5)
-  - [ ] Reuse the existing auth stack in `backend/src/app/api/v1/login.py`, `logout.py`, and related security helpers.
-  - [ ] Ensure public login returns one authenticated `user` identity with the current primary role and enough data to determine accessible public workspaces.
-  - [ ] Ensure Attendant and Admin logins remain dedicated sessions rather than entering the public workspace model.
-  - [ ] Preserve the token-body strategy introduced for mobile in Story 1.1.
+- [x] Task 2: Implement backend login resolution for public and separate-account flows (AC: 1, 2, 3, 5)
+  - [x] Reuse the existing auth stack in `backend/src/app/api/v1/login.py`, `logout.py`, and related security helpers.
+  - [x] Ensure public login returns one authenticated `user` identity with the current primary role and enough data to determine accessible public workspaces.
+  - [x] Ensure Attendant and Admin logins remain dedicated sessions rather than entering the public workspace model.
+  - [x] Preserve the token-body strategy introduced for mobile in Story 1.1.
 
-- [ ] Task 3: Implement mobile session bootstrap and workspace entry (AC: 2, 3, 4)
-  - [ ] Add the login screen and auth service call using the backend contract.
-  - [ ] Restore the saved session on app start and route to the correct initial workspace.
-  - [ ] Use `user.role` as the default public workspace while keeping room for later workspace switching when additional public capabilities are approved.
-  - [ ] Keep Attendant/Admin entry separate from the public workspace shell.
+- [x] Task 3: Implement mobile session bootstrap and workspace entry (AC: 2, 3, 4)
+  - [x] Add the login screen and auth service call using the backend contract.
+  - [x] Restore the saved session on app start and route to the correct initial workspace.
+  - [x] Use `user.role` as the default public workspace while keeping room for later workspace switching when additional public capabilities are approved.
+  - [x] Keep Attendant/Admin entry separate from the public workspace shell.
 
-- [ ] Task 4: Harden logout and token lifecycle around the new contract (AC: 3, 4)
-  - [ ] Ensure logout revokes tokens server-side and clears secure local storage.
-  - [ ] Confirm refresh behavior remains compatible with mobile-stored refresh tokens.
-  - [ ] Verify that app restart restores only valid sessions.
+- [x] Task 4: Harden logout and token lifecycle around the new contract (AC: 3, 4)
+  - [x] Ensure logout revokes tokens server-side and clears secure local storage.
+  - [x] Confirm refresh behavior remains compatible with mobile-stored refresh tokens.
+  - [x] Verify that app restart restores only valid sessions.
 
-- [ ] Task 5: Test login, session restoration, and role/capability routing (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for successful login, failed login, and response contract correctness.
-  - [ ] Add focused backend coverage for public-account identity resolution versus separate-account flows.
-  - [ ] Add mobile tests for login form behavior and session bootstrap routing.
+- [x] Task 5: Test login, session restoration, and role/capability routing (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for successful login, failed login, and response contract correctness.
+  - [x] Add focused backend coverage for public-account identity resolution versus separate-account flows.
+  - [x] Add mobile tests for login form behavior and session bootstrap routing.
 
 ## Dev Notes
 
@@ -118,9 +118,29 @@ GPT-5.4
 - Story created to align login behavior with the shared public-identity capability model.
 - Story preserves the existing schema assumption that `user.role` is the current primary public workspace.
 - Story keeps Attendant and Admin as separate-account flows.
+- Extended backend login/register auth responses with explicit capability flags suitable for mobile session restore and workspace routing.
+- Added capability resolution that derives public access from linked `driver`, `lot_owner`, `manager` rows while preserving separate-account handling for Attendant and Admin.
+- Refactored Flutter auth bootstrap around `AuthSession`, secure persisted user payloads, login UI, and session restoration on app restart.
+- Added workspace-aware authenticated placeholders so Admin, Attendant, Operator, LotOwner, and public flows land in distinct shells.
+- Verified backend auth coverage in containers and Flutter widget coverage locally after fixing contract and selector regressions.
+- Verified manual register/login flow on the connected Android device after configuring `API_BASE_URL` and `adb reverse` for the local backend.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/1-2-user-login.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/tech-design.md`
+- `backend/src/app/api/v1/auth.py`
+- `backend/src/app/api/v1/login.py`
+- `backend/tests/test_auth.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/core/auth/token_store.dart`
+- `mobile/lib/src/features/auth/data/auth_service.dart`
+- `mobile/lib/src/features/auth/presentation/auth_gate.dart`
+- `mobile/lib/src/features/auth/presentation/login_screen.dart`
+- `mobile/lib/src/features/auth/presentation/register_screen.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-26: Implemented Story 1.2 login/session flow across backend and Flutter, including capability-aware auth payloads, secure session restoration, role-based shell routing, backend auth tests, and Flutter widget tests.

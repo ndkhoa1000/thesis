@@ -101,17 +101,67 @@ class MyApp extends StatelessWidget {
       ),
       home: AuthGate(
         authService: authService,
-        authenticatedBuilder: (_) => const AuthenticatedHome(),
+        authenticatedBuilder: (_, session) =>
+            AuthenticatedHome(session: session),
       ),
     );
   }
 }
 
 class AuthenticatedHome extends StatelessWidget {
-  const AuthenticatedHome({super.key});
+  const AuthenticatedHome({super.key, required this.session});
+
+  final AuthSession session;
+
+  Widget _buildWorkspacePlaceholder({
+    required String title,
+    required String message,
+  }) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(message, textAlign: TextAlign.center),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (session.isAdmin) {
+      return _buildWorkspacePlaceholder(
+        title: 'Admin Workspace',
+        message:
+            'Đăng nhập thành công với tài khoản Admin. Dashboard quản trị sẽ được triển khai ở các story sau.',
+      );
+    }
+
+    if (session.isAttendant) {
+      return _buildWorkspacePlaceholder(
+        title: 'Attendant Workspace',
+        message:
+            'Đăng nhập thành công với tài khoản Attendant. Luồng nghiệp vụ attendant sẽ được triển khai ở các story sau.',
+      );
+    }
+
+    if (session.role == 'MANAGER') {
+      return _buildWorkspacePlaceholder(
+        title: 'Operator Workspace',
+        message:
+            'Đăng nhập thành công ở workspace Operator. Các chức năng vận hành bãi xe sẽ được mở dần ở Epic 3.',
+      );
+    }
+
+    if (session.role == 'LOT_OWNER') {
+      return _buildWorkspacePlaceholder(
+        title: 'LotOwner Workspace',
+        message:
+            'Đăng nhập thành công ở workspace LotOwner. Các chức năng đăng ký bãi xe sẽ được mở ở Epic 2.',
+      );
+    }
+
     final mapboxToken =
         dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dotenv.env['ACCESS_TOKEN'];
     if (mapboxToken == null || mapboxToken.isEmpty) {
@@ -121,7 +171,7 @@ class AuthenticatedHome extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'Đăng ký thành công. Hãy thêm MAPBOX_ACCESS_TOKEN vào mobile/.env để bật bản đồ thử nghiệm.',
+              'Xác thực thành công. Hãy thêm MAPBOX_ACCESS_TOKEN vào mobile/.env để bật bản đồ thử nghiệm cho workspace public.',
               textAlign: TextAlign.center,
             ),
           ),

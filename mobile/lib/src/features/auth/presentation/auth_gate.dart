@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
+import 'login_screen.dart';
 import 'register_screen.dart';
 
 class AuthGate extends StatefulWidget {
@@ -11,7 +12,8 @@ class AuthGate extends StatefulWidget {
   });
 
   final AuthService authService;
-  final WidgetBuilder authenticatedBuilder;
+  final Widget Function(BuildContext context, AuthSession session)
+  authenticatedBuilder;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -19,7 +21,8 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool _loading = true;
-  bool _authenticated = false;
+  bool _showLogin = true;
+  AuthSession? _session;
 
   @override
   void initState() {
@@ -28,20 +31,20 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _loadSession() async {
-    final hasSession = await widget.authService.hasSession();
+    final session = await widget.authService.restoreSession();
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _authenticated = hasSession;
+      _session = session;
       _loading = false;
     });
   }
 
-  void _handleRegistered() {
+  void _handleAuthenticated(AuthSession session) {
     setState(() {
-      _authenticated = true;
+      _session = session;
     });
   }
 
@@ -51,13 +54,31 @@ class _AuthGateState extends State<AuthGate> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (_authenticated) {
-      return widget.authenticatedBuilder(context);
+    final session = _session;
+    if (session != null) {
+      return widget.authenticatedBuilder(context, session);
+    }
+
+    if (_showLogin) {
+      return LoginScreen(
+        authService: widget.authService,
+        onAuthenticated: _handleAuthenticated,
+        onSwitchToRegister: () {
+          setState(() {
+            _showLogin = false;
+          });
+        },
+      );
     }
 
     return RegisterScreen(
       authService: widget.authService,
-      onRegistered: _handleRegistered,
+      onAuthenticated: _handleAuthenticated,
+      onSwitchToLogin: () {
+        setState(() {
+          _showLogin = true;
+        });
+      },
     );
   }
 }

@@ -2,23 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../data/auth_service.dart';
 
-class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({
     super.key,
     required this.authService,
     required this.onAuthenticated,
-    required this.onSwitchToLogin,
+    required this.onSwitchToRegister,
   });
 
   final AuthService authService;
   final ValueChanged<AuthSession> onAuthenticated;
-  final VoidCallback onSwitchToLogin;
+  final VoidCallback onSwitchToRegister;
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -41,7 +41,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final session = await widget.authService.register(
+      final session = await widget.authService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
@@ -51,7 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       widget.onAuthenticated(session);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Đăng ký thành công.')));
+      ).showSnackBar(const SnackBar(content: Text('Đăng nhập thành công.')));
     } on AuthException catch (error) {
       if (!mounted) {
         return;
@@ -83,12 +83,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Tạo tài khoản',
+                    'Đăng nhập',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Bắt đầu với email và mật khẩu. Các trường hồ sơ còn lại sẽ được hoàn thiện sau.',
+                    'Sử dụng email và mật khẩu để truy cập workspace hiện tại của bạn.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 24),
@@ -111,8 +111,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     decoration: const InputDecoration(labelText: 'Mật khẩu'),
                     validator: (value) {
                       final text = value ?? '';
-                      if (text.length < 8) {
-                        return 'Mật khẩu phải có ít nhất 8 ký tự';
+                      if (text.isEmpty) {
+                        return 'Nhập mật khẩu';
                       }
                       return null;
                     },
@@ -126,12 +126,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Đăng ký'),
+                        : const Text('Đăng nhập'),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
-                    onPressed: _submitting ? null : widget.onSwitchToLogin,
-                    child: const Text('Đã có tài khoản? Đăng nhập'),
+                    onPressed: _submitting ? null : widget.onSwitchToRegister,
+                    child: const Text('Chưa có tài khoản? Tạo tài khoản'),
                   ),
                 ],
               ),

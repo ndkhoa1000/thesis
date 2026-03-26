@@ -1,14 +1,122 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../../../core/auth/token_store.dart';
 import '../../../core/network/api_client.dart';
 
 abstract class AuthService {
-  Future<bool> hasSession();
+  Future<AuthSession?> restoreSession();
 
-  Future<void> register({required String email, required String password});
+  Future<AuthSession> register({
+    required String email,
+    required String password,
+  });
+
+  Future<AuthSession> login({required String email, required String password});
 
   Future<void> signOut();
+}
+
+class AuthSession {
+  const AuthSession({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.role,
+    required this.capabilities,
+    this.id,
+    this.name,
+    this.username,
+    this.email,
+    this.isActive = true,
+  });
+
+  final String accessToken;
+  final String refreshToken;
+  final int? id;
+  final String? name;
+  final String? username;
+  final String? email;
+  final String role;
+  final bool isActive;
+  final Map<String, bool> capabilities;
+
+  bool get isPublicAccount => capabilities['public_account'] ?? false;
+  bool get isAttendant =>
+      capabilities['attendant'] ?? false || role == 'ATTENDANT';
+  bool get isAdmin => capabilities['admin'] ?? false || role == 'ADMIN';
+
+  factory AuthSession.fromAuthResponse(Map<String, dynamic> data) {
+    final accessToken = data['access_token'] as String?;
+    final refreshToken = data['refresh_token'] as String?;
+    final user = data['user'];
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      throw const AuthException('Thiếu token trong phản hồi xác thực.');
+    }
+    if (user is! Map<String, dynamic>) {
+      throw const AuthException(
+        'Thiếu thông tin người dùng trong phản hồi xác thực.',
+      );
+    }
+
+    final capabilities = <String, bool>{};
+    final rawCapabilities = user['capabilities'];
+    if (rawCapabilities is Map<String, dynamic>) {
+      for (final entry in rawCapabilities.entries) {
+        capabilities[entry.key] = entry.value == true;
+      }
+    }
+
+    final role = user['role'] as String?;
+    if (role == null || role.isEmpty) {
+      throw const AuthException(
+        'Thiếu role của người dùng trong phản hồi xác thực.',
+      );
+    }
+
+    return AuthSession(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      id: user['id'] as int?,
+      name: user['name'] as String?,
+      username: user['username'] as String?,
+      email: user['email'] as String?,
+      role: role,
+      isActive: user['is_active'] as bool? ?? true,
+      capabilities: capabilities,
+    );
+  }
+
+  factory AuthSession.fromStoredPayload({
+    required String accessToken,
+    required String refreshToken,
+    required String userPayload,
+  }) {
+    final decoded = jsonDecode(userPayload);
+    if (decoded is! Map<String, dynamic>) {
+      throw const AuthException('Dữ liệu phiên đăng nhập đã lưu không hợp lệ.');
+    }
+    return AuthSession.fromAuthResponse({
+      'access_token': accessToken,
+      'refresh_token': refreshToken,
+      'user': decoded,
+    });
+  }
+
+  String toStoredUserPayload() {
+    return jsonEncode({
+      'id': id,
+      'name': name,
+      'username': username,
+      'email': email,
+      'role': role,
+      'is_active': isActive,
+      'capabilities': capabilities,
+    });
+  }
 }
 
 class BackendAuthService implements AuthService {
@@ -21,46 +129,94 @@ class BackendAuthService implements AuthService {
   final Dio _client;
   final TokenStore _tokenStore;
 
-  @override
-  Future<bool> hasSession() async {
-    final accessToken = await _tokenStore.readAccessToken();
-    return accessToken != null && accessToken.isNotEmpty;
+  String get _connectionHelpMessage {
+    final baseUrl = _client.options.baseUrl;
+    return 'Khong ket noi duoc backend tai $baseUrl. Neu dang chay tren thiet bi that, hay them API_BASE_URL vao mobile/.env va dung adb reverse tcp:8000 tcp:8000 hoac mot host LAN phu hop.';
   }
 
   @override
-  Future<void> register({
+  Future<AuthSession?> restoreSession() async {
+    final accessToken = await _tokenStore.readAccessToken();
+    final refreshToken = await _tokenStore.readRefreshToken();
+    final userPayload = await _tokenStore.readUserPayload();
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty ||
+        userPayload == null ||
+        userPayload.isEmpty) {
+      return null;
+    }
+
+    try {
+      return AuthSession.fromStoredPayload(
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        userPayload: userPayload,
+      );
+    } on AuthException {
+      await _tokenStore.clear();
+      return null;
+    }
+  }
+
+  @override
+  Future<AuthSession> register({
     required String email,
     required String password,
   }) async {
+    final session = await _authenticate(
+      path: '/auth/register',
+      payload: {'email': email, 'password': password},
+    );
+    return session;
+  }
+
+  @override
+  Future<AuthSession> login({
+    required String email,
+    required String password,
+  }) async {
+    final session = await _authenticate(
+      path: '/login',
+      payload: {'username': email, 'password': password},
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    return session;
+  }
+
+  Future<AuthSession> _authenticate({
+    required String path,
+    required Map<String, dynamic> payload,
+    Options? options,
+  }) async {
     try {
       final response = await _client.post<dynamic>(
-        '/auth/register',
-        data: {'email': email, 'password': password},
+        path,
+        data: payload,
+        options: options,
       );
-      final data = response.data;
-      if (data is! Map<String, dynamic>) {
-        throw const AuthException('Phản hồi đăng ký không hợp lệ.');
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
+        throw const AuthException('Phản hồi xác thực không hợp lệ.');
       }
 
-      final accessToken = data['access_token'] as String?;
-      final refreshToken = data['refresh_token'] as String?;
-      if (accessToken == null ||
-          accessToken.isEmpty ||
-          refreshToken == null ||
-          refreshToken.isEmpty) {
-        throw const AuthException('Thiếu token sau khi đăng ký thành công.');
-      }
-
-      await _tokenStore.saveTokens(
-        accessToken: accessToken,
-        refreshToken: refreshToken,
+      final session = AuthSession.fromAuthResponse(responseData);
+      await _tokenStore.saveSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        userPayload: session.toStoredUserPayload(),
       );
+      return session;
     } on DioException catch (error) {
       final payload = error.response?.data;
       if (payload is Map<String, dynamic> && payload['detail'] is String) {
         throw AuthException(payload['detail'] as String);
       }
-      throw const AuthException('Không thể đăng ký tài khoản lúc này.');
+      if (error.response == null) {
+        throw AuthException(_connectionHelpMessage);
+      }
+      throw const AuthException('Không thể xác thực tài khoản lúc này.');
     }
   }
 

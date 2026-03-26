@@ -17,7 +17,7 @@ from ...core.security import (
     create_refresh_token,
     verify_token,
 )
-from .auth import build_auth_response
+from .auth import build_auth_response, resolve_auth_capabilities
 
 router = APIRouter(tags=["login"])
 
@@ -35,8 +35,9 @@ async def login_for_access_token(
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = await create_access_token(data={"sub": user["username"]}, expires_delta=access_token_expires)
     refresh_token = await create_refresh_token(data={"sub": user["username"]})
+    capabilities = await resolve_auth_capabilities(user, db)
 
-    return build_auth_response(user, access_token, refresh_token)
+    return build_auth_response(user, access_token, refresh_token, capabilities=capabilities)
 
 
 @router.post("/refresh")
