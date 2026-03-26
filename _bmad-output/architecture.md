@@ -10,7 +10,7 @@
 
 The system uses a three-part architecture:
 
-1. **Mobile client:** React Native with Expo for all user-facing flows.
+1. **Mobile client:** Flutter for all user-facing flows.
 2. **Backend:** FastAPI monolith using `uv`, built on top of the existing backend already present in this repository.
 3. **Data and media services:** PostgreSQL for relational data and Cloudinary for image/document storage.
 
@@ -18,7 +18,7 @@ The system uses a three-part architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     React Native (Expo)                    │
+│                          Flutter                           │
 │  Driver · Attendant · Operator · LotOwner · Admin screens  │
 │  Camera · QR Scanner · Map · Secure token storage          │
 └─────────────────────────┬───────────────────────────────────┘
@@ -59,15 +59,14 @@ Suggested mobile libraries remain:
 
 | Capability | Library |
 |-----------|---------|
-| Navigation | `expo-router` |
-| HTTP client | `axios` |
-| Remote state | TanStack Query |
-| Local state | `zustand` |
-| QR scanning | `expo-camera` |
-| Image selection | `expo-image-picker` |
-| Map rendering | `@rnmapbox/maps` |
-| Token storage | `expo-secure-store` |
-| Styling | `NativeWind` |
+| Navigation | `go_router` |
+| HTTP client | `dio` |
+| State management | `flutter_riverpod` |
+| QR scanning | `mobile_scanner` |
+| Image selection | `image_picker` |
+| Map rendering | `mapbox_maps_flutter` |
+| Token storage | `flutter_secure_storage` |
+| Styling | `Material 3` + custom theme |
 
 ### 2.2 Backend
 
@@ -119,7 +118,7 @@ Authentication is backend-owned.
 - Users register and log in through FastAPI endpoints.
 - Passwords are hashed in the backend.
 - FastAPI issues access and refresh tokens.
-- The mobile client stores tokens with `expo-secure-store`.
+- The mobile client stores tokens with `flutter_secure_storage`.
 
 Authorization is enforced in FastAPI via role-aware dependencies such as `get_current_user()` and `require_role()`.
 
@@ -263,7 +262,7 @@ This is an adaptation plan, not a mandate to delete the starter code in one step
 
 | Component | Decision |
 |-----------|----------|
-| Mobile app | Expo for development and Android-focused thesis demo |
+| Mobile app | Flutter for development, with Android-focused thesis demo and future multi-platform expansion |
 | Backend runtime | FastAPI with `uv` |
 | Backend base | Existing `backend/` project in this repository |
 | Database | PostgreSQL |
@@ -288,8 +287,8 @@ CLOUDINARY_API_SECRET=<secret>
 
 ```env
 # mobile
-EXPO_PUBLIC_API_BASE_URL=http://<host>:8000/api/v1
-EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=<token>
+API_BASE_URL=http://<host>:8000/api/v1
+MAPBOX_ACCESS_TOKEN=<token>
 ```
 
 ---

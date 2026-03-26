@@ -20,15 +20,15 @@ status: Draft
   - Implement a basic `/health` endpoint to verify the backend and DB connection.
 
 ## Scope 2: Frontend Foundation
-- **App Initialization:** Setup the core React Native (Expo) mobile application structure.
+- **App Initialization:** Setup the core Flutter mobile application structure.
 - **Environment Structure (`.env`):**
-  - Backend connection: `EXPO_PUBLIC_API_BASE_URL` (e.g., `http://localhost:8000/api/v1`)
-  - Map rendering: `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` (required for `@rnmapbox/maps`)
+  - Backend connection: `API_BASE_URL` (for injection through `--dart-define`, e.g., `http://localhost:8000/api/v1`)
+  - Map rendering: `MAPBOX_ACCESS_TOKEN` (for injection through `--dart-define`, required for `mapbox_maps_flutter`)
 
 ## Scope 3: Communication & Testing
-- **Shared Contracts (Workflow Recommendation):** Use `npx openapi-typescript http://localhost:8000/openapi.json` to establish a shared TypeScript schema, preventing conflicting data types between backend APIs and the frontend view.
+- **Shared Contracts (Workflow Recommendation):** Use an OpenAPI-to-Dart client generation workflow such as `openapi-generator-cli generate -i http://localhost:8000/openapi.json -g dart-dio -o mobile/api_client` to reduce API contract drift between backend and frontend.
 - **API Verification:** Frontend implementation must systematically use the backend Swagger UI (`http://localhost:8000/docs`) to test endpoints *before* writing any mobile integration code.
-- **Connectivity:** Ensure CORS is correctly configured on the backend for local Expo testing.
+- **Connectivity:** Ensure backend networking is correctly configured for local Flutter emulator/device testing.
 - **AI Loop & Conflict Prevention:**
   - Actively detect and resolve contradictory instructions across docs (e.g., `SKILL.md` vs `tech-design.md`).
   - If a test fails repeatedly, stop and re-evaluate the approach to prevent "vibe coding" inside an infinite loop.

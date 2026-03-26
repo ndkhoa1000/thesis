@@ -10,7 +10,7 @@
 
 This document aligns implementation with the chosen stack:
 
-- **Frontend:** React Native with Expo
+- **Frontend:** Flutter
 - **Backend:** existing FastAPI project in [backend](../backend), managed with `uv`
 - **Database:** PostgreSQL
 - **Storage:** Cloudinary
@@ -113,7 +113,7 @@ Authentication is handled fully by FastAPI.
 1. Client posts credentials to `/auth/login`.
 2. FastAPI verifies password hash.
 3. FastAPI returns signed tokens.
-4. Mobile stores tokens in `expo-secure-store`.
+4. Mobile stores tokens in `flutter_secure_storage`.
 
 ### 4.3 Authorization
 
@@ -202,7 +202,7 @@ The mobile app is currently preconfigured to use Supabase directly. That must be
 
 ### 7.2 Replace with backend equivalents
 
-- `AuthContext` becomes backend-token based
+- app-level authentication state becomes backend-token based
 - map and lot screens consume FastAPI lot endpoints
 - profile screens consume FastAPI user endpoints
 - photo and document uploads go through FastAPI
