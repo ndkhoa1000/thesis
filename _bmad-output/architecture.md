@@ -196,6 +196,24 @@ Realtime updates are produced by FastAPI, not an external realtime platform.
 3. FastAPI publishes lot updates to connected clients over WebSocket or SSE.
 4. Mobile map screens refresh visible lot markers in near real time.
 
+### 4.6 Pending Sync (Offline Resilience)
+
+To maintain the 5-second check-in/out SLA under degraded network conditions, the mobile client implements a "Pending Sync" strategy:
+1. When evaluating a QR scan, the app attempts to reach FastAPI.
+2. If the network times out or drops, the check-in/out event is temporarily saved to a local SQLite/Hive queue on the attendant's device.
+3. The UI immediately unblocks the attendant, displaying a "Pending Sync" indicator (Honest Degradation) so they can process the next vehicle.
+4. A background isolate or periodic sync task continuously attempts to flush the queue to FastAPI when connectivity is restored.
+5. In the backend, FastAPI utilizes **Redis** for caching real-time availability and session states. When multiple degraded devices reconnect and flush their queues simultaneously, Redis absorbs the read-heavy validation checks (e.g., checking if a vehicle is already checked in or if capacity allows) before committing the atomic write to PostgreSQL, ensuring the database is not overwhelmed by the sync burst.
+
+### 4.7 Zero-Trust Shift Handover
+
+Attendants transfer financial accountability at the end of their shift using a QR-based handover flow.
+1. The outgoing attendant ends their shift in the app. FastAPI calculates the `expected_cash` based on all cash payments during that `Shift`.
+2. The app generates a Shift QR containing the shift payload.
+3. The incoming attendant scans the Shift QR, counts the physical cash, and enters the `actual_cash` amount.
+4. If there is a discrepancy, the incoming attendant is forced by the UI to enter a `discrepancy_reason`.
+5. FastAPI records the `ShiftHandover`, linking the two shifts, and locks the outgoing shift.
+
 ---
 
 ## 5. API Design Principles
@@ -229,6 +247,7 @@ Representative endpoint groups:
 - `/leases/*`
 - `/admin/*`
 - `/reports/*`
+- `/shifts/*`
 - `/ws/availability`
 
 ---
@@ -251,7 +270,8 @@ backend/src/app/
 │   ├── leases.py
 │   ├── attendants.py
 │   ├── announcements.py
-│   └── reports.py
+│   ├── reports.py
+│   └── shifts.py
 ├── core/
 │   ├── config.py
 │   ├── security.py
@@ -261,7 +281,8 @@ backend/src/app/
 │   ├── pricing_service.py
 │   ├── booking_service.py
 │   ├── cloudinary_service.py
-│   └── contract_service.py
+│   ├── contract_service.py
+│   └── shift_service.py
 ├── models/
 ├── schemas/
 └── migrations/
@@ -281,6 +302,7 @@ This is an adaptation plan, not a mandate to delete the starter code in one step
 | Database | PostgreSQL |
 | Migrations | Alembic in backend |
 | File storage | Cloudinary |
+| Caching & Realtime | Redis |
 | Local orchestration | Existing Docker Compose setup in backend |
 
 Environment variables should move toward:
@@ -292,6 +314,7 @@ POSTGRES_PORT=5432
 POSTGRES_DB=parking
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
+REDIS_URL=redis://localhost:6379/0
 SECRET_KEY=<backend-secret>
 CLOUDINARY_CLOUD_NAME=<name>
 CLOUDINARY_API_KEY=<key>

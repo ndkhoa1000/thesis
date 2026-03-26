@@ -103,6 +103,8 @@ N/A
 
 ## Epic List
 
+> **UX Consistency Note (Applied across all Epics):** All UI development must strictly adhere to the Divergent UI Strategy. The Attendant App must use Dark Mode, massive typography, edge-to-edge touch targets, and avoid on-screen keyboards at the gate. The Driver/Operator App must use Light Mode, floating MD3 components, and spacious layouts. All primary actions must be anchored to the bottom "Thumb-Zone".
+
 ### Epic 1: User Identity & Profiles
 **Goal:** Users can securely authenticate and manage their identities/vehicles, forming the foundation of the platform.
 **FRs covered:** FR44, FR45, FR46, FR47, FR48
@@ -249,23 +251,27 @@ N/A
 
 #### Story 4.2: Attendant Scans QR for Check-In
 **As an** Attendant,
-**I want** to scan a driver's QR code,
-**So that** I can register their vehicle entry.
+**I want** to scan a driver's QR code or NFC card,
+**So that** I can register their vehicle entry in under 5 seconds.
 
 **Acceptance Criteria:**
 * **Given** I am an Attendant
-* **When** I scan a valid check-in QR
+* **When** I scan a valid check-in QR or NFC
 * **Then** a new active session is created for that vehicle.
+* **And (UX)** the screen immediately flashes Green with heavy haptic vibration and a Beep (Multisensory Flash Overlay).
+* **And (UX)** a 2-second Cooldown Lens Lock overlay engages to prevent accidental double-scans of tailgating vehicles.
+* **And (UX)** if the network is degraded, the session is saved locally and a "Pending Sync" state is displayed to maintain gate throughput without blocking the UI.
 
-#### Story 4.3: Manual License Plate Check-In
+#### Story 4.3: Manual License Plate Check-In (NFC Walk-in)
 **As an** Attendant,
-**I want** to manually log a check-in via photo/text,
-**So that** I can process walk-in drivers without the app.
+**I want** to check-in walk-in vehicles using Camera,
+**So that** I can process walk-in drivers without the app while maintaining the 5-second SLA.
 
 **Acceptance Criteria:**
 * **Given** I am an Attendant
-* **When** a driver arrives without the app
-* **Then** I can take a photo of their plate or manual type it to start a session.
+* **When** a driver arrives without the app or with an unregistered NFC card
+* **Then** I am prompted to take a photo of the front and back of the vehicle (Conditional Friction).
+* **And (UX)** the system relies entirely on camera OCR or swipe gestures; the on-screen keyboard is disabled at the gate to prevent manual typing delays.
 
 #### Story 4.4: Driver Generates Check-Out QR
 **As a** Driver,
@@ -279,23 +285,26 @@ N/A
 
 #### Story 4.5: Attendant Scans QR for Check-Out & Calculates Fee
 **As an** Attendant,
-**I want** to scan a driver's check-out QR to calculate the fee,
-**So that** I know how much to charge.
+**I want** to scan a driver's check-out QR or NFC to calculate the fee,
+**So that** I know how much to charge rapidly.
 
 **Acceptance Criteria:**
 * **Given** a driver wants to leave
-* **When** I scan their check-out QR
+* **When** I scan their check-out QR or NFC
 * **Then** the final fee is computed based on lot pricing rules.
+* **And (UX)** the price is displayed using oversized typography (ExtraBold).
+* **And (UX)** I am not required to visually verify the entry photos on-screen (No-Look Verification) to maximize exit speed.
 
 #### Story 4.6: Record Payment & Finalize Session
 **As an** Attendant,
-**I want** to mark the session as paid,
-**So that** the session is closed and the spot freed.
+**I want** to mark the session as paid using macroscopic gestures,
+**So that** the session is closed effortlessly without fat-finger errors.
 
 **Acceptance Criteria:**
 * **Given** the fee is calculated
-* **When** I confirm payment received (mock mode)
+* **When** I use the "Swipe-to-Resolve" gesture (Swipe Left for Cash, Swipe Right for Online paid)
 * **Then** the session state changes to COMPLETED.
+* **And (UX)** a non-blocking 3-second Undo Toast appears to allow reverting the swipe if a mistake was made, without interrupting the camera for the next vehicle.
 
 ### Epic 5: Map Discovery & History
 **Goal:** Drivers can find parking lots and view parking history.
@@ -303,23 +312,26 @@ N/A
 
 #### Story 5.1: View Interactive Map & Lots
 **As a** Driver,
-**I want** to see active parking lots on a map,
-**So that** I can locate nearby parking.
+**I want** to see active parking lots on a map with clear capacity indicators,
+**So that** I can locate nearby parking instantly.
 
 **Acceptance Criteria:**
 * **Given** I am on the Map tab
 * **When** it loads
 * **Then** I see pins for ACTIVE lots.
+* **And (UX)** lot markers are Dynamic Color-Coded Pins (Green/Orange/Red) that display the live available slot number without requiring a tap.
+* **And (UX)** map pins are clustered when zoomed out to prevent UI clutter.
 
 #### Story 5.2: View Lot Details & Availability
 **As a** Driver,
-**I want** to tap a lot to see its details and realtime availability,
+**I want** to tap a lot to see its details, realtime availability, and historical trends,
 **So that** I can decide if I want to park there.
 
 **Acceptance Criteria:**
 * **Given** I select a lot on the map
 * **When** the details open
 * **Then** I see price, hours, and available spots.
+* **And (UX)** I can view a "Historical Peak Hours" chart to anticipate if the lot will fill up by my estimated arrival time.
 
 #### Story 5.3: Driver Parking History
 **As a** Driver,
@@ -330,6 +342,17 @@ N/A
 * **Given** I am on my Profile
 * **When** I view History
 * **Then** I see a list of my COMPLETED sessions.
+
+#### Story 5.4: En-route Lot Capacity Alert
+**As a** Driver,
+**I want** to be notified if the lot I am navigating to becomes full,
+**So that** my expectations are managed without forced rerouting.
+
+**Acceptance Criteria:**
+* **Given** I have tapped Navigate for a specific lot
+* **When** the lot capacity reaches 100% while I am en-route
+* **Then** I receive a temporary UI alert indicating the lot has recently filled up.
+* **And (UX)** the system does NOT force an auto-reroute, respecting my navigation autonomy.
 
 ### Epic 6: Advanced Session Management
 **Goal:** Attendants can view real-time lot stats and operators post announcements.
@@ -364,6 +387,17 @@ N/A
 * **Given** a session never checked out
 * **When** I forcefully close it
 * **Then** the spot is freed and session marked TIMEOUT.
+
+#### Story 6.4: Zero-Trust Shift Handover
+**As an** Attendant,
+**I want** to transfer my shift and cash balance to the incoming attendant via QR scan,
+**So that** financial accountability is strictly enforced.
+
+**Acceptance Criteria:**
+* **Given** I am ending my shift
+* **When** I generate a Shift QR containing my collected cash total, and the incoming attendant scans it
+* **Then** the shift is locked and transferred if the physical cash matches.
+* **And (UX)** if there is a mismatch, the incoming attendant must submit a Mandatory Discrepancy Report via a Full-Screen hard-blocking modal (Red warning UI) that requires a text rationale before proceeding.
 
 ### Epic 7: Advance Booking System
 **Goal:** Drivers can pre-book a spot with automatic expiration.

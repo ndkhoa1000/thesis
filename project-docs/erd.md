@@ -289,6 +289,33 @@ Thiết kế đạt chuẩn **BCNF/4NF** để đảm bảo:
 | is_read | BOOLEAN | Đã đọc |
 | created_at | TIMESTAMP | Ngày tạo |
 
+### 24. Shift (Ca trực)
+| Thuộc tính | Kiểu | Mô tả |
+|------------|------|-------|
+| shift_id | INT | PK |
+| attendant_id | INT | FK → Attendant (Người trực) |
+| parking_lot_id | INT | FK → ParkingLot |
+| start_time | TIMESTAMP | Bắt đầu ca |
+| end_time | TIMESTAMP | Kết thúc ca (nullable) |
+| starting_cash | DECIMAL(12,2) | Tiền mặt đầu ca |
+| expected_cash | DECIMAL(12,2) | Tiền mặt dự kiến (hệ thống tính) |
+| actual_cash | DECIMAL(12,2) | Tiền mặt thực tế (nullable) |
+| status | ENUM | ACTIVE, ENDED |
+| created_at | TIMESTAMP | Ngày tạo |
+
+### 25. ShiftHandover (Bàn giao ca)
+| Thuộc tính | Kiểu | Mô tả |
+|------------|------|-------|
+| handover_id | INT | PK |
+| from_shift_id | INT | FK → Shift (UNIQUE) |
+| to_shift_id | INT | FK → Shift (UNIQUE, nullable) |
+| handover_time | TIMESTAMP | Thời gian giao |
+| transferred_cash | DECIMAL(12,2) | Tiền mặt thực tế bàn giao |
+| discrepancy_amount | DECIMAL(12,2) | Tiền chênh lệch (thực tế - dự kiến) |
+| discrepancy_reason | TEXT | Lý do chênh lệch (bắt buộc nếu có lệch) |
+| status | ENUM | PENDING, COMPLETED, DISCREPANCY_REPORTED |
+| qr_code | VARCHAR(100) | Mã QR bàn giao tạm thời |
+
 ---
 
 ## Sơ đồ ERD (PlantUML)
@@ -555,6 +582,34 @@ entity "LeaseContract" as contract {
   status : ENUM
 }
 
+' === SHIFT MANAGEMENT ===
+entity "Shift" as shift {
+  * shift_id : INT <<PK>>
+  --
+  * attendant_id : INT <<FK>>
+  * parking_lot_id : INT <<FK>>
+  start_time : TIMESTAMP
+  end_time : TIMESTAMP
+  starting_cash : DECIMAL(12,2)
+  expected_cash : DECIMAL(12,2)
+  actual_cash : DECIMAL(12,2)
+  status : ENUM
+  created_at : TIMESTAMP
+}
+
+entity "ShiftHandover" as handover {
+  * handover_id : INT <<PK>>
+  --
+  * from_shift_id : INT <<FK>> <<UK>>
+  * to_shift_id : INT <<FK>> <<UK>>
+  handover_time : TIMESTAMP
+  transferred_cash : DECIMAL(12,2)
+  discrepancy_amount : DECIMAL(12,2)
+  discrepancy_reason : TEXT
+  status : ENUM
+  qr_code : VARCHAR(100)
+}
+
 ' === NOTIFICATION ===
 entity "ParkingLotAnnouncement" as announce {
   * announcement_id : INT <<PK>>
@@ -636,6 +691,11 @@ manager ||--o{ announce
 user ||--o{ notif
 user ||--o{ invoice
 
+attendant ||--o{ shift
+lot ||--o{ shift
+shift ||--o| handover : from
+shift ||--o| handover : to
+
 @enduml
 ```
 
@@ -658,6 +718,8 @@ user ||--o{ invoice
 | Booking → ParkingSession | 1:0..1 | Đặt chỗ có thể thành phiên gửi |
 | ParkingSession → Payment | 1:0..1 | 1 phiên tối đa 1 thanh toán |
 | Payment → Invoice | 1:0..1 | 1 thanh toán có thể xuất hoá đơn |
+| Attendant → Shift | 1:N | 1 nhân viên có nhiều ca trực |
+| Shift → ShiftHandover | 1:1 | Mỗi ca giao cho tối đa 1 ca khác |
 
 ---
 
