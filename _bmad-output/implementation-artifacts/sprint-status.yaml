@@ -38,9 +38,11 @@ development_status:
   epic-0: done
   epic-0-retrospective: optional
   epic-1: in-progress
-  1-1-user-registration: ready-for-dev
+  1-1-user-registration: in-progress
   1-2-user-login: backlog
   1-3-manage-license-plates: backlog
+  1-4-apply-to-become-lot-owner: ready-for-dev
+  1-5-apply-to-become-operator: ready-for-dev
   epic-1-retrospective: optional
   epic-2: backlog
   2-1-register-new-parking-lot: backlog
@@ -50,7 +52,7 @@ development_status:
   epic-3: backlog
   3-1-configure-lot-details-capacity: backlog
   3-2-set-operating-hours-pricing-rules: backlog
-  3-3-assign-attendants: backlog
+  3-3-create-attendant-accounts: backlog
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-driver-generates-check-in-qr: backlog

@@ -50,6 +50,15 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 
 > **Terminology note:** The PRD uses **Operator** to refer to the business entity that leases and runs a parking lot. In the ERD and database schema, the same role is modeled as the `Manager` entity with `User.role = MANAGER`. These terms are interchangeable — "Operator" is the product-facing name, "Manager" is the data-model name.
 
+## Roles & Account Model
+
+- **Driver (default public account):** Any user who registers through the public app flow is created as a `Driver` by default.
+- **LotOwner capability:** A public account that starts as `Driver` can later apply to become a `LotOwner`. Once approved, the same account gains the ability to register lots, submit ownership documents, and post lots for lease.
+- **Operator capability:** A public account that starts as `Driver` can later apply to become an `Operator`. Once approved, the same account gains the ability to lease lots, configure operations, and manage attendants.
+- **Shared public-account model:** `Driver`, `LotOwner`, and `Operator` are treated as capabilities on the same public account lifecycle. They are not modeled as isolated login identities that require separate credentials.
+- **Attendant account:** `Attendant` is always a separate account created and provisioned by an `Operator`. It is not added as an extra capability on the public Driver/LotOwner/Operator account. A user acting as an attendant must sign out and sign back in with dedicated Attendant credentials.
+- **Admin account:** `Admin` is always a separate privileged account managed outside the public signup flow.
+
 ## Success Criteria
 
 ### User Success
@@ -179,24 +188,27 @@ This is a thesis project demonstrating proof of concept. The scope targets a fun
 **Persona:** Lan, 40, business operator who just leased a lot from a LotOwner.
 
 **Journey:**
-1. Lease approved by Admin → Lan accesses her lot in the operator app.
-2. Configures lot: sets capacity (60 motorbikes, 10 cars), hours (6AM–10PM), uploads photos, writes description and policies.
-3. Sets pricing: motorbike 3,000₫/session (day), 8,000₫/session (night); car 15,000₫/hr.
-4. A holiday is coming → posts announcement: "Tết holiday hours: 8AM–6PM, expect high demand."
-5. End of month → checks revenue dashboard: 4,200 sessions, 85M₫ revenue, 78% occupancy rate.
-6. Adjusts capacity for next month by creating a new ParkingLotConfig with updated effective date.
+1. Lan already has a public account and applies to become an Operator → Admin approves the operator capability.
+2. Lease approved by Admin → Lan accesses her lot in the operator workspace of the same account.
+3. Configures lot: sets capacity (60 motorbikes, 10 cars), hours (6AM–10PM), uploads photos, writes description and policies.
+4. Sets pricing: motorbike 3,000₫/session (day), 8,000₫/session (night); car 15,000₫/hr.
+5. A holiday is coming → posts announcement: "Tết holiday hours: 8AM–6PM, expect high demand."
+6. End of month → checks revenue dashboard: 4,200 sessions, 85M₫ revenue, 78% occupancy rate.
+7. Creates a separate Attendant account for a staff member, who must log in with those dedicated credentials to operate the lot.
 
 ### Journey 4: Bảo — Lot Owner Lists Property for Lease
 
 **Persona:** Bảo, 50, owns a commercial building with ground-floor parking space in District 7.
 
 **Journey:**
-1. Registers on the platform as a LotOwner → uploads business license / ownership proof.
-2. Registers his parking lot: address, coordinates, photos, description → submits for Admin approval.
-3. Admin approves → lot appears on the platform with APPROVED status.
-4. Posts the lot for lease: monthly fee 15M₫, minimum 6-month contract.
-5. Operator Lan applies to lease → Bảo reviews the application → Admin approves the contract → LotLease created as ACTIVE.
-6. Bảo monitors his active contract and can see when it's expiring.
+1. Registers on the platform as a public user and starts as a Driver account.
+2. Applies to become a LotOwner → uploads ownership proof and required business documents.
+3. Admin approves the LotOwner capability on the same account.
+4. Registers his parking lot: address, coordinates, photos, description → submits for Admin approval.
+5. Admin approves → lot appears on the platform with APPROVED status.
+6. Posts the lot for lease: monthly fee 15M₫, minimum 6-month contract.
+7. Operator Lan applies to lease → Bảo reviews the application → Admin approves the contract → LotLease created as ACTIVE.
+8. Bảo monitors his active contract and can see when it's expiring.
 
 ### Journey 5: Admin — Platform Oversight
 
@@ -257,7 +269,7 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 ### Implementation Considerations
 
 - **Flutter plugin setup** — Some plugins require Android and iOS configuration during integration. NFC and other advanced native capabilities remain outside the MVP and are deferred.
-- **Two app experiences in one** — Driver and Attendant are different user flows within the same app, role-switched via `User.role`. Operator/LotOwner/Admin flows also in-app (simpler CRUD screens).
+- **Account-model split** — Public-user experiences (`Driver`, `LotOwner`, `Operator`) live on the same account lifecycle, with `LotOwner` and `Operator` unlocked through approval-based capability expansion. `Attendant` and `Admin` use separate accounts and separate login sessions.
 - **Core features first** — QR scanning, map, check-in/out, payment must work end-to-end before adding NFC, push notifications, biometrics.
 
 
@@ -319,7 +331,7 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 
 ### Attendant Management (Operator)
 
-- **FR33:** Operator can add an attendant to their lot by creating or linking a user account with the Attendant role
+- **FR33:** Operator can create and provision a separate Attendant account for a staff member, then assign that account to one or more managed lots
 - **FR34:** Operator can view the list of attendants assigned to their lot
 - **FR35:** Operator can remove an attendant from their lot
 
@@ -339,14 +351,16 @@ Not required for thesis demo. Always-online is acceptable. Future consideration:
 
 ### User Management & Authentication
 
-- **FR44:** User can register an account through FastAPI using email and password. Account records are stored in PostgreSQL and issued API tokens by the backend
-- **FR45:** User can log in through FastAPI and access role-appropriate features (Driver, Attendant, Operator, LotOwner, Admin). Authentication is handled by the backend; the mobile app only stores and sends backend-issued tokens
+- **FR44:** User can register a public account through FastAPI using email and password. Public registration always creates a `Driver` account by default. Account records are stored in PostgreSQL and issued API tokens by the backend.
+- **FR45:** A public account can later apply to gain `LotOwner` capability or `Operator` capability. These capabilities are granted on the same account after approval and unlock role-appropriate features without requiring separate public-account credentials.
 - **FR46:** Driver can register vehicles with license plate, type, brand, color, and photos
+- **FR47:** `Attendant` accounts are separate credentials created by an `Operator`. Users must sign out of any public account session and sign in again with the dedicated Attendant account to act as an attendant.
+- **FR48:** `Admin` accounts are separate privileged accounts managed outside the public signup flow.
 
 ### Notifications (Phase 2)
 
-- **FR47:** System can send in-app notifications to users (booking expiry, subscription expiry, lot closing, payment success)
-- **FR48:** User can view their notification list and mark notifications as read
+- **FR49:** System can send in-app notifications to users (booking expiry, subscription expiry, lot closing, payment success)
+- **FR50:** User can view their notification list and mark notifications as read
 
 ## Non-Functional Requirements
 

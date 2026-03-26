@@ -1,6 +1,6 @@
 # Story 1.1: User Registration
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -15,23 +15,25 @@ so that I can create a personal profile on the smart parking platform.
 1. Given I am on the registration screen, when I enter a valid email and a secure password and submit, then my account is created in the database atomically.
 2. The API uses the existing FastAPI backend stack to create the user and issue authentication tokens.
 3. I am automatically logged in after successful registration.
+4. The created public account is initialized with Driver capability by default and does not require any additional approval before using Driver features.
 
 ## Implementation Clarifications
 
 - Treat the contradictory epic wording about "Postgres Trigger" as an implementation conflict. For this repository, registration must be handled by FastAPI application logic and a normal database transaction, not by a database trigger.
 - The product requirement says registration uses email + password. The current boilerplate schema also requires `name` and `username`. This story must resolve that mismatch without pushing unnecessary fields into the first mobile registration screen.
 - The default registered role for MVP should be `DRIVER`, because this is the safest fit with the product journeys and existing `UserRole` enum.
+- Story 1.1 only covers public-account signup and immediate Driver access. It does not include the later application flows for `LotOwner` or `Operator` capability; those belong to separate stories.
 - Because the backend already contains role-specific subtables, successful driver registration should provision both the base `user` row and the related `driver` row in one transaction unless a narrower scope is explicitly documented and accepted.
 - The registration token contract must be consistent with login. Do not let `/auth/register` and `/login` return different auth shapes.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define the thesis-specific registration contract on top of the existing backend auth stack (AC: 1, 2, 3)
+- [ ] Task 1: Define the thesis-specific registration contract on top of the existing backend auth stack (AC: 1, 2, 3, 4)
   - [ ] Add or update request/response schemas for a mobile-friendly registration endpoint under `backend/src/app/schemas` and `backend/src/app/core/schemas.py`.
   - [ ] Decide how `username` and `name` are satisfied for MVP registration: generated server-side, derived from email, or made optional through schema/model changes.
   - [ ] Ensure the response model excludes sensitive fields and exposes only the auth payload and any safe user summary needed immediately after signup.
 
-- [ ] Task 2: Implement backend registration using existing reusable auth pieces instead of rewriting them (AC: 1, 2)
+- [ ] Task 2: Implement backend registration using existing reusable auth pieces instead of rewriting them (AC: 1, 2, 4)
   - [ ] Add `/api/v1/auth/register` or an equivalent auth-owned endpoint in `backend/src/app/api/v1` while preserving the existing router organization.
   - [ ] Register any new auth route module in `backend/src/app/api/v1/__init__.py` so the endpoint is reachable through the application router.
   - [ ] Reuse `crud_users.exists`, `crud_users.create`, `get_password_hash`, `create_access_token`, and `create_refresh_token`.
@@ -87,6 +89,7 @@ so that I can create a personal profile on the smart parking platform.
 - All auth flows must go through FastAPI. Do not introduce direct database access from mobile.
 - Use PostgreSQL through the existing backend stack and migration tooling.
 - New user registration for MVP should result in a platform user that can later act as a driver without extra admin setup.
+- New user registration must not present role selection during signup. The public account starts as Driver by default.
 - The backend already includes a dedicated `driver` table, so registration should not leave the user in a half-created state where `role=DRIVER` exists but no driver profile record exists.
 - Do not introduce Supabase assumptions anywhere in backend or mobile auth.
 
@@ -172,6 +175,7 @@ GPT-5.4
 - Story includes explicit guardrails for schema mismatch (`email + password` vs current `name + username + email + password`).
 - Story includes token transport decision as an explicit task to prevent mobile/backend contract drift.
 - Story validation added missing guidance for router registration, `driver` subtable provisioning, local cookie behavior, and markdown link references.
+- Story clarified that public signup creates Driver capability only; LotOwner and Operator upgrades are deferred to separate follow-up stories.
 
 ### File List
 

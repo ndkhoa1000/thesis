@@ -45,7 +45,7 @@ This document provides the complete epic and story breakdown for thesis, decompo
 - FR30: Operator can post announcements (events, traffic alerts, closures, peak hours) with visibility dates
 - FR31: Operator can view revenue reports by day, week, or month
 - FR32: Operator can view session counts, occupancy rates, and vehicle type breakdowns
-- FR33: Operator can add an attendant to their lot by creating or linking a user account with the Attendant role
+- FR33: Operator can create and provision a separate Attendant account for a staff member, then assign that account to one or more managed lots
 - FR34: Operator can view the list of attendants assigned to their lot
 - FR35: Operator can remove an attendant from their lot
 - FR36: Lot Owner can register a parking lot with address, coordinates, photos, and ownership documents
@@ -56,11 +56,13 @@ This document provides the complete epic and story breakdown for thesis, decompo
 - FR41: Admin can approve or reject lot registrations from Lot Owners
 - FR42: Admin can approve or reject lease requests from Operators
 - FR43: Admin can search, view, activate, or deactivate user accounts
-- FR44: User can register an account through FastAPI using email and password, with account data stored in PostgreSQL
-- FR45: User can log in through FastAPI and access role-appropriate features. Authentication is handled by the backend and consumed by the mobile client via API tokens
+- FR44: User can register a public account through FastAPI using email and password, with public signup creating a Driver account by default
+- FR45: A public account can later apply to gain LotOwner capability or Operator capability on the same account after approval
 - FR46: Driver can register vehicles with license plate, type, brand, color, and photos
-- FR47: System can send in-app notifications to users (Phase 2 scope)
-- FR48: User can view their notification list and mark notifications as read (Phase 2 scope)
+- FR47: Attendant accounts are separate credentials created by an Operator and require a dedicated login session
+- FR48: Admin accounts are separate privileged accounts outside the public signup flow
+- FR49: System can send in-app notifications to users (Phase 2 scope)
+- FR50: User can view their notification list and mark notifications as read (Phase 2 scope)
 
 ### NonFunctional Requirements
 
@@ -103,7 +105,7 @@ N/A
 
 ### Epic 1: User Identity & Profiles
 **Goal:** Users can securely authenticate and manage their identities/vehicles, forming the foundation of the platform.
-**FRs covered:** FR44, FR45, FR46
+**FRs covered:** FR44, FR45, FR46, FR47, FR48
 
 #### Story 1.1: User Registration
 **As a** new user,
@@ -113,9 +115,10 @@ N/A
 **Acceptance Criteria:**
 * **Given** I am on the registration screen
 * **When** I enter a valid email and a secure password and submit
-* **Then** my account is created in the database atomically via Postgres Trigger
+* **Then** my account is created in the database atomically
 * **And** the API uses the existing FastAPI backend stack to create the user and issue tokens
-* **And** I am automatically logged in.
+* **And** I am automatically logged in
+* **And** the created public account is initialized with Driver capability by default.
 
 #### Story 1.2: User Login
 **As a** registered user,
@@ -125,7 +128,9 @@ N/A
 **Acceptance Criteria:**
 * **Given** I am on the login screen
 * **When** I enter my correct email and password
-* **Then** I am authenticated and navigated to the main dashboard/map.
+* **Then** I am authenticated and navigated to the workspace allowed by that account type
+* **And** public accounts can access Driver, LotOwner, and Operator capabilities granted to the same account
+* **And** Attendant and Admin accounts log in through separate credentials rather than switching from a public account session.
 
 #### Story 1.3: Manage License Plates
 **As a** driver,
@@ -136,6 +141,28 @@ N/A
 * **Given** I am logged into the app
 * **When** I add a new license plate
 * **Then** it is saved to my profile and visible in my registered vehicles list.
+
+#### Story 1.4: Apply to Become Lot Owner
+**As a** Driver,
+**I want** to apply for LotOwner capability on my existing account,
+**So that** I can register parking lots and post them for lease without creating a separate public account.
+
+**Acceptance Criteria:**
+* **Given** I am authenticated with a public account
+* **When** I submit the required ownership and verification documents
+* **Then** the system creates a pending LotOwner application linked to my existing account
+* **And** after Admin approval, my same account gains LotOwner capability.
+
+#### Story 1.5: Apply to Become Operator
+**As a** Driver,
+**I want** to apply for Operator capability on my existing account,
+**So that** I can lease lots and manage parking operations without creating a separate public account.
+
+**Acceptance Criteria:**
+* **Given** I am authenticated with a public account
+* **When** I submit the required business and verification documents
+* **Then** the system creates a pending Operator application linked to my existing account
+* **And** after Admin approval, my same account gains Operator capability.
 
 ### Epic 2: Platform Inventory & Approvals
 **Goal:** Lot Owners can register their properties and Admin can approve them, establishing the supply of parking lots.
@@ -172,7 +199,7 @@ N/A
 * **Then** it is hidden from the map and prevents new check-ins.
 
 ### Epic 3: Lot Operations Setup
-**Goal:** Operators can configure their approved lots and assign attendants.
+**Goal:** Operators can configure their approved lots and provision dedicated attendant accounts.
 **FRs covered:** FR27, FR28, FR29, FR33, FR34, FR35
 
 #### Story 3.1: Configure Lot Details & Capacity
@@ -195,15 +222,16 @@ N/A
 * **When** I set pricing rules
 * **Then** they are saved and applied to future check-ins.
 
-#### Story 3.3: Assign Attendants
+#### Story 3.3: Create Attendant Accounts
 **As an** Operator,
-**I want** to assign users as attendants to my lot,
-**So that** they can process check-ins and check-outs.
+**I want** to create and provision dedicated Attendant accounts for my lot staff,
+**So that** attendants can process check-ins and check-outs using separate credentials.
 
 **Acceptance Criteria:**
 * **Given** I am the Operator
-* **When** I enter a user identifier to assign them as Attendant
-* **Then** they gain privileges to process vehicles for this lot.
+* **When** I create or provision an Attendant account for a staff member
+* **Then** that account is assigned attendant privileges for my lot
+* **And** the attendant must log in with the dedicated Attendant credentials rather than switching from a public account session.
 
 ### Epic 4: The Core Parking Loop
 **Goal:** Drivers can check-in/out and attendants process payments.
