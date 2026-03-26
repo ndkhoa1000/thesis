@@ -1,7 +1,7 @@
 ---
 epic_id: EPIC-0
 title: Core Foundation & Integration Setup
-status: Draft
+status: Done
 ---
 
 # Epic 0: Core Foundation & Integration Setup
@@ -33,3 +33,8 @@ status: Draft
   - Actively detect and resolve contradictory instructions across docs (e.g., `SKILL.md` vs `tech-design.md`).
   - If a test fails repeatedly, stop and re-evaluate the approach to prevent "vibe coding" inside an infinite loop.
   - Rely on targeted integration tests verifying that the frontend and backend communicate smoothly.
+
+## Completion Notes
+- Backend health and parking-domain scaffold routes exist and are runnable.
+- Flutter project bootstrap and Mapbox integration are in place for local testing.
+- Epic 1 should start by replacing remaining mock/bootstrap behavior with backend-owned authentication and user profile flows.

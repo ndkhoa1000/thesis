@@ -14,11 +14,17 @@
 
 ## Current Technical Direction
 
-- **Frontend:** React Native mobile app with Expo.
+- **Frontend:** Flutter mobile app.
 - **Backend:** Existing FastAPI backend in `backend/`, managed with `uv` and used as the mandatory application server.
 - **Database:** PostgreSQL.
 - **Media storage:** Cloudinary.
 - **Integration rule:** Mobile communicates only with FastAPI. Supabase is excluded from the project architecture.
+
+## Current Delivery Status
+
+- **Epic 0:** Foundation complete and runnable.
+- **Mobile state:** Flutter app currently proves local map/bootstrap flow and still needs backend-auth and API integration work.
+- **Next implementation focus:** Epic 1 (User Identity & Profiles).
 
 ---
 *Generated via `bmad-index-docs`*
