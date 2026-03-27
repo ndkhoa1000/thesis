@@ -9,6 +9,8 @@ import 'src/features/auth/data/auth_service.dart';
 import 'src/features/auth/presentation/auth_gate.dart';
 import 'src/features/admin_approvals/data/admin_approvals_service.dart';
 import 'src/features/admin_approvals/presentation/admin_approvals_screen.dart';
+import 'src/features/attendant_check_in/data/attendant_check_in_service.dart';
+import 'src/features/attendant_check_in/presentation/attendant_check_in_screen.dart';
 import 'src/features/driver_check_in/data/driver_check_in_service.dart';
 import 'src/features/driver_check_in/presentation/driver_check_in_screen.dart';
 import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
@@ -35,6 +37,8 @@ typedef OperatorLotManagementServiceFactory =
     OperatorLotManagementService Function(String accessToken);
 typedef DriverCheckInServiceFactory =
     DriverCheckInService Function(String accessToken);
+typedef AttendantCheckInServiceFactory =
+    AttendantCheckInService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -90,6 +94,16 @@ OperatorLotManagementService defaultOperatorLotManagementServiceFactory(
 DriverCheckInService defaultDriverCheckInServiceFactory(String accessToken) {
   final apiClient = ApiClient();
   return BackendDriverCheckInService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+AttendantCheckInService defaultAttendantCheckInServiceFactory(
+  String accessToken,
+) {
+  final apiClient = ApiClient();
+  return BackendAttendantCheckInService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -254,9 +268,16 @@ final List<ParkingLot> mockParkingLots = [
 // =========================================================
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, required this.authService});
+  const MyApp({
+    super.key,
+    required this.authService,
+    this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
+    this.attendantScannerBuilder = defaultAttendantScannerBuilder,
+  });
 
   final AuthService authService;
+  final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
+  final AttendantScannerBuilder attendantScannerBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +295,8 @@ class MyApp extends StatelessWidget {
               authService: authService,
               onSignOut: onSignOut,
               onSessionUpdated: onSessionUpdated,
+              attendantCheckInServiceFactory: attendantCheckInServiceFactory,
+              attendantScannerBuilder: attendantScannerBuilder,
             ),
       ),
     );
@@ -296,6 +319,8 @@ class AuthenticatedHome extends StatelessWidget {
     this.operatorLotManagementServiceFactory =
         defaultOperatorLotManagementServiceFactory,
     this.driverCheckInServiceFactory = defaultDriverCheckInServiceFactory,
+    this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
+    this.attendantScannerBuilder = defaultAttendantScannerBuilder,
   });
 
   final AuthSession session;
@@ -309,16 +334,8 @@ class AuthenticatedHome extends StatelessWidget {
   final ParkingLotServiceFactory parkingLotServiceFactory;
   final OperatorLotManagementServiceFactory operatorLotManagementServiceFactory;
   final DriverCheckInServiceFactory driverCheckInServiceFactory;
-
-  List<Widget> _buildAuthActions() {
-    return [
-      IconButton(
-        icon: const Icon(Icons.logout),
-        tooltip: 'Đăng xuất',
-        onPressed: onSignOut,
-      ),
-    ];
-  }
+  final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
+  final AttendantScannerBuilder attendantScannerBuilder;
 
   List<Widget> _buildPublicActions(BuildContext context) {
     return [
@@ -352,21 +369,6 @@ class AuthenticatedHome extends StatelessWidget {
     ];
   }
 
-  Widget _buildWorkspacePlaceholder({
-    required String title,
-    required String message,
-  }) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title), actions: _buildAuthActions()),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(message, textAlign: TextAlign.center),
-        ),
-      ),
-    );
-  }
-
   bool get _hasLotOwnerWorkspace =>
       (session.capabilities['lot_owner'] ?? false) ||
       session.role == 'LOT_OWNER';
@@ -387,10 +389,12 @@ class AuthenticatedHome extends StatelessWidget {
     }
 
     if (session.isAttendant) {
-      return _buildWorkspacePlaceholder(
-        title: 'Attendant Workspace',
-        message:
-            'Đăng nhập thành công với tài khoản Attendant. Luồng nghiệp vụ attendant sẽ được triển khai ở các story sau.',
+      return AttendantCheckInScreen(
+        attendantCheckInService: attendantCheckInServiceFactory(
+          session.accessToken,
+        ),
+        scannerBuilder: attendantScannerBuilder,
+        onSignOut: onSignOut,
       );
     }
 

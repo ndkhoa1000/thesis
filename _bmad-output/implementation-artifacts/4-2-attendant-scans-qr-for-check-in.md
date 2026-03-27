@@ -1,6 +1,6 @@
 # Story 4.2: Attendant Scans QR for Check-In
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -29,20 +29,20 @@ so that I can register the vehicle's entry in under 5 seconds.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add attendant QR check-in backend contract (AC: 2, 3, 4)
-  - [ ] Extend the sessions API with an Attendant-facing check-in endpoint that validates the Story 4.1 driver token and resolves the attendant's assigned lot context securely.
-  - [ ] Create the `ParkingSession` atomically while updating lot availability in the same transaction.
-  - [ ] Reject invalid, expired, malformed, duplicate, or already-active-session scans without creating partial session state.
+- [x] Task 1: Add attendant QR check-in backend contract (AC: 2, 3, 4)
+  - [x] Extend the sessions API with an Attendant-facing check-in endpoint that validates the Story 4.1 driver token and resolves the attendant's assigned lot context securely.
+  - [x] Create the `ParkingSession` atomically while updating lot availability in the same transaction.
+  - [x] Reject invalid, expired, malformed, duplicate, or already-active-session scans without creating partial session state.
 
-- [ ] Task 2: Add a usable attendant gate flow in Flutter (AC: 1, 3, 4, 5)
-  - [ ] Replace the current Attendant placeholder with a minimal scanner-first screen in the existing auth routing path.
-  - [ ] Add an attendant feature service that submits scanned QR payloads to the backend and renders success/error states for gate operation.
-  - [ ] Keep the UI focused on QR check-in only; do not add walk-in plate entry, photo capture, checkout, or payment controls in this story.
+- [x] Task 2: Add a usable attendant gate flow in Flutter (AC: 1, 3, 4, 5)
+  - [x] Replace the current Attendant placeholder with a minimal scanner-first screen in the existing auth routing path.
+  - [x] Add an attendant feature service that submits scanned QR payloads to the backend and renders success/error states for gate operation.
+  - [x] Keep the UI focused on QR check-in only; do not add walk-in plate entry, photo capture, checkout, or payment controls in this story.
 
-- [ ] Task 3: Add focused regression coverage (AC: 2, 3, 4)
-  - [ ] Add backend tests for valid token consumption, active-session rejection, invalid-token rejection, and atomic lot/session updates.
-  - [ ] Add Flutter widget coverage for attendant placeholder replacement, check-in success feedback, and failed-scan states.
-  - [ ] Verify backend in Docker and Flutter locally after wiring the flow.
+- [x] Task 3: Add focused regression coverage (AC: 2, 3, 4)
+  - [x] Add backend tests for valid token consumption, active-session rejection, invalid-token rejection, and atomic lot/session updates.
+  - [x] Add Flutter widget coverage for attendant placeholder replacement, check-in success feedback, and failed-scan states.
+  - [x] Verify backend in Docker and Flutter locally after wiring the flow.
 
 ## Dev Notes
 
@@ -122,12 +122,25 @@ GPT-5.4
 
 - Story created from Epic 4 planning, PRD check-in requirements, current tech design, UX gate-flow requirements, Story 3.3 attendant provisioning, and Story 4.1 pre-session QR implementation.
 - Key guardrail: Story 4.2 is the first boundary that creates `ParkingSession`; it must consume the backend-signed pre-session QR from Story 4.1 and update lot availability atomically.
+- Added `POST /sessions/attendant-check-in` for attendant-only token consumption, server-side validation, duplicate-session rejection, and atomic `ParkingSession` plus lot-capacity updates.
+- Replaced the Attendant placeholder route with a scanner-first gate screen backed by an injectable Flutter service and QR scanner builder, with success and failure feedback sized for gate use.
+- Validation completed with focused backend Docker tests and focused Flutter widget tests.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/4-2-attendant-scans-qr-for-check-in.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/schemas/session.py`
+- `backend/tests/test_attendant_check_in.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/features/attendant_check_in/data/attendant_check_in_service.dart`
+- `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
+- `mobile/pubspec.yaml`
+- `mobile/test/attendant_check_in_screen_test.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-27: Created Story 4.2 implementation artifact with attendant-only check-in guardrails, transaction requirements, and interim mobile-shell guidance.
+- 2026-03-27: Implemented attendant QR check-in backend and Flutter gate flow, added focused backend/widget regression coverage, and validated the story end-to-end.

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:parking_app/main.dart';
 import 'package:parking_app/src/features/admin_approvals/data/admin_approvals_service.dart';
 import 'package:parking_app/src/features/admin_approvals/presentation/admin_approvals_screen.dart';
+import 'package:parking_app/src/features/attendant_check_in/data/attendant_check_in_service.dart';
 import 'package:parking_app/src/features/auth/data/auth_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
@@ -110,6 +111,38 @@ class FakeVehicleService implements VehicleService {
 
   @override
   Future<List<Vehicle>> listVehicles() async => List<Vehicle>.from(_vehicles);
+}
+
+class FakeAttendantCheckInService implements AttendantCheckInService {
+  FakeAttendantCheckInService({this.result, this.errorMessage});
+
+  final AttendantCheckInResult? result;
+  final String? errorMessage;
+
+  @override
+  Future<AttendantCheckInResult> checkInDriver({required String token}) async {
+    if (errorMessage != null) {
+      throw AttendantCheckInException(errorMessage!);
+    }
+
+    return result ??
+        AttendantCheckInResult(
+          sessionId: 901,
+          parkingLotId: 13,
+          currentAvailable: 4,
+          licensePlate: '59A-12345',
+          vehicleType: 'MOTORBIKE',
+          checkedInAt: DateTime(2026, 3, 27, 8, 30),
+        );
+  }
+}
+
+Widget _fakeAttendantScannerBuilder(
+  BuildContext context,
+  Future<void> Function(String token) onDetect,
+  bool isBusy,
+) {
+  return const SizedBox.expand();
 }
 
 class FakeLotOwnerApplicationService implements LotOwnerApplicationService {
@@ -363,7 +396,9 @@ class FakeParkingLotService implements ParkingLotService {
     required int managerUserId,
     double monthlyFee = 0,
   }) async {
-    final operator = _operators.firstWhere((item) => item.userId == managerUserId);
+    final operator = _operators.firstWhere(
+      (item) => item.userId == managerUserId,
+    );
     final index = _parkingLots.indexWhere((lot) => lot.id == parkingLotId);
     final current = _parkingLots[index];
     _parkingLots[index] = ParkingLotRegistration(
@@ -575,11 +610,13 @@ void main() {
             },
           ),
         ),
+        attendantCheckInServiceFactory: (_) => FakeAttendantCheckInService(),
+        attendantScannerBuilder: _fakeAttendantScannerBuilder,
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Attendant Workspace'), findsOneWidget);
+    expect(find.text('Quét mã check-in'), findsOneWidget);
   });
 
   testWidgets('ParkingApp routes admin session to approvals dashboard', (
@@ -1352,7 +1389,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Gán operator thử nghiệm'));
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Gán operator thử nghiệm'),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Tran Thi B'));

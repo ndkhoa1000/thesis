@@ -18,3 +18,20 @@ class DriverCheckInTokenRead(BaseModel):
     expires_at: datetime
     expires_in_seconds: int
     vehicle: VehicleRead
+
+
+class AttendantCheckInCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1)
+
+
+class AttendantCheckInRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    current_available: int
+    license_plate: str
+    vehicle_type: str
+    checked_in_at: datetime
