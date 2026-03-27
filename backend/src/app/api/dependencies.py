@@ -66,7 +66,7 @@ async def get_optional_user(request: Request, db: AsyncSession = Depends(async_g
 
 
 async def get_current_superuser(current_user: Annotated[dict, Depends(get_current_user)]) -> dict:
-    if not current_user["is_superuser"]:
+    if not (current_user.get("is_superuser") or current_user.get("role") == "ADMIN"):
         raise ForbiddenException("You do not have enough privileges.")
 
     return current_user

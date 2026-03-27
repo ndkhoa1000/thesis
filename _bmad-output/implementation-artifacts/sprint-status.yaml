@@ -44,9 +44,9 @@ development_status:
   1-4-apply-to-become-lot-owner: done
   1-5-apply-to-become-operator: done
   epic-1-retrospective: done
-  epic-2: backlog
-  2-1-register-new-parking-lot: backlog
-  2-2-admin-dashboard-pending-approvals: ready-for-dev
+  epic-2: in-progress
+  2-1-register-new-parking-lot: done
+  2-2-admin-dashboard-pending-approvals: done
   2-3-admin-system-management-lot-suspension: backlog
   epic-2-retrospective: optional
   epic-3: backlog

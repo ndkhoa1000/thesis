@@ -1,0 +1,286 @@
+import 'package:dio/dio.dart';
+
+enum ApprovalSubjectType { lotOwner, operator, parkingLot }
+
+class AdminApprovalItem {
+  const AdminApprovalItem({
+    required this.id,
+    required this.type,
+    required this.applicantName,
+    required this.phoneNumber,
+    required this.businessLicense,
+    required this.documentReference,
+    required this.status,
+    this.notes,
+    this.rejectionReason,
+    this.parkingLotName,
+    this.parkingLotAddress,
+    this.coverImage,
+  });
+
+  final int id;
+  final ApprovalSubjectType type;
+  final String applicantName;
+  final String phoneNumber;
+  final String businessLicense;
+  final String documentReference;
+  final String status;
+  final String? notes;
+  final String? rejectionReason;
+  final String? parkingLotName;
+  final String? parkingLotAddress;
+  final String? coverImage;
+
+  bool get isPending => status == 'PENDING';
+
+  String get title => switch (type) {
+    ApprovalSubjectType.lotOwner => 'Hồ sơ Chủ bãi',
+    ApprovalSubjectType.operator => 'Hồ sơ Operator',
+    ApprovalSubjectType.parkingLot => 'Đăng ký bãi xe',
+  };
+
+  String get typeLabel => switch (type) {
+    ApprovalSubjectType.lotOwner => 'Chủ bãi',
+    ApprovalSubjectType.operator => 'Operator',
+    ApprovalSubjectType.parkingLot => 'Bãi xe',
+  };
+
+  factory AdminApprovalItem.fromLotOwnerJson(Map<String, dynamic> json) {
+    return AdminApprovalItem(
+      id: json['id'] as int,
+      type: ApprovalSubjectType.lotOwner,
+      applicantName: json['full_name'] as String,
+      phoneNumber: json['phone_number'] as String,
+      businessLicense: json['business_license'] as String,
+      documentReference: json['document_reference'] as String,
+      status: json['status'] as String,
+      notes: json['notes'] as String?,
+      rejectionReason: json['rejection_reason'] as String?,
+    );
+  }
+
+  factory AdminApprovalItem.fromOperatorJson(Map<String, dynamic> json) {
+    return AdminApprovalItem(
+      id: json['id'] as int,
+      type: ApprovalSubjectType.operator,
+      applicantName: json['full_name'] as String,
+      phoneNumber: json['phone_number'] as String,
+      businessLicense: json['business_license'] as String,
+      documentReference: json['document_reference'] as String,
+      status: json['status'] as String,
+      notes: json['notes'] as String?,
+      rejectionReason: json['rejection_reason'] as String?,
+    );
+  }
+
+  factory AdminApprovalItem.fromParkingLotJson(Map<String, dynamic> json) {
+    return AdminApprovalItem(
+      id: json['id'] as int,
+      type: ApprovalSubjectType.parkingLot,
+      applicantName: (json['owner_name'] as String?) ?? 'Lot Owner',
+      phoneNumber: (json['owner_phone'] as String?) ?? 'Chưa có',
+      businessLicense: (json['owner_business_license'] as String?) ?? 'Chưa có',
+      documentReference: json['address'] as String,
+      status: json['status'] as String,
+      notes: json['description'] as String?,
+      parkingLotName: json['name'] as String,
+      parkingLotAddress: json['address'] as String,
+      coverImage: json['cover_image'] as String?,
+    );
+  }
+}
+
+class AdminApprovalsDashboard {
+  const AdminApprovalsDashboard({
+    required this.lotOwnerApplications,
+    required this.operatorApplications,
+    required this.parkingLotApplications,
+  });
+
+  final List<AdminApprovalItem> lotOwnerApplications;
+  final List<AdminApprovalItem> operatorApplications;
+  final List<AdminApprovalItem> parkingLotApplications;
+}
+
+abstract class AdminApprovalsService {
+  Future<AdminApprovalsDashboard> loadDashboard();
+
+  Future<AdminApprovalItem> approve({
+    required ApprovalSubjectType type,
+    required int applicationId,
+  });
+
+  Future<AdminApprovalItem> reject({
+    required ApprovalSubjectType type,
+    required int applicationId,
+    required String rejectionReason,
+  });
+}
+
+class BackendAdminApprovalsService implements AdminApprovalsService {
+  BackendAdminApprovalsService({required Dio dio, required String accessToken})
+    : _dio = dio,
+      _accessToken = accessToken;
+
+  final Dio _dio;
+  final String _accessToken;
+
+  Options get _authOptions =>
+      Options(headers: {'Authorization': 'Bearer $_accessToken'});
+
+  @override
+  Future<AdminApprovalsDashboard> loadDashboard() async {
+    try {
+      final lotOwnerResponse = await _dio.get<dynamic>(
+        '/admin/lot-owner-applications',
+        options: _authOptions,
+      );
+      final operatorResponse = await _dio.get<dynamic>(
+        '/admin/operator-applications',
+        options: _authOptions,
+      );
+      final parkingLotResponse = await _dio.get<dynamic>(
+        '/admin/parking-lots',
+        options: _authOptions,
+      );
+
+      final lotOwnerItems = _parseList(
+        lotOwnerResponse.data,
+        AdminApprovalItem.fromLotOwnerJson,
+      ).where((item) => item.isPending).toList();
+      final operatorItems = _parseList(
+        operatorResponse.data,
+        AdminApprovalItem.fromOperatorJson,
+      ).where((item) => item.isPending).toList();
+      final parkingLotItems = _parseList(
+        parkingLotResponse.data,
+        AdminApprovalItem.fromParkingLotJson,
+      ).where((item) => item.isPending).toList();
+
+      return AdminApprovalsDashboard(
+        lotOwnerApplications: lotOwnerItems,
+        operatorApplications: operatorItems,
+        parkingLotApplications: parkingLotItems,
+      );
+    } on DioException catch (error) {
+      throw AdminApprovalsException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AdminApprovalItem> approve({
+    required ApprovalSubjectType type,
+    required int applicationId,
+  }) {
+    return _review(
+      type: type,
+      applicationId: applicationId,
+      decision: 'APPROVED',
+    );
+  }
+
+  @override
+  Future<AdminApprovalItem> reject({
+    required ApprovalSubjectType type,
+    required int applicationId,
+    required String rejectionReason,
+  }) {
+    return _review(
+      type: type,
+      applicationId: applicationId,
+      decision: 'REJECTED',
+      rejectionReason: rejectionReason,
+    );
+  }
+
+  Future<AdminApprovalItem> _review({
+    required ApprovalSubjectType type,
+    required int applicationId,
+    required String decision,
+    String? rejectionReason,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '${_reviewPath(type, applicationId)}',
+        data: {'decision': decision, 'rejection_reason': rejectionReason},
+        options: _authOptions,
+      );
+
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AdminApprovalsException(
+          'Phản hồi duyệt hồ sơ không hợp lệ.',
+        );
+      }
+      return _fromJson(type, raw);
+    } on DioException catch (error) {
+      throw AdminApprovalsException(_extractMessage(error));
+    }
+  }
+
+  List<AdminApprovalItem> _parseList(
+    dynamic raw,
+    AdminApprovalItem Function(Map<String, dynamic>) parser,
+  ) {
+    if (raw is! List) {
+      throw const AdminApprovalsException(
+        'Phản hồi danh sách phê duyệt không hợp lệ.',
+      );
+    }
+
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(parser)
+        .toList(growable: false);
+  }
+
+  AdminApprovalItem _fromJson(
+    ApprovalSubjectType type,
+    Map<String, dynamic> json,
+  ) {
+    return switch (type) {
+      ApprovalSubjectType.lotOwner => AdminApprovalItem.fromLotOwnerJson(json),
+      ApprovalSubjectType.operator => AdminApprovalItem.fromOperatorJson(json),
+      ApprovalSubjectType.parkingLot => AdminApprovalItem.fromParkingLotJson(
+        json,
+      ),
+    };
+  }
+
+  String _reviewPath(ApprovalSubjectType type, int applicationId) {
+    return switch (type) {
+      ApprovalSubjectType.lotOwner =>
+        '/admin/lot-owner-applications/$applicationId/review',
+      ApprovalSubjectType.operator =>
+        '/admin/operator-applications/$applicationId/review',
+      ApprovalSubjectType.parkingLot =>
+        '/admin/parking-lots/$applicationId/review',
+    };
+  }
+
+  String _extractMessage(DioException error) {
+    final data = error.response?.data;
+    if (data is Map<String, dynamic>) {
+      final detail = data['detail'];
+      if (detail is String) {
+        return detail;
+      }
+      if (detail is List && detail.isNotEmpty) {
+        final first = detail.first;
+        if (first is Map<String, dynamic> && first['msg'] is String) {
+          return first['msg'] as String;
+        }
+      }
+    }
+    return 'Không thể tải hoặc xử lý danh sách phê duyệt lúc này.';
+  }
+}
+
+class AdminApprovalsException implements Exception {
+  const AdminApprovalsException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}

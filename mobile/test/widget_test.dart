@@ -3,11 +3,15 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:parking_app/main.dart';
+import 'package:parking_app/src/features/admin_approvals/data/admin_approvals_service.dart';
+import 'package:parking_app/src/features/admin_approvals/presentation/admin_approvals_screen.dart';
 import 'package:parking_app/src/features/auth/data/auth_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'package:parking_app/src/features/operator_application/data/operator_application_service.dart';
 import 'package:parking_app/src/features/operator_application/presentation/operator_application_screen.dart';
+import 'package:parking_app/src/features/parking_lot_registration/data/parking_lot_service.dart';
+import 'package:parking_app/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
 import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
 import 'package:parking_app/src/features/vehicles/presentation/vehicle_screen.dart';
 
@@ -164,6 +168,104 @@ class FakeOperatorApplicationService implements OperatorApplicationService {
   }
 }
 
+class FakeAdminApprovalsService implements AdminApprovalsService {
+  FakeAdminApprovalsService({
+    List<AdminApprovalItem>? lotOwnerApplications,
+    List<AdminApprovalItem>? operatorApplications,
+    List<AdminApprovalItem>? parkingLotApplications,
+  }) : _lotOwnerApplications = List<AdminApprovalItem>.from(
+         lotOwnerApplications ?? const [],
+       ),
+       _operatorApplications = List<AdminApprovalItem>.from(
+         operatorApplications ?? const [],
+       ),
+       _parkingLotApplications = List<AdminApprovalItem>.from(
+         parkingLotApplications ?? const [],
+       );
+
+  final List<AdminApprovalItem> _lotOwnerApplications;
+  final List<AdminApprovalItem> _operatorApplications;
+  final List<AdminApprovalItem> _parkingLotApplications;
+
+  @override
+  Future<AdminApprovalsDashboard> loadDashboard() async {
+    return AdminApprovalsDashboard(
+      lotOwnerApplications: List<AdminApprovalItem>.from(_lotOwnerApplications),
+      operatorApplications: List<AdminApprovalItem>.from(_operatorApplications),
+      parkingLotApplications: List<AdminApprovalItem>.from(
+        _parkingLotApplications,
+      ),
+    );
+  }
+
+  @override
+  Future<AdminApprovalItem> approve({
+    required ApprovalSubjectType type,
+    required int applicationId,
+  }) async {
+    final item = _removeItem(type, applicationId);
+    return item;
+  }
+
+  @override
+  Future<AdminApprovalItem> reject({
+    required ApprovalSubjectType type,
+    required int applicationId,
+    required String rejectionReason,
+  }) async {
+    final item = _removeItem(type, applicationId);
+    return item;
+  }
+
+  AdminApprovalItem _removeItem(ApprovalSubjectType type, int applicationId) {
+    final source = switch (type) {
+      ApprovalSubjectType.lotOwner => _lotOwnerApplications,
+      ApprovalSubjectType.operator => _operatorApplications,
+      ApprovalSubjectType.parkingLot => _parkingLotApplications,
+    };
+    final index = source.indexWhere((item) => item.id == applicationId);
+    return source.removeAt(index);
+  }
+}
+
+class FakeParkingLotService implements ParkingLotService {
+  FakeParkingLotService({List<ParkingLotRegistration>? initialLots})
+    : _parkingLots = List<ParkingLotRegistration>.from(initialLots ?? const []);
+
+  final List<ParkingLotRegistration> _parkingLots;
+  int _nextId = 100;
+
+  @override
+  Future<ParkingLotRegistration> createParkingLot({
+    required String name,
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? description,
+    String? coverImage,
+  }) async {
+    final parkingLot = ParkingLotRegistration(
+      id: _nextId++,
+      lotOwnerId: 1,
+      name: name,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      currentAvailable: 0,
+      status: 'PENDING',
+      description: description,
+      coverImage: coverImage,
+    );
+    _parkingLots.insert(0, parkingLot);
+    return parkingLot;
+  }
+
+  @override
+  Future<List<ParkingLotRegistration>> getMyParkingLots() async {
+    return List<ParkingLotRegistration>.from(_parkingLots);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -233,6 +335,101 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Attendant Workspace'), findsOneWidget);
+  });
+
+  testWidgets('ParkingApp routes admin session to approvals dashboard', (
+    WidgetTester tester,
+  ) async {
+    final approvalsService = FakeAdminApprovalsService(
+      lotOwnerApplications: const [
+        AdminApprovalItem(
+          id: 1,
+          type: ApprovalSubjectType.lotOwner,
+          applicantName: 'Nguyen Van A',
+          phoneNumber: '0909123456',
+          businessLicense: 'BL-001',
+          documentReference: 'https://example.com/doc.pdf',
+          status: 'PENDING',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthenticatedHome(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'ADMIN',
+            capabilities: {
+              'driver': false,
+              'lot_owner': false,
+              'operator': false,
+              'attendant': false,
+              'admin': true,
+              'public_account': false,
+            },
+          ),
+          authService: FakeAuthService(),
+          onSignOut: () async {},
+          onSessionUpdated: (_) {},
+          adminApprovalsServiceFactory: (_) => approvalsService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AdminApprovalsScreen), findsOneWidget);
+    expect(find.text('Phê duyệt hệ thống'), findsOneWidget);
+    expect(find.text('Nguyen Van A'), findsOneWidget);
+  });
+
+  testWidgets('ParkingApp routes lot owner session to parking lot workspace', (
+    WidgetTester tester,
+  ) async {
+    final parkingLotService = FakeParkingLotService(
+      initialLots: const [
+        ParkingLotRegistration(
+          id: 7,
+          lotOwnerId: 1,
+          name: 'Bai xe Nguyen Hue',
+          address: '1 Nguyen Hue, Quan 1',
+          latitude: 10.7732,
+          longitude: 106.7041,
+          currentAvailable: 0,
+          status: 'PENDING',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthenticatedHome(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'LOT_OWNER',
+            capabilities: {
+              'driver': true,
+              'lot_owner': true,
+              'operator': false,
+              'attendant': false,
+              'admin': false,
+              'public_account': true,
+            },
+          ),
+          authService: FakeAuthService(),
+          onSignOut: () async {},
+          onSessionUpdated: (_) {},
+          parkingLotServiceFactory: (_) => parkingLotService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ParkingLotRegistrationScreen), findsOneWidget);
+    expect(find.text('Bãi xe của tôi'), findsOneWidget);
+    expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
   });
 
   testWidgets(
@@ -601,4 +798,134 @@ void main() {
       expect(applicationService.application, isNull);
     },
   );
+
+  testWidgets('Admin approvals dashboard can approve a pending application', (
+    WidgetTester tester,
+  ) async {
+    final approvalsService = FakeAdminApprovalsService(
+      operatorApplications: const [
+        AdminApprovalItem(
+          id: 9,
+          type: ApprovalSubjectType.operator,
+          applicantName: 'Tran Thi B',
+          phoneNumber: '0909555666',
+          businessLicense: 'OP-001',
+          documentReference: 'https://example.com/operator.pdf',
+          status: 'PENDING',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminApprovalsScreen(
+          approvalsService: approvalsService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Operator'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tran Thi B'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Duyệt'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tran Thi B'), findsNothing);
+    expect(find.text('Không có hồ sơ Operator chờ duyệt'), findsOneWidget);
+  });
+
+  testWidgets('Lot owner workspace can submit a new parking lot', (
+    WidgetTester tester,
+  ) async {
+    final parkingLotService = FakeParkingLotService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ParkingLotRegistrationScreen(
+          parkingLotService: parkingLotService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chưa có bãi xe nào được khai báo'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Tạo hồ sơ bãi xe'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tên bãi xe'),
+      'Bai xe Ben Thanh',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Địa chỉ'),
+      '45 Le Loi, Quan 1',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Vĩ độ'),
+      '10.772900',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Kinh độ'),
+      '106.698300',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mô tả'),
+      'Co camera va che mua',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Gửi đăng ký'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Ben Thanh'), findsOneWidget);
+    expect(find.text('Đang chờ duyệt'), findsOneWidget);
+  });
+
+  testWidgets('Admin dashboard can approve a pending parking lot', (
+    WidgetTester tester,
+  ) async {
+    final approvalsService = FakeAdminApprovalsService(
+      parkingLotApplications: const [
+        AdminApprovalItem(
+          id: 12,
+          type: ApprovalSubjectType.parkingLot,
+          applicantName: 'Nguyen Van A',
+          phoneNumber: '0909123456',
+          businessLicense: 'BL-001',
+          documentReference: '1 Nguyen Hue, Quan 1',
+          status: 'PENDING',
+          parkingLotName: 'Bai xe Nguyen Hue',
+          parkingLotAddress: '1 Nguyen Hue, Quan 1',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminApprovalsScreen(
+          approvalsService: approvalsService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Bãi xe'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Duyệt'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Nguyen Hue'), findsNothing);
+    expect(find.text('Không có đăng ký bãi xe chờ duyệt'), findsOneWidget);
+  });
 }

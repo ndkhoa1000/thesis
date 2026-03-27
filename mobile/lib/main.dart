@@ -7,10 +7,14 @@ import 'src/core/auth/token_store.dart';
 import 'src/core/network/api_client.dart';
 import 'src/features/auth/data/auth_service.dart';
 import 'src/features/auth/presentation/auth_gate.dart';
+import 'src/features/admin_approvals/data/admin_approvals_service.dart';
+import 'src/features/admin_approvals/presentation/admin_approvals_screen.dart';
 import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'src/features/operator_application/data/operator_application_service.dart';
 import 'src/features/operator_application/presentation/operator_application_screen.dart';
+import 'src/features/parking_lot_registration/data/parking_lot_service.dart';
+import 'src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
 import 'src/features/vehicles/data/vehicle_service.dart';
 import 'src/features/vehicles/presentation/vehicle_screen.dart';
 
@@ -19,6 +23,10 @@ typedef LotOwnerApplicationServiceFactory =
     LotOwnerApplicationService Function(String accessToken);
 typedef OperatorApplicationServiceFactory =
     OperatorApplicationService Function(String accessToken);
+typedef AdminApprovalsServiceFactory =
+    AdminApprovalsService Function(String accessToken);
+typedef ParkingLotServiceFactory =
+    ParkingLotService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -40,6 +48,22 @@ OperatorApplicationService defaultOperatorApplicationServiceFactory(
 ) {
   final apiClient = ApiClient();
   return BackendOperatorApplicationService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+AdminApprovalsService defaultAdminApprovalsServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendAdminApprovalsService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+ParkingLotService defaultParkingLotServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendParkingLotService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -218,6 +242,8 @@ class AuthenticatedHome extends StatelessWidget {
     this.applicationServiceFactory = defaultLotOwnerApplicationServiceFactory,
     this.operatorApplicationServiceFactory =
         defaultOperatorApplicationServiceFactory,
+    this.adminApprovalsServiceFactory = defaultAdminApprovalsServiceFactory,
+    this.parkingLotServiceFactory = defaultParkingLotServiceFactory,
   });
 
   final AuthSession session;
@@ -227,6 +253,8 @@ class AuthenticatedHome extends StatelessWidget {
   final VehicleServiceFactory vehicleServiceFactory;
   final LotOwnerApplicationServiceFactory applicationServiceFactory;
   final OperatorApplicationServiceFactory operatorApplicationServiceFactory;
+  final AdminApprovalsServiceFactory adminApprovalsServiceFactory;
+  final ParkingLotServiceFactory parkingLotServiceFactory;
 
   List<Widget> _buildAuthActions() {
     return [
@@ -288,10 +316,9 @@ class AuthenticatedHome extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (session.isAdmin) {
-      return _buildWorkspacePlaceholder(
-        title: 'Admin Workspace',
-        message:
-            'Đăng nhập thành công với tài khoản Admin. Dashboard quản trị sẽ được triển khai ở các story sau.',
+      return AdminApprovalsScreen(
+        approvalsService: adminApprovalsServiceFactory(session.accessToken),
+        onSignOut: onSignOut,
       );
     }
 
@@ -312,10 +339,9 @@ class AuthenticatedHome extends StatelessWidget {
     }
 
     if (session.role == 'LOT_OWNER') {
-      return _buildWorkspacePlaceholder(
-        title: 'LotOwner Workspace',
-        message:
-            'Đăng nhập thành công ở workspace LotOwner. Các chức năng đăng ký bãi xe sẽ được mở ở Epic 2.',
+      return ParkingLotRegistrationScreen(
+        parkingLotService: parkingLotServiceFactory(session.accessToken),
+        onSignOut: onSignOut,
       );
     }
 
