@@ -214,10 +214,12 @@ class TestAuthTokenFlows:
         from src.app.core.schemas import RefreshTokenRequest
 
         payload = RefreshTokenRequest(refresh_token="refresh-token")
+        user = {"id": 1, "username": "tester", "is_active": True}
 
         with patch("src.app.api.v1.login.verify_token", new=AsyncMock(return_value=Mock(username_or_email="tester"))):
-            with patch("src.app.api.v1.login.create_access_token", new=AsyncMock(return_value="new-access-token")):
-                result = await refresh_access_token(Mock(), payload, mock_db)
+            with patch("src.app.api.v1.login.crud_users.get", new=AsyncMock(return_value=user)):
+                with patch("src.app.api.v1.login.create_access_token", new=AsyncMock(return_value="new-access-token")):
+                    result = await refresh_access_token(Mock(), payload, mock_db)
 
         assert result == {"access_token": "new-access-token", "token_type": "bearer"}
 
@@ -230,3 +232,57 @@ class TestAuthTokenFlows:
 
         with pytest.raises(UnauthorizedException, match="Refresh token missing"):
             await refresh_access_token(request, None, mock_db)
+
+    @pytest.mark.asyncio
+    async def test_authenticate_user_rejects_inactive_account(self, mock_db):
+        from src.app.core.security import authenticate_user
+
+        inactive_user = {
+            "id": 1,
+            "username": "tester",
+            "hashed_password": "hashed-password",
+            "is_active": False,
+        }
+
+        with patch("src.app.core.security.crud_users.get", new=AsyncMock(return_value=inactive_user)):
+            with patch("src.app.core.security.verify_password", new=AsyncMock(return_value=True)):
+                result = await authenticate_user("tester", "Str1ngst!123", mock_db)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_get_current_user_rejects_inactive_account(self, mock_db):
+        from src.app.api.dependencies import get_current_user
+
+        inactive_user = {
+            "id": 1,
+            "username": "tester",
+            "email": "tester@example.com",
+            "is_active": False,
+        }
+
+        with patch(
+            "src.app.api.dependencies.verify_token",
+            new=AsyncMock(return_value=Mock(username_or_email="tester")),
+        ):
+            with patch("src.app.api.dependencies.crud_users.get", new=AsyncMock(return_value=inactive_user)):
+                with pytest.raises(UnauthorizedException, match="User account is inactive"):
+                    await get_current_user("access-token", mock_db)
+
+    @pytest.mark.asyncio
+    async def test_refresh_rejects_inactive_account(self, mock_db):
+        from src.app.api.v1.login import refresh_access_token
+        from src.app.core.schemas import RefreshTokenRequest
+
+        payload = RefreshTokenRequest(refresh_token="refresh-token")
+        inactive_user = {
+            "id": 1,
+            "username": "tester",
+            "email": "tester@example.com",
+            "is_active": False,
+        }
+
+        with patch("src.app.api.v1.login.verify_token", new=AsyncMock(return_value=Mock(username_or_email="tester"))):
+            with patch("src.app.api.v1.login.crud_users.get", new=AsyncMock(return_value=inactive_user)):
+                with pytest.raises(UnauthorizedException, match="User account is inactive"):
+                    await refresh_access_token(Mock(), payload, mock_db)

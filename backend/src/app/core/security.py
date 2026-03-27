@@ -45,6 +45,9 @@ async def authenticate_user(username_or_email: str, password: str, db: AsyncSess
     if not db_user:
         return False
 
+    if not db_user.get("is_active", True):
+        return False
+
     if not await verify_password(password, db_user["hashed_password"]):
         return False
 

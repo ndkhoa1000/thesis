@@ -330,6 +330,15 @@ class AuthenticatedHome extends StatelessWidget {
     );
   }
 
+  bool get _hasLotOwnerWorkspace =>
+      (session.capabilities['lot_owner'] ?? false) || session.role == 'LOT_OWNER';
+
+  bool get _hasOperatorWorkspace =>
+      (session.capabilities['operator'] ?? false) || session.role == 'MANAGER';
+
+  bool get _needsPublicWorkspaceSwitcher =>
+      session.isPublicAccount && _hasLotOwnerWorkspace && _hasOperatorWorkspace;
+
   @override
   Widget build(BuildContext context) {
     if (session.isAdmin) {
@@ -347,8 +356,35 @@ class AuthenticatedHome extends StatelessWidget {
       );
     }
 
-    if ((session.capabilities['operator'] ?? false) ||
-        session.role == 'MANAGER') {
+    if (_needsPublicWorkspaceSwitcher) {
+      return _PublicWorkspaceSwitcherScreen(
+        openLotOwnerWorkspace: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ParkingLotRegistrationScreen(
+                parkingLotService: parkingLotServiceFactory(session.accessToken),
+                onSignOut: onSignOut,
+              ),
+            ),
+          );
+        },
+        openOperatorWorkspace: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => OperatorLotManagementScreen(
+                lotManagementService: operatorLotManagementServiceFactory(
+                  session.accessToken,
+                ),
+                onSignOut: onSignOut,
+              ),
+            ),
+          );
+        },
+        onSignOut: onSignOut,
+      );
+    }
+
+    if (_hasOperatorWorkspace) {
       return OperatorLotManagementScreen(
         lotManagementService: operatorLotManagementServiceFactory(
           session.accessToken,
@@ -357,7 +393,7 @@ class AuthenticatedHome extends StatelessWidget {
       );
     }
 
-    if (session.role == 'LOT_OWNER') {
+    if (_hasLotOwnerWorkspace) {
       return ParkingLotRegistrationScreen(
         parkingLotService: parkingLotServiceFactory(session.accessToken),
         onSignOut: onSignOut,
@@ -403,6 +439,65 @@ class AuthenticatedHome extends StatelessWidget {
       vehicleServiceFactory: vehicleServiceFactory,
       applicationServiceFactory: applicationServiceFactory,
       operatorApplicationServiceFactory: operatorApplicationServiceFactory,
+    );
+  }
+}
+
+class _PublicWorkspaceSwitcherScreen extends StatelessWidget {
+  const _PublicWorkspaceSwitcherScreen({
+    required this.openLotOwnerWorkspace,
+    required this.openOperatorWorkspace,
+    required this.onSignOut,
+  });
+
+  final VoidCallback openLotOwnerWorkspace;
+  final VoidCallback openOperatorWorkspace;
+  final Future<void> Function() onSignOut;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Chọn không gian làm việc'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Đăng xuất',
+            onPressed: onSignOut,
+          ),
+        ],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Tài khoản này có nhiều vai trò vận hành. Chọn workspace bạn muốn mở.',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: openLotOwnerWorkspace,
+                  icon: const Icon(Icons.storefront_outlined),
+                  label: const Text('Chủ bãi'),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: openOperatorWorkspace,
+                  icon: const Icon(Icons.settings_suggest_outlined),
+                  label: const Text('Operator'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

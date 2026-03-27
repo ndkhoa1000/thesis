@@ -310,6 +310,16 @@ class FakeParkingLotService implements ParkingLotService {
     : _parkingLots = List<ParkingLotRegistration>.from(initialLots ?? const []);
 
   final List<ParkingLotRegistration> _parkingLots;
+  final List<AvailableOperatorOption> _operators = <AvailableOperatorOption>[
+    const AvailableOperatorOption(
+      managerId: 4,
+      userId: 9,
+      name: 'Tran Thi B',
+      email: 'operator@test.com',
+      phone: '0909555666',
+      businessLicense: 'OP-001',
+    ),
+  ];
   int _nextId = 100;
 
   @override
@@ -340,6 +350,50 @@ class FakeParkingLotService implements ParkingLotService {
   @override
   Future<List<ParkingLotRegistration>> getMyParkingLots() async {
     return List<ParkingLotRegistration>.from(_parkingLots);
+  }
+
+  @override
+  Future<List<AvailableOperatorOption>> getAvailableOperators() async {
+    return List<AvailableOperatorOption>.from(_operators);
+  }
+
+  @override
+  Future<LeaseBootstrapAssignment> bootstrapLease({
+    required int parkingLotId,
+    required int managerUserId,
+    double monthlyFee = 0,
+  }) async {
+    final operator = _operators.firstWhere((item) => item.userId == managerUserId);
+    final index = _parkingLots.indexWhere((lot) => lot.id == parkingLotId);
+    final current = _parkingLots[index];
+    _parkingLots[index] = ParkingLotRegistration(
+      id: current.id,
+      lotOwnerId: current.lotOwnerId,
+      name: current.name,
+      address: current.address,
+      latitude: current.latitude,
+      longitude: current.longitude,
+      currentAvailable: current.currentAvailable,
+      status: current.status,
+      description: current.description,
+      coverImage: current.coverImage,
+      createdAt: current.createdAt,
+      updatedAt: DateTime(2026, 3, 27),
+      activeLeaseId: 88,
+      activeLeaseStatus: 'ACTIVE',
+      activeOperatorUserId: operator.userId,
+      activeOperatorName: operator.name,
+    );
+    return LeaseBootstrapAssignment(
+      leaseId: 88,
+      parkingLotId: parkingLotId,
+      managerId: operator.managerId,
+      managerUserId: operator.userId,
+      operatorName: operator.name,
+      status: 'ACTIVE',
+      monthlyFee: monthlyFee,
+      startDate: DateTime(2026, 3, 27),
+    );
   }
 }
 
@@ -732,6 +786,88 @@ void main() {
     expect(find.text('Bãi xe của tôi'), findsOneWidget);
     expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
   });
+
+  testWidgets(
+    'Public multi-capability session shows workspace switcher bridge',
+    (WidgetTester tester) async {
+      final parkingLotService = FakeParkingLotService(
+        initialLots: const [
+          ParkingLotRegistration(
+            id: 7,
+            lotOwnerId: 1,
+            name: 'Bai xe Nguyen Hue',
+            address: '1 Nguyen Hue, Quan 1',
+            latitude: 10.7732,
+            longitude: 106.7041,
+            currentAvailable: 0,
+            status: 'APPROVED',
+          ),
+        ],
+      );
+      final lotManagementService = FakeOperatorLotManagementService(
+        initialLots: const [
+          OperatorManagedParkingLot(
+            id: 18,
+            leaseId: 6,
+            lotOwnerId: 4,
+            name: 'Bai xe Mac Thi Buoi',
+            address: '6 Mac Thi Buoi, Quan 1',
+            latitude: 10.775,
+            longitude: 106.704,
+            currentAvailable: 5,
+            status: 'APPROVED',
+            occupiedCount: 1,
+            totalCapacity: 6,
+            openingTime: '05:30',
+            closingTime: '21:30',
+            pricingMode: 'SESSION',
+            priceAmount: 25000,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AuthenticatedHome(
+            session: const AuthSession(
+              accessToken: 'access',
+              refreshToken: 'refresh',
+              role: 'LOT_OWNER',
+              capabilities: {
+                'driver': true,
+                'lot_owner': true,
+                'operator': true,
+                'attendant': false,
+                'admin': false,
+                'public_account': true,
+              },
+            ),
+            authService: FakeAuthService(),
+            onSignOut: () async {},
+            onSessionUpdated: (_) {},
+            parkingLotServiceFactory: (_) => parkingLotService,
+            operatorLotManagementServiceFactory: (_) => lotManagementService,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chọn không gian làm việc'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Chủ bãi'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Operator'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Operator'));
+      await tester.pumpAndSettle();
+      expect(find.byType(OperatorLotManagementScreen), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Chủ bãi'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ParkingLotRegistrationScreen), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'Public workspace exposes vehicle management without Mapbox token',
@@ -1186,6 +1322,49 @@ void main() {
 
     expect(find.text('Bai xe Ben Thanh'), findsOneWidget);
     expect(find.text('Đang chờ duyệt'), findsOneWidget);
+  });
+
+  testWidgets('Lot owner workspace can bootstrap an operator lease', (
+    WidgetTester tester,
+  ) async {
+    final parkingLotService = FakeParkingLotService(
+      initialLots: const [
+        ParkingLotRegistration(
+          id: 7,
+          lotOwnerId: 1,
+          name: 'Bai xe Nguyen Hue',
+          address: '1 Nguyen Hue, Quan 1',
+          latitude: 10.7732,
+          longitude: 106.7041,
+          currentAvailable: 0,
+          status: 'APPROVED',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ParkingLotRegistrationScreen(
+          parkingLotService: parkingLotService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Gán operator thử nghiệm'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tran Thi B'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Kích hoạt điều hành'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Operator đang phụ trách'), findsOneWidget);
+    expect(find.text('Tran Thi B'), findsWidgets);
+    expect(find.text('Lease'), findsOneWidget);
+    expect(find.text('ACTIVE'), findsOneWidget);
   });
 
   testWidgets('Admin dashboard can approve a pending parking lot', (

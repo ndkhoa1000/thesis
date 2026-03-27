@@ -17,6 +17,7 @@ from ...core.security import (
     create_refresh_token,
     verify_token,
 )
+from ...crud.crud_users import crud_users
 from .auth import build_auth_response, resolve_auth_capabilities
 
 router = APIRouter(tags=["login"])
@@ -53,6 +54,16 @@ async def refresh_access_token(
     user_data = await verify_token(refresh_token, TokenType.REFRESH, db)
     if not user_data:
         raise UnauthorizedException("Invalid refresh token.")
+
+    if "@" in user_data.username_or_email:
+        user = await crud_users.get(db=db, email=user_data.username_or_email, is_deleted=False)
+    else:
+        user = await crud_users.get(db=db, username=user_data.username_or_email, is_deleted=False)
+
+    if not user:
+        raise UnauthorizedException("User not authenticated.")
+    if not user.get("is_active", True):
+        raise UnauthorizedException("User account is inactive.")
 
     new_access_token = await create_access_token(data={"sub": user_data.username_or_email})
     return {"access_token": new_access_token, "token_type": "bearer"}

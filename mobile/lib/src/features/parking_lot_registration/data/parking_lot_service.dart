@@ -12,6 +12,10 @@ class ParkingLotRegistration {
     required this.status,
     this.description,
     this.coverImage,
+    this.activeLeaseId,
+    this.activeLeaseStatus,
+    this.activeOperatorUserId,
+    this.activeOperatorName,
     this.createdAt,
     this.updatedAt,
   });
@@ -26,6 +30,10 @@ class ParkingLotRegistration {
   final String status;
   final String? description;
   final String? coverImage;
+  final int? activeLeaseId;
+  final String? activeLeaseStatus;
+  final int? activeOperatorUserId;
+  final String? activeOperatorName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -45,6 +53,10 @@ class ParkingLotRegistration {
       status: json['status'] as String,
       description: json['description'] as String?,
       coverImage: json['cover_image'] as String?,
+      activeLeaseId: json['active_lease_id'] as int?,
+      activeLeaseStatus: json['active_lease_status'] as String?,
+      activeOperatorUserId: json['active_operator_user_id'] as int?,
+      activeOperatorName: json['active_operator_name'] as String?,
       createdAt: _parseDateTime(json['created_at']),
       updatedAt: _parseDateTime(json['updated_at']),
     );
@@ -58,8 +70,80 @@ class ParkingLotRegistration {
   }
 }
 
+class AvailableOperatorOption {
+  const AvailableOperatorOption({
+    required this.managerId,
+    required this.userId,
+    required this.name,
+    required this.email,
+    this.phone,
+    this.businessLicense,
+  });
+
+  final int managerId;
+  final int userId;
+  final String name;
+  final String email;
+  final String? phone;
+  final String? businessLicense;
+
+  factory AvailableOperatorOption.fromJson(Map<String, dynamic> json) {
+    return AvailableOperatorOption(
+      managerId: json['manager_id'] as int,
+      userId: json['user_id'] as int,
+      name: json['name'] as String,
+      email: json['email'] as String,
+      phone: json['phone'] as String?,
+      businessLicense: json['business_license'] as String?,
+    );
+  }
+}
+
+class LeaseBootstrapAssignment {
+  const LeaseBootstrapAssignment({
+    required this.leaseId,
+    required this.parkingLotId,
+    required this.managerId,
+    required this.managerUserId,
+    required this.operatorName,
+    required this.status,
+    required this.monthlyFee,
+    this.startDate,
+  });
+
+  final int leaseId;
+  final int parkingLotId;
+  final int managerId;
+  final int managerUserId;
+  final String operatorName;
+  final String status;
+  final double monthlyFee;
+  final DateTime? startDate;
+
+  factory LeaseBootstrapAssignment.fromJson(Map<String, dynamic> json) {
+    return LeaseBootstrapAssignment(
+      leaseId: json['lease_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      managerId: json['manager_id'] as int,
+      managerUserId: json['manager_user_id'] as int,
+      operatorName: json['operator_name'] as String,
+      status: json['status'] as String,
+      monthlyFee: (json['monthly_fee'] as num).toDouble(),
+      startDate: ParkingLotRegistration._parseDateTime(json['start_date']),
+    );
+  }
+}
+
 abstract class ParkingLotService {
   Future<List<ParkingLotRegistration>> getMyParkingLots();
+
+  Future<List<AvailableOperatorOption>> getAvailableOperators();
+
+  Future<LeaseBootstrapAssignment> bootstrapLease({
+    required int parkingLotId,
+    required int managerUserId,
+    double monthlyFee = 0,
+  });
 
   Future<ParkingLotRegistration> createParkingLot({
     required String name,
@@ -99,6 +183,51 @@ class BackendParkingLotService implements ParkingLotService {
           .whereType<Map<String, dynamic>>()
           .map(ParkingLotRegistration.fromJson)
           .toList(growable: false);
+    } on DioException catch (error) {
+      throw ParkingLotException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<List<AvailableOperatorOption>> getAvailableOperators() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/user/me/operators',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! List) {
+        throw const ParkingLotException('Phản hồi danh sách operator không hợp lệ.');
+      }
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(AvailableOperatorOption.fromJson)
+          .toList(growable: false);
+    } on DioException catch (error) {
+      throw ParkingLotException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<LeaseBootstrapAssignment> bootstrapLease({
+    required int parkingLotId,
+    required int managerUserId,
+    double monthlyFee = 0,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/user/me/parking-lots/$parkingLotId/lease-bootstrap',
+        data: {
+          'manager_user_id': managerUserId,
+          'monthly_fee': monthlyFee,
+        },
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const ParkingLotException('Phản hồi kích hoạt operator không hợp lệ.');
+      }
+      return LeaseBootstrapAssignment.fromJson(raw);
     } on DioException catch (error) {
       throw ParkingLotException(_extractMessage(error));
     }

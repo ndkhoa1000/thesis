@@ -49,6 +49,10 @@ class ParkingLotRead(BaseModel):
     status: str
     description: str | None = None
     cover_image: str | None = None
+    active_lease_id: int | None = None
+    active_lease_status: str | None = None
+    active_operator_user_id: int | None = None
+    active_operator_name: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
 
@@ -161,6 +165,39 @@ class OperatorManagedAttendantCreate(BaseModel):
     @classmethod
     def validate_password(cls, value: str) -> str:
         return _validate_password_strength(value)
+
+
+class AvailableOperatorRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    manager_id: int
+    user_id: int
+    name: str
+    email: EmailStr
+    phone: str | None = None
+    business_license: str | None = None
+    verified_at: datetime | None = None
+
+
+class ParkingLotLeaseBootstrapCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    manager_user_id: int
+    monthly_fee: Annotated[float, Field(ge=0, le=1000000000, default=0)] = 0
+
+
+class ParkingLotLeaseBootstrapRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    lease_id: int
+    parking_lot_id: int
+    manager_id: int
+    manager_user_id: int
+    operator_name: str
+    status: str
+    monthly_fee: float
+    start_date: date | None = None
+    end_date: date | None = None
 
 
 class ParkingLotReview(BaseModel):

@@ -67,6 +67,24 @@ class _ParkingLotRegistrationScreenState
     }
   }
 
+  Future<void> _openLeaseBootstrap(ParkingLotRegistration parkingLot) async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _LeaseBootstrapSheet(
+        parkingLotService: widget.parkingLotService,
+        parkingLot: parkingLot,
+      ),
+    );
+
+    if (created == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã kích hoạt quyền điều hành cho operator.')),
+      );
+      _reload();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -108,7 +126,12 @@ class _ParkingLotRegistrationScreenState
             padding: const EdgeInsets.all(16),
             itemBuilder: (context, index) {
               final parkingLot = parkingLots[index];
-              return _ParkingLotCard(parkingLot: parkingLot);
+              return _ParkingLotCard(
+                parkingLot: parkingLot,
+                onBootstrapLease: parkingLot.isApproved
+                    ? () => _openLeaseBootstrap(parkingLot)
+                    : null,
+              );
             },
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemCount: parkingLots.length,
@@ -167,9 +190,10 @@ class _ParkingLotEmptyState extends StatelessWidget {
 }
 
 class _ParkingLotCard extends StatelessWidget {
-  const _ParkingLotCard({required this.parkingLot});
+  const _ParkingLotCard({required this.parkingLot, this.onBootstrapLease});
 
   final ParkingLotRegistration parkingLot;
+  final VoidCallback? onBootstrapLease;
 
   @override
   Widget build(BuildContext context) {
@@ -234,7 +258,163 @@ class _ParkingLotCard extends StatelessWidget {
                 label: 'Ảnh đại diện',
                 value: parkingLot.coverImage!,
               ),
+            if (parkingLot.activeOperatorName != null)
+              _ParkingLotInfoRow(
+                label: 'Operator đang phụ trách',
+                value: parkingLot.activeOperatorName!,
+              ),
+            if (parkingLot.activeLeaseStatus != null)
+              _ParkingLotInfoRow(
+                label: 'Lease',
+                value: parkingLot.activeLeaseStatus!,
+              ),
+            if (parkingLot.isApproved && parkingLot.activeLeaseId == null) ...[
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: onBootstrapLease,
+                child: const Text('Gán operator thử nghiệm'),
+              ),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LeaseBootstrapSheet extends StatefulWidget {
+  const _LeaseBootstrapSheet({
+    required this.parkingLotService,
+    required this.parkingLot,
+  });
+
+  final ParkingLotService parkingLotService;
+  final ParkingLotRegistration parkingLot;
+
+  @override
+  State<_LeaseBootstrapSheet> createState() => _LeaseBootstrapSheetState();
+}
+
+class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
+  late Future<List<AvailableOperatorOption>> _operatorsFuture;
+  AvailableOperatorOption? _selectedOperator;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _operatorsFuture = widget.parkingLotService.getAvailableOperators();
+  }
+
+  Future<void> _submit() async {
+    final operator = _selectedOperator;
+    if (operator == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn operator.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.parkingLotService.bootstrapLease(
+        parkingLotId: widget.parkingLot.id,
+        managerUserId: operator.userId,
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(true);
+    } on ParkingLotException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SafeArea(
+        child: FutureBuilder<List<AvailableOperatorOption>>(
+          future: _operatorsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 220,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return SizedBox(
+                height: 220,
+                child: Center(child: Text(snapshot.error.toString())),
+              );
+            }
+
+            final operators = snapshot.data ?? const <AvailableOperatorOption>[];
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Kích hoạt operator cho ${widget.parkingLot.name}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                if (operators.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text('Chưa có operator đã được duyệt để gán thử nghiệm.'),
+                  )
+                else
+                  ...operators.map(
+                    (operator) => RadioListTile<int>(
+                      value: operator.userId,
+                      groupValue: _selectedOperator?.userId,
+                      title: Text(operator.name),
+                      subtitle: Text(operator.email),
+                      onChanged: _isSubmitting
+                          ? null
+                          : (_) {
+                              setState(() {
+                                _selectedOperator = operator;
+                              });
+                            },
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _isSubmitting || operators.isEmpty ? null : _submit,
+                    child: Text(
+                      _isSubmitting ? 'Đang kích hoạt...' : 'Kích hoạt điều hành',
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

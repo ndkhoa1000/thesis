@@ -6,16 +6,21 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 import pytest
 
 from src.app.api.v1.lots import (
+    bootstrap_parking_lot_lease,
     create_my_parking_lot,
+    list_available_operators,
     list_lots,
     read_my_parking_lots,
     read_parking_lot_applications,
     review_parking_lot,
 )
 from src.app.core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
-from src.app.models.enums import ParkingLotStatus
+from src.app.models.enums import LeaseStatus, ParkingLotStatus
+from src.app.models.leases import LotLease
 from src.app.models.parking import ParkingLot
-from src.app.models.users import LotOwner
+from src.app.models.user import User
+from src.app.models.users import LotOwner, Manager
+from src.app.schemas.parking_lot import ParkingLotLeaseBootstrapCreate
 from src.app.schemas.parking_lot import ParkingLotAdminRead, ParkingLotCreate, ParkingLotRead, ParkingLotReview
 
 
@@ -48,6 +53,26 @@ def _lot_owner_profile(profile_id: int = 3, user_id: int = 1) -> LotOwner:
     return profile
 
 
+def _manager_profile(profile_id: int = 4, user_id: int = 9) -> Manager:
+    profile = MagicMock(spec=Manager)
+    profile.id = profile_id
+    profile.user_id = user_id
+    profile.business_license = "OP-001"
+    profile.verified_at = datetime.now(UTC)
+    return profile
+
+
+def _manager_user(user_id: int = 9, name: str = "Tran Thi B") -> User:
+    user = MagicMock(spec=User)
+    user.id = user_id
+    user.name = name
+    user.email = "operator@test.com"
+    user.phone = "0909555666"
+    user.is_active = True
+    user.is_deleted = False
+    return user
+
+
 def _parking_lot(
     lot_id: int = 7,
     lot_owner_id: int = 3,
@@ -67,6 +92,19 @@ def _parking_lot(
     parking_lot.created_at = datetime.now(UTC)
     parking_lot.updated_at = None
     return parking_lot
+
+
+def _lease(lease_id: int = 21, parking_lot_id: int = 7, manager_id: int = 4) -> LotLease:
+    lease = MagicMock(spec=LotLease)
+    lease.id = lease_id
+    lease.parking_lot_id = parking_lot_id
+    lease.manager_id = manager_id
+    lease.monthly_fee = 0
+    lease.status = LeaseStatus.ACTIVE.value
+    lease.start_date = datetime.now(UTC).date()
+    lease.end_date = None
+    lease.created_at = datetime.now(UTC)
+    return lease
 
 
 class TestPublicParkingLots:
@@ -97,7 +135,9 @@ class TestLotOwnerParkingLots:
         owner_result.scalar_one_or_none.return_value = _lot_owner_profile()
         lots_result = MagicMock()
         lots_result.scalars.return_value.all.return_value = [_parking_lot()]
-        mock_db.execute = AsyncMock(side_effect=[owner_result, lots_result])
+        active_lease_result = MagicMock()
+        active_lease_result.one_or_none.return_value = None
+        mock_db.execute = AsyncMock(side_effect=[owner_result, lots_result, active_lease_result])
 
         result = await read_my_parking_lots(Mock(), _public_user(), mock_db)
 
@@ -111,7 +151,7 @@ class TestLotOwnerParkingLots:
         mock_db.execute = AsyncMock(return_value=owner_result)
         mock_db.add = Mock()
         mock_db.commit = AsyncMock()
-        mock_db.refresh = AsyncMock()
+        mock_db.refresh = AsyncMock(side_effect=lambda parking_lot: setattr(parking_lot, "id", 17))
 
         payload = ParkingLotCreate(
             name="Bai xe Ben Thanh",
@@ -143,6 +183,68 @@ class TestLotOwnerParkingLots:
 
         with pytest.raises(ForbiddenException, match="Lot owner capability"):
             await create_my_parking_lot(Mock(), payload, _public_user(), mock_db)
+
+    @pytest.mark.asyncio
+    async def test_list_available_operators_returns_verified_profiles(self, mock_db):
+        owner_result = MagicMock()
+        owner_result.scalar_one_or_none.return_value = _lot_owner_profile()
+        operators_result = MagicMock()
+        operators_result.all.return_value = [(_manager_profile(), _manager_user())]
+        mock_db.execute = AsyncMock(side_effect=[owner_result, operators_result])
+
+        result = await list_available_operators(Mock(), _public_user(), mock_db)
+
+        assert len(result) == 1
+        assert result[0].user_id == 9
+        assert result[0].name == "Tran Thi B"
+
+    @pytest.mark.asyncio
+    async def test_bootstrap_parking_lot_lease_success(self, mock_db):
+        owner_result = MagicMock()
+        owner_result.scalar_one_or_none.return_value = _lot_owner_profile()
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = _parking_lot(
+            status=ParkingLotStatus.APPROVED.value,
+        )
+        existing_lease_result = MagicMock()
+        existing_lease_result.one_or_none.return_value = None
+        manager_result = MagicMock()
+        manager_result.one_or_none.return_value = (_manager_profile(), _manager_user())
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                owner_result,
+                lot_result,
+                existing_lease_result,
+                manager_result,
+            ]
+        )
+        mock_db.add = Mock()
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock(side_effect=lambda lease: setattr(lease, "id", 21))
+
+        payload = ParkingLotLeaseBootstrapCreate(manager_user_id=9, monthly_fee=0)
+
+        result = await bootstrap_parking_lot_lease(Mock(), 7, payload, _public_user(), mock_db)
+
+        assert result.status == LeaseStatus.ACTIVE.value
+        assert result.operator_name == "Tran Thi B"
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_bootstrap_parking_lot_lease_requires_approved_lot(self, mock_db):
+        owner_result = MagicMock()
+        owner_result.scalar_one_or_none.return_value = _lot_owner_profile()
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = _parking_lot(
+            status=ParkingLotStatus.PENDING.value,
+        )
+        mock_db.execute = AsyncMock(side_effect=[owner_result, lot_result])
+
+        payload = ParkingLotLeaseBootstrapCreate(manager_user_id=9, monthly_fee=0)
+
+        with pytest.raises(BadRequestException, match="Only approved parking lots"):
+            await bootstrap_parking_lot_lease(Mock(), 7, payload, _public_user(), mock_db)
 
 
 class TestAdminParkingLotApprovals:
