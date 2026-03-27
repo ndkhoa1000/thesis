@@ -184,13 +184,13 @@ N/A
 
 #### Story 2.2: Admin Dashboard & Pending Approvals
 **As an** Admin,
-**I want** to view and approve newly registered parking lots,
-**So that** only vetted properties become active.
+**I want** to view pending approvals from one dashboard,
+**So that** I can vet public-account capability applications and newly registered parking lots without using raw backend endpoints.
 
 **Acceptance Criteria:**
 * **Given** I am an Admin
 * **When** I view pending approvals
-* **Then** I can approve or reject the lot.
+* **Then** I can review and approve or reject supported application types including capability approvals and parking-lot registrations.
 
 #### Story 2.3: Admin System Management & Lot Suspension
 **As an** Admin,

@@ -37,16 +37,16 @@ story_location: /home/khoa/thesis/app/_bmad-output/implementation-artifacts
 development_status:
   epic-0: done
   epic-0-retrospective: optional
-  epic-1: in-progress
-  1-1-user-registration: review
+  epic-1: done
+  1-1-user-registration: done
   1-2-user-login: done
   1-3-manage-license-plates: done
   1-4-apply-to-become-lot-owner: done
-  1-5-apply-to-become-operator: ready-for-dev
-  epic-1-retrospective: optional
+  1-5-apply-to-become-operator: done
+  epic-1-retrospective: done
   epic-2: backlog
   2-1-register-new-parking-lot: backlog
-  2-2-admin-dashboard-pending-approvals: backlog
+  2-2-admin-dashboard-pending-approvals: ready-for-dev
   2-3-admin-system-management-lot-suspension: backlog
   epic-2-retrospective: optional
   epic-3: backlog

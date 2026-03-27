@@ -6,6 +6,8 @@ import 'package:parking_app/main.dart';
 import 'package:parking_app/src/features/auth/data/auth_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
+import 'package:parking_app/src/features/operator_application/data/operator_application_service.dart';
+import 'package:parking_app/src/features/operator_application/presentation/operator_application_screen.dart';
 import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
 import 'package:parking_app/src/features/vehicles/presentation/vehicle_screen.dart';
 
@@ -132,6 +134,36 @@ class FakeLotOwnerApplicationService implements LotOwnerApplicationService {
   }
 }
 
+class FakeOperatorApplicationService implements OperatorApplicationService {
+  FakeOperatorApplicationService({this.application});
+
+  OperatorApplication? application;
+
+  @override
+  Future<OperatorApplication?> getMyApplication() async => application;
+
+  @override
+  Future<OperatorApplication> submitApplication({
+    required String fullName,
+    required String phoneNumber,
+    required String businessLicense,
+    required String documentReference,
+    String? notes,
+  }) async {
+    application = OperatorApplication(
+      id: 1,
+      userId: 1,
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+      businessLicense: businessLicense,
+      documentReference: documentReference,
+      status: 'PENDING',
+      notes: notes,
+    );
+    return application!;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -240,6 +272,7 @@ void main() {
       expect(find.textContaining('quản lý xe của mình'), findsOneWidget);
       expect(find.byTooltip('Xe của tôi'), findsOneWidget);
       expect(find.byTooltip('Chủ bãi'), findsOneWidget);
+      expect(find.byTooltip('Operator'), findsOneWidget);
       expect(find.byTooltip('Đăng xuất'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Xe của tôi'));
@@ -407,4 +440,165 @@ void main() {
     expect(find.text('Đang chờ duyệt'), findsOneWidget);
     expect(find.text('Nguyen Van A'), findsOneWidget);
   });
+
+  testWidgets('Public workspace can open operator application screen', (
+    WidgetTester tester,
+  ) async {
+    final applicationService = FakeOperatorApplicationService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthenticatedHome(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'DRIVER',
+            capabilities: {
+              'driver': true,
+              'lot_owner': false,
+              'operator': false,
+              'attendant': false,
+              'admin': false,
+              'public_account': true,
+            },
+          ),
+          authService: FakeAuthService(),
+          onSignOut: () async {},
+          onSessionUpdated: (_) {},
+          operatorApplicationServiceFactory: (_) => applicationService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Operator').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OperatorApplicationScreen), findsOneWidget);
+    expect(find.text('Nộp hồ sơ Operator'), findsWidgets);
+  });
+
+  testWidgets('Operator application screen submits and shows pending status', (
+    WidgetTester tester,
+  ) async {
+    final applicationService = FakeOperatorApplicationService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorApplicationScreen(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'DRIVER',
+            capabilities: {
+              'driver': true,
+              'lot_owner': false,
+              'operator': false,
+              'attendant': false,
+              'admin': false,
+              'public_account': true,
+            },
+          ),
+          authService: FakeAuthService(),
+          applicationService: applicationService,
+          onSessionUpdated: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nộp hồ sơ Operator').first);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Họ và tên'),
+      'Nguyen Van B',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Số điện thoại'),
+      '0909555666',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Giấy phép kinh doanh / mã số thuế'),
+      'OP-001',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Link tài liệu xác minh'),
+      'https://example.com/operator.pdf',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Gửi hồ sơ'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đang chờ duyệt'), findsOneWidget);
+    expect(find.text('Nguyen Van B'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Operator application form blocks values shorter than backend rules',
+    (WidgetTester tester) async {
+      final applicationService = FakeOperatorApplicationService();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OperatorApplicationScreen(
+            session: const AuthSession(
+              accessToken: 'access',
+              refreshToken: 'refresh',
+              role: 'DRIVER',
+              capabilities: {
+                'driver': true,
+                'lot_owner': false,
+                'operator': false,
+                'attendant': false,
+                'admin': false,
+                'public_account': true,
+              },
+            ),
+            authService: FakeAuthService(),
+            applicationService: applicationService,
+            onSessionUpdated: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Nộp hồ sơ Operator').first);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Họ và tên'),
+        'A',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Số điện thoại'),
+        '1234567',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Giấy phép kinh doanh / mã số thuế'),
+        'OP1',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Link tài liệu xác minh'),
+        'abc',
+      );
+      await tester.tap(find.widgetWithText(FilledButton, 'Gửi hồ sơ'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Họ và tên phải có ít nhất 2 ký tự'), findsOneWidget);
+      expect(
+        find.text('Số điện thoại phải có ít nhất 8 ký tự'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Giấy phép kinh doanh phải có ít nhất 4 ký tự'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Link tài liệu phải có ít nhất 4 ký tự'),
+        findsOneWidget,
+      );
+      expect(applicationService.application, isNull);
+    },
+  );
 }

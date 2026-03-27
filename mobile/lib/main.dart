@@ -9,12 +9,16 @@ import 'src/features/auth/data/auth_service.dart';
 import 'src/features/auth/presentation/auth_gate.dart';
 import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
+import 'src/features/operator_application/data/operator_application_service.dart';
+import 'src/features/operator_application/presentation/operator_application_screen.dart';
 import 'src/features/vehicles/data/vehicle_service.dart';
 import 'src/features/vehicles/presentation/vehicle_screen.dart';
 
 typedef VehicleServiceFactory = VehicleService Function(String accessToken);
 typedef LotOwnerApplicationServiceFactory =
     LotOwnerApplicationService Function(String accessToken);
+typedef OperatorApplicationServiceFactory =
+    OperatorApplicationService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -26,6 +30,16 @@ LotOwnerApplicationService defaultLotOwnerApplicationServiceFactory(
 ) {
   final apiClient = ApiClient();
   return BackendLotOwnerApplicationService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+OperatorApplicationService defaultOperatorApplicationServiceFactory(
+  String accessToken,
+) {
+  final apiClient = ApiClient();
+  return BackendOperatorApplicationService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -58,6 +72,27 @@ void openLotOwnerApplication(
     context,
     MaterialPageRoute<void>(
       builder: (_) => LotOwnerApplicationScreen(
+        session: session,
+        authService: authService,
+        applicationService: applicationServiceFactory(session.accessToken),
+        onSessionUpdated: onSessionUpdated,
+      ),
+    ),
+  );
+}
+
+void openOperatorApplication(
+  BuildContext context,
+  AuthSession session, {
+  required AuthService authService,
+  required void Function(AuthSession session) onSessionUpdated,
+  OperatorApplicationServiceFactory applicationServiceFactory =
+      defaultOperatorApplicationServiceFactory,
+}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => OperatorApplicationScreen(
         session: session,
         authService: authService,
         applicationService: applicationServiceFactory(session.accessToken),
@@ -181,6 +216,8 @@ class AuthenticatedHome extends StatelessWidget {
     required this.onSessionUpdated,
     this.vehicleServiceFactory = defaultVehicleServiceFactory,
     this.applicationServiceFactory = defaultLotOwnerApplicationServiceFactory,
+    this.operatorApplicationServiceFactory =
+        defaultOperatorApplicationServiceFactory,
   });
 
   final AuthSession session;
@@ -189,6 +226,7 @@ class AuthenticatedHome extends StatelessWidget {
   final void Function(AuthSession session) onSessionUpdated;
   final VehicleServiceFactory vehicleServiceFactory;
   final LotOwnerApplicationServiceFactory applicationServiceFactory;
+  final OperatorApplicationServiceFactory operatorApplicationServiceFactory;
 
   List<Widget> _buildAuthActions() {
     return [
@@ -211,6 +249,17 @@ class AuthenticatedHome extends StatelessWidget {
           authService: authService,
           onSessionUpdated: onSessionUpdated,
           applicationServiceFactory: applicationServiceFactory,
+        ),
+      ),
+      IconButton(
+        icon: const Icon(Icons.settings_suggest_outlined),
+        tooltip: 'Operator',
+        onPressed: () => openOperatorApplication(
+          context,
+          session,
+          authService: authService,
+          onSessionUpdated: onSessionUpdated,
+          applicationServiceFactory: operatorApplicationServiceFactory,
         ),
       ),
       IconButton(
@@ -308,6 +357,7 @@ class AuthenticatedHome extends StatelessWidget {
       onSessionUpdated: onSessionUpdated,
       vehicleServiceFactory: vehicleServiceFactory,
       applicationServiceFactory: applicationServiceFactory,
+      operatorApplicationServiceFactory: operatorApplicationServiceFactory,
     );
   }
 }
@@ -321,6 +371,8 @@ class MapScreen extends StatefulWidget {
     required this.onSessionUpdated,
     this.vehicleServiceFactory = defaultVehicleServiceFactory,
     this.applicationServiceFactory = defaultLotOwnerApplicationServiceFactory,
+    this.operatorApplicationServiceFactory =
+        defaultOperatorApplicationServiceFactory,
   });
 
   final AuthSession session;
@@ -329,6 +381,7 @@ class MapScreen extends StatefulWidget {
   final void Function(AuthSession session) onSessionUpdated;
   final VehicleServiceFactory vehicleServiceFactory;
   final LotOwnerApplicationServiceFactory applicationServiceFactory;
+  final OperatorApplicationServiceFactory operatorApplicationServiceFactory;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -577,6 +630,18 @@ class _MapScreenState extends State<MapScreen> {
               authService: widget.authService,
               onSessionUpdated: widget.onSessionUpdated,
               applicationServiceFactory: widget.applicationServiceFactory,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_suggest_outlined),
+            tooltip: 'Operator',
+            onPressed: () => openOperatorApplication(
+              context,
+              widget.session,
+              authService: widget.authService,
+              onSessionUpdated: widget.onSessionUpdated,
+              applicationServiceFactory:
+                  widget.operatorApplicationServiceFactory,
             ),
           ),
           IconButton(

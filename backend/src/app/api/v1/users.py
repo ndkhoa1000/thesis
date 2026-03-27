@@ -16,8 +16,9 @@ from ...crud.crud_tier import crud_tiers
 from ...crud.crud_users import crud_users
 from ...models.enums import CapabilityApplicationStatus, UserRole, VehicleType
 from ...models.user import User
-from ...models.users import Driver, LotOwner, LotOwnerApplication
+from ...models.users import Driver, LotOwner, LotOwnerApplication, Manager, OperatorApplication
 from ...schemas.lot_owner_application import LotOwnerApplicationCreate, LotOwnerApplicationRead, LotOwnerApplicationReview
+from ...schemas.operator_application import OperatorApplicationCreate, OperatorApplicationRead, OperatorApplicationReview
 from ...models.vehicles import Vehicle
 from ...schemas.tier import TierRead
 from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserTierUpdate, UserUpdate
@@ -71,6 +72,21 @@ async def _get_lot_owner_application_by_user_id(db: AsyncSession, user_id: int) 
 async def _get_lot_owner_profile(db: AsyncSession, user_id: int) -> LotOwner | None:
     lot_owner_result = await db.execute(select(LotOwner).where(LotOwner.user_id == user_id).limit(1))
     return lot_owner_result.scalar_one_or_none()
+
+
+async def _get_operator_application_by_user_id(db: AsyncSession, user_id: int) -> OperatorApplication | None:
+    application_result = await db.execute(
+        select(OperatorApplication)
+        .where(OperatorApplication.user_id == user_id)
+        .order_by(OperatorApplication.created_at.desc(), OperatorApplication.id.desc())
+        .limit(1)
+    )
+    return application_result.scalar_one_or_none()
+
+
+async def _get_manager_profile(db: AsyncSession, user_id: int) -> Manager | None:
+    manager_result = await db.execute(select(Manager).where(Manager.user_id == user_id).limit(1))
+    return manager_result.scalar_one_or_none()
 
 
 @router.get("/user/me/lot-owner-application", response_model=LotOwnerApplicationRead | None)
@@ -177,6 +193,120 @@ async def review_lot_owner_application(
 
         if user.role in {UserRole.DRIVER.value, UserRole.LOT_OWNER.value}:
             user.role = UserRole.LOT_OWNER.value
+
+    await db.commit()
+    await db.refresh(application)
+    return application
+
+
+@router.get("/user/me/operator-application", response_model=OperatorApplicationRead | None)
+async def read_my_operator_application(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> OperatorApplication | None:
+    _ensure_public_account(current_user)
+    return await _get_operator_application_by_user_id(db, current_user["id"])
+
+
+@router.post("/user/me/operator-application", response_model=OperatorApplicationRead, status_code=201)
+async def create_my_operator_application(
+    request: Request,
+    payload: OperatorApplicationCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> OperatorApplication:
+    _ensure_public_account(current_user)
+
+    existing_capability = await _get_manager_profile(db, current_user["id"])
+    if existing_capability is not None:
+        raise DuplicateValueException("Operator capability is already active for this account")
+
+    existing_application = await _get_operator_application_by_user_id(db, current_user["id"])
+    if existing_application is not None:
+        if existing_application.status == CapabilityApplicationStatus.PENDING.value:
+            raise DuplicateValueException("Operator application is already pending review")
+        if existing_application.status == CapabilityApplicationStatus.APPROVED.value:
+            raise DuplicateValueException("Operator capability is already approved for this account")
+
+    application = OperatorApplication(
+        user_id=current_user["id"],
+        full_name=payload.full_name,
+        phone_number=payload.phone_number,
+        business_license=payload.business_license,
+        document_reference=payload.document_reference,
+        notes=payload.notes,
+        status=CapabilityApplicationStatus.PENDING.value,
+    )
+    db.add(application)
+    await db.commit()
+    await db.refresh(application)
+    return application
+
+
+@router.get("/admin/operator-applications", response_model=list[OperatorApplicationRead])
+async def read_operator_applications(
+    request: Request,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> Sequence[OperatorApplication]:
+    applications_result = await db.execute(
+        select(OperatorApplication).order_by(OperatorApplication.created_at.desc(), OperatorApplication.id.desc())
+    )
+    return list(applications_result.scalars().all())
+
+
+@router.post("/admin/operator-applications/{application_id}/review", response_model=OperatorApplicationRead)
+async def review_operator_application(
+    request: Request,
+    application_id: int,
+    payload: OperatorApplicationReview,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> OperatorApplication:
+    application_result = await db.execute(select(OperatorApplication).where(OperatorApplication.id == application_id).limit(1))
+    application = application_result.scalar_one_or_none()
+    if application is None:
+        raise NotFoundException("Operator application not found")
+
+    if application.status != CapabilityApplicationStatus.PENDING.value:
+        raise BadRequestException("Only pending operator applications can be reviewed")
+
+    if payload.decision == CapabilityApplicationStatus.REJECTED and not payload.rejection_reason:
+        raise BadRequestException("Rejection reason is required when rejecting an application")
+
+    reviewed_at = _utcnow()
+    application.status = payload.decision.value
+    application.rejection_reason = payload.rejection_reason if payload.decision == CapabilityApplicationStatus.REJECTED else None
+    application.reviewed_by_user_id = current_superuser["id"]
+    application.reviewed_at = reviewed_at
+    application.updated_at = reviewed_at
+
+    if payload.decision == CapabilityApplicationStatus.APPROVED:
+        user_result = await db.execute(select(User).where(User.id == application.user_id).limit(1))
+        user = user_result.scalar_one_or_none()
+        if user is None:
+            raise NotFoundException("Applicant user not found")
+
+        manager = await _get_manager_profile(db, application.user_id)
+        if manager is None:
+            db.add(
+                Manager(
+                    user_id=application.user_id,
+                    business_license=application.business_license,
+                    verified_at=reviewed_at,
+                )
+            )
+        else:
+            manager.business_license = application.business_license
+            manager.verified_at = reviewed_at
+
+        if user.role in {
+            UserRole.DRIVER.value,
+            UserRole.LOT_OWNER.value,
+            UserRole.MANAGER.value,
+        }:
+            user.role = UserRole.MANAGER.value
 
     await db.commit()
     await db.refresh(application)

@@ -27,7 +27,7 @@ from .enums import (
     VehicleType,
     VehicleTypeAll,
 )
-from .users import Attendant, Driver, LotOwner, LotOwnerApplication, Manager
+from .users import Attendant, Driver, LotOwner, LotOwnerApplication, Manager, OperatorApplication
 from .parking import ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLotTag, Pricing, Slot
 from .leases import LeaseContract, LotLease
 from .vehicles import Subscription, SubscriptionLot, Vehicle
