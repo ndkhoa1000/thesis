@@ -346,15 +346,72 @@ class FakeParkingLotService implements ParkingLotService {
 class FakeOperatorLotManagementService implements OperatorLotManagementService {
   FakeOperatorLotManagementService({
     List<OperatorManagedParkingLot>? initialLots,
+    Map<int, List<OperatorManagedAttendant>>? attendantsByLot,
   }) : _parkingLots = List<OperatorManagedParkingLot>.from(
          initialLots ?? const [],
-       );
+       ),
+       _attendantsByLot = {
+         for (final entry
+             in (attendantsByLot ??
+                     const <int, List<OperatorManagedAttendant>>{})
+                 .entries)
+           entry.key: List<OperatorManagedAttendant>.from(entry.value),
+       };
 
   final List<OperatorManagedParkingLot> _parkingLots;
+  final Map<int, List<OperatorManagedAttendant>> _attendantsByLot;
+  int _nextAttendantId = 200;
 
   @override
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots() async {
     return List<OperatorManagedParkingLot>.from(_parkingLots);
+  }
+
+  @override
+  Future<List<OperatorManagedAttendant>> getLotAttendants({
+    required int parkingLotId,
+  }) async {
+    return List<OperatorManagedAttendant>.from(
+      _attendantsByLot[parkingLotId] ?? const <OperatorManagedAttendant>[],
+    );
+  }
+
+  @override
+  Future<OperatorManagedAttendant> createLotAttendant({
+    required int parkingLotId,
+    required String name,
+    required String username,
+    required String email,
+    required String password,
+    String? phone,
+  }) async {
+    final attendant = OperatorManagedAttendant(
+      id: _nextAttendantId++,
+      userId: _nextAttendantId + 100,
+      parkingLotId: parkingLotId,
+      name: name,
+      username: username,
+      email: email,
+      phone: phone,
+      isActive: true,
+      hiredAt: DateTime(2026, 3, 27),
+    );
+    final attendants = _attendantsByLot.putIfAbsent(
+      parkingLotId,
+      () => <OperatorManagedAttendant>[],
+    );
+    attendants.insert(0, attendant);
+    return attendant;
+  }
+
+  @override
+  Future<void> removeLotAttendant({
+    required int parkingLotId,
+    required int attendantId,
+  }) async {
+    _attendantsByLot[parkingLotId]?.removeWhere(
+      (attendant) => attendant.id == attendantId,
+    );
   }
 
   @override
@@ -363,6 +420,10 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
     required String name,
     required String address,
     required int totalCapacity,
+    required String openingTime,
+    required String closingTime,
+    required String pricingMode,
+    required double priceAmount,
     String? description,
     String? coverImage,
   }) async {
@@ -382,6 +443,10 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
       status: current.status,
       occupiedCount: current.occupiedCount,
       totalCapacity: totalCapacity,
+      openingTime: openingTime,
+      closingTime: closingTime,
+      pricingMode: pricingMode,
+      priceAmount: priceAmount,
       description: description,
       coverImage: coverImage,
       createdAt: current.createdAt,
@@ -527,6 +592,10 @@ void main() {
           status: 'APPROVED',
           occupiedCount: 4,
           totalCapacity: 20,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 15000,
         ),
       ],
     );
@@ -578,6 +647,10 @@ void main() {
             status: 'APPROVED',
             occupiedCount: 1,
             totalCapacity: 6,
+            openingTime: '05:30',
+            closingTime: '21:30',
+            pricingMode: 'SESSION',
+            priceAmount: 25000,
           ),
         ],
       );
@@ -1375,6 +1448,10 @@ void main() {
           status: 'APPROVED',
           occupiedCount: 3,
           totalCapacity: 15,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 18000,
           description: 'Gan trung tam thuong mai',
         ),
       ],
@@ -1392,6 +1469,8 @@ void main() {
 
     expect(find.text('Bai xe Dong Khoi'), findsOneWidget);
     expect(find.text('3/15 xe đang trong bãi'), findsOneWidget);
+    expect(find.text('06:00 - 22:00'), findsOneWidget);
+    expect(find.text('Theo giờ: 18000 VND'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Cập nhật cấu hình'));
     await tester.pumpAndSettle();
@@ -1404,13 +1483,148 @@ void main() {
       find.widgetWithText(TextFormField, 'Tổng sức chứa tối đa'),
       '25',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Lưu cấu hình'));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Giờ mở cửa (HH:mm)'),
+      '05:00',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Giờ đóng cửa (HH:mm)'),
+      '23:30',
+    );
+    await tester.tap(find.text('Theo giờ').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Theo lượt').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mức giá hiện hành (VND)'),
+      '30000',
+    );
+    final saveButton = find.widgetWithText(FilledButton, 'Lưu cấu hình');
+    await tester.ensureVisible(saveButton);
+    await tester.tap(saveButton);
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.text('Bai xe Dong Khoi Mo Rong'), findsOneWidget);
     expect(find.text('3/25 xe đang trong bãi'), findsOneWidget);
     expect(find.text('22 xe'), findsOneWidget);
+    expect(find.text('05:00 - 23:30'), findsOneWidget);
+    expect(find.text('Theo lượt: 30000 VND'), findsOneWidget);
+  });
+
+  testWidgets('Operator workspace can create and remove attendant accounts', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 23,
+          leaseId: 11,
+          lotOwnerId: 5,
+          name: 'Bai xe Pasteur',
+          address: '12 Pasteur, Quan 1',
+          latitude: 10.779,
+          longitude: 106.699,
+          currentAvailable: 10,
+          status: 'APPROVED',
+          occupiedCount: 2,
+          totalCapacity: 12,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 15000,
+        ),
+      ],
+      attendantsByLot: {
+        23: const [
+          OperatorManagedAttendant(
+            id: 51,
+            userId: 301,
+            parkingLotId: 23,
+            name: 'Tran Van Truc',
+            username: 'tranvantruc',
+            email: 'truc@parking.vn',
+            phone: '0909888777',
+            isActive: true,
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Nhân viên trực'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tran Van Truc'), findsOneWidget);
+
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Tạo tài khoản Attendant'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Họ và tên'),
+      'Le Thi Hoa',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tên đăng nhập'),
+      'lethihoa',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Email'),
+      'hoa@parking.vn',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mật khẩu tạm thời'),
+      'Str1ngst!123',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Số điện thoại (tuỳ chọn)'),
+      '0909111222',
+    );
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    final createAttendantButton = find.widgetWithText(
+      FilledButton,
+      'Tạo tài khoản',
+    );
+    await tester.scrollUntilVisible(
+      createAttendantButton,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(createAttendantButton);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Le Thi Hoa'), findsOneWidget);
+    expect(find.text('hoa@parking.vn'), findsOneWidget);
+
+    final revokeButton = find
+        .widgetWithText(OutlinedButton, 'Thu hồi tài khoản')
+        .last;
+    await tester.dragUntilVisible(
+      revokeButton,
+      find.byType(ListView).last,
+      const Offset(0, -200),
+    );
+    final revokeAction = tester.widget<OutlinedButton>(revokeButton).onPressed;
+    expect(revokeAction, isNotNull);
+    revokeAction!.call();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tran Van Truc'), findsNothing);
+    expect(find.text('Le Thi Hoa'), findsOneWidget);
   });
 
   testWidgets('Operator workspace floors available slots at zero', (
@@ -1430,6 +1644,10 @@ void main() {
           status: 'APPROVED',
           occupiedCount: 3,
           totalCapacity: 4,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 12000,
         ),
       ],
     );
@@ -1451,7 +1669,21 @@ void main() {
       find.widgetWithText(TextFormField, 'Tổng sức chứa tối đa'),
       '2',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Lưu cấu hình'));
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Giờ mở cửa (HH:mm)'),
+      '06:00',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Giờ đóng cửa (HH:mm)'),
+      '22:00',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Mức giá hiện hành (VND)'),
+      '12000',
+    );
+    final saveButton = find.widgetWithText(FilledButton, 'Lưu cấu hình');
+    await tester.ensureVisible(saveButton);
+    await tester.tap(saveButton);
     await tester.pump();
     await tester.pumpAndSettle();
 

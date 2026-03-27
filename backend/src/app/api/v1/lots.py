@@ -10,14 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
+from ...core.exceptions.http_exceptions import BadRequestException, DuplicateValueException, ForbiddenException, NotFoundException
+from ...core.security import get_password_hash
+from ...crud.crud_users import crud_users
 from ...models.enums import LeaseStatus, ParkingLotStatus, SessionStatus, UserRole, VehicleTypeAll
 from ...models.leases import LotLease
-from ...models.parking import ParkingLot, ParkingLotConfig
+from ...models.parking import ParkingLot, ParkingLotConfig, Pricing
 from ...models.sessions import ParkingSession
 from ...models.user import User
-from ...models.users import LotOwner, Manager
+from ...models.users import Attendant, LotOwner, Manager
 from ...schemas.parking_lot import (
+    OperatorManagedAttendantCreate,
+    OperatorManagedAttendantRead,
     OperatorManagedParkingLotRead,
     OperatorManagedParkingLotUpdate,
     ParkingLotAdminRead,
@@ -26,6 +30,7 @@ from ...schemas.parking_lot import (
     ParkingLotReview,
     ParkingLotStatusUpdate,
 )
+from ...schemas.user import UserCreateInternal
 
 router = APIRouter(tags=["lots"])
 
@@ -83,7 +88,7 @@ async def _get_parking_lot_owner_snapshot(
     owner_snapshot = owner_result.one_or_none()
     if owner_snapshot is None:
         return None, None, None
-    return owner_snapshot
+    return tuple(owner_snapshot)
 
 
 async def _get_latest_parking_lot_config(
@@ -162,6 +167,10 @@ def _build_operator_read(
     lease: LotLease,
     total_capacity: int | None,
     occupied_count: int,
+    opening_time=None,
+    closing_time=None,
+    pricing_mode: str | None = None,
+    price_amount: float | None = None,
 ) -> OperatorManagedParkingLotRead:
     return OperatorManagedParkingLotRead.model_validate(
         {
@@ -180,8 +189,80 @@ def _build_operator_read(
             "updated_at": parking_lot.updated_at,
             "total_capacity": total_capacity,
             "occupied_count": occupied_count,
+            "opening_time": opening_time,
+            "closing_time": closing_time,
+            "pricing_mode": pricing_mode,
+            "price_amount": price_amount,
         }
     )
+
+
+def _build_attendant_read(user: User, attendant: Attendant) -> OperatorManagedAttendantRead:
+    hired_at = attendant.hired_at.date() if isinstance(attendant.hired_at, datetime) else attendant.hired_at
+    return OperatorManagedAttendantRead.model_validate(
+        {
+            "id": attendant.id,
+            "user_id": user.id,
+            "parking_lot_id": attendant.parking_lot_id,
+            "name": user.name,
+            "username": user.username,
+            "email": user.email,
+            "phone": user.phone,
+            "is_active": user.is_active,
+            "hired_at": hired_at,
+        }
+    )
+
+
+async def _get_latest_pricing(db: AsyncSession, parking_lot_id: int) -> Pricing | None:
+    pricing_result = await db.execute(
+        select(Pricing)
+        .where(
+            Pricing.parking_lot_id == parking_lot_id,
+            Pricing.vehicle_type == VehicleTypeAll.ALL.value,
+        )
+        .order_by(Pricing.id.desc())
+        .limit(1)
+    )
+    return pricing_result.scalar_one_or_none()
+
+
+async def _get_active_attendant_pairs(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> list[tuple[Attendant, User]]:
+    attendants_result = await db.execute(
+        select(Attendant, User)
+        .join(User, Attendant.user_id == User.id)
+        .where(
+            Attendant.parking_lot_id == parking_lot_id,
+            User.is_deleted.is_(False),
+            User.is_active.is_(True),
+        )
+        .order_by(User.created_at.desc(), User.id.desc())
+    )
+    return [tuple(row) for row in attendants_result.all()]
+
+
+async def _get_attendant_pair_for_lot(
+    db: AsyncSession,
+    parking_lot_id: int,
+    attendant_id: int,
+) -> tuple[Attendant, User] | None:
+    attendant_result = await db.execute(
+        select(Attendant, User)
+        .join(User, Attendant.user_id == User.id)
+        .where(
+            Attendant.id == attendant_id,
+            Attendant.parking_lot_id == parking_lot_id,
+            User.is_deleted.is_(False),
+        )
+        .limit(1)
+    )
+    attendant_pair = attendant_result.one_or_none()
+    if attendant_pair is None:
+        return None
+    return tuple(attendant_pair)
 
 
 @router.get("/lots", response_model=list[ParkingLotRead])
@@ -232,6 +313,7 @@ async def read_operator_parking_lots(
     managed_lots: list[OperatorManagedParkingLotRead] = []
     for lease, parking_lot in leases_result.all():
         latest_config = await _get_latest_parking_lot_config(db, parking_lot.id)
+        latest_pricing = await _get_latest_pricing(db, parking_lot.id)
         occupied_count = await _count_active_sessions(db, parking_lot.id)
         managed_lots.append(
             _build_operator_read(
@@ -239,6 +321,10 @@ async def read_operator_parking_lots(
                 lease,
                 latest_config.total_capacity if latest_config else None,
                 occupied_count,
+                latest_config.opening_time if latest_config else None,
+                latest_config.closing_time if latest_config else None,
+                latest_pricing.pricing_mode if latest_pricing else None,
+                float(latest_pricing.price_amount) if latest_pricing else None,
             )
         )
     return managed_lots
@@ -277,8 +363,17 @@ async def patch_operator_parking_lot(
         set_by=manager.id,
         total_capacity=payload.total_capacity,
         vehicle_type=VehicleTypeAll.ALL.value,
+        opening_time=payload.opening_time.isoformat(),
+        closing_time=payload.closing_time.isoformat(),
+    )
+    pricing = Pricing(
+        parking_lot_id=parking_lot.id,
+        price_amount=payload.price_amount,
+        pricing_mode=payload.pricing_mode.value,
+        vehicle_type=VehicleTypeAll.ALL.value,
     )
     db.add(parking_lot_config)
+    db.add(pricing)
 
     await db.commit()
     await db.refresh(parking_lot)
@@ -288,7 +383,104 @@ async def patch_operator_parking_lot(
         lease,
         parking_lot_config.total_capacity,
         occupied_count,
+        parking_lot_config.opening_time,
+        parking_lot_config.closing_time,
+        pricing.pricing_mode,
+        float(pricing.price_amount),
     )
+
+
+@router.get(
+    "/operator/parking-lots/{parking_lot_id}/attendants",
+    response_model=list[OperatorManagedAttendantRead],
+)
+async def read_operator_lot_attendants(
+    request: Request,
+    parking_lot_id: int,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> list[OperatorManagedAttendantRead]:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    attendants = await _get_active_attendant_pairs(db, parking_lot_id)
+    return [_build_attendant_read(user, attendant) for attendant, user in attendants]
+
+
+@router.post(
+    "/operator/parking-lots/{parking_lot_id}/attendants",
+    response_model=OperatorManagedAttendantRead,
+    status_code=201,
+)
+async def create_operator_lot_attendant(
+    request: Request,
+    parking_lot_id: int,
+    payload: OperatorManagedAttendantCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> OperatorManagedAttendantRead:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    email_exists = await crud_users.exists(db=db, email=payload.email)
+    if email_exists:
+        raise DuplicateValueException("Email is already registered")
+
+    username_exists = await crud_users.exists(db=db, username=payload.username)
+    if username_exists:
+        raise DuplicateValueException("Username not available")
+
+    created_user = await crud_users.create(
+        db=db,
+        object=UserCreateInternal(
+            name=payload.name,
+            username=payload.username,
+            email=payload.email,
+            phone=payload.phone,
+            hashed_password=get_password_hash(payload.password),
+            role=UserRole.ATTENDANT.value,
+            is_active=True,
+        ),
+        commit=False,
+    )
+    attendant = Attendant(
+        user_id=created_user.id,
+        parking_lot_id=parking_lot_id,
+        hired_at=_utcnow(),
+    )
+    db.add(attendant)
+    await db.commit()
+    await db.refresh(created_user)
+    await db.refresh(attendant)
+    return _build_attendant_read(created_user, attendant)
+
+
+@router.delete("/operator/parking-lots/{parking_lot_id}/attendants/{attendant_id}")
+async def remove_operator_lot_attendant(
+    request: Request,
+    parking_lot_id: int,
+    attendant_id: int,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, str]:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    attendant_pair = await _get_attendant_pair_for_lot(db, parking_lot_id, attendant_id)
+    if attendant_pair is None:
+        raise NotFoundException("Attendant not found")
+
+    _, user = attendant_pair
+    user.is_active = False
+    user.updated_at = _utcnow()
+    await db.commit()
+    return {"message": "Attendant removed"}
 
 
 @router.post("/user/me/parking-lots", response_model=ParkingLotRead, status_code=201)

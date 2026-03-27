@@ -74,6 +74,7 @@ class UserCreateInternal(UserBase):
     hashed_password: str
     role: str = UserRole.DRIVER.value
     is_active: bool = True
+    phone: str | None = None
 
 
 class UserRegister(BaseModel):
