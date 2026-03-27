@@ -9,6 +9,8 @@ import 'src/features/auth/data/auth_service.dart';
 import 'src/features/auth/presentation/auth_gate.dart';
 import 'src/features/admin_approvals/data/admin_approvals_service.dart';
 import 'src/features/admin_approvals/presentation/admin_approvals_screen.dart';
+import 'src/features/driver_check_in/data/driver_check_in_service.dart';
+import 'src/features/driver_check_in/presentation/driver_check_in_screen.dart';
 import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'src/features/operator_application/data/operator_application_service.dart';
@@ -31,6 +33,8 @@ typedef ParkingLotServiceFactory =
     ParkingLotService Function(String accessToken);
 typedef OperatorLotManagementServiceFactory =
     OperatorLotManagementService Function(String accessToken);
+typedef DriverCheckInServiceFactory =
+    DriverCheckInService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -83,16 +87,47 @@ OperatorLotManagementService defaultOperatorLotManagementServiceFactory(
   );
 }
 
-void openVehicleManagement(
+DriverCheckInService defaultDriverCheckInServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendDriverCheckInService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+Future<void> openVehicleManagement(
   BuildContext context,
   AuthSession session, {
   VehicleServiceFactory vehicleServiceFactory = defaultVehicleServiceFactory,
 }) {
-  Navigator.push(
+  return Navigator.push(
     context,
     MaterialPageRoute<void>(
       builder: (_) => VehicleScreen(
         vehicleService: vehicleServiceFactory(session.accessToken),
+      ),
+    ),
+  );
+}
+
+Future<void> openDriverCheckIn(
+  BuildContext context,
+  AuthSession session, {
+  VehicleServiceFactory vehicleServiceFactory = defaultVehicleServiceFactory,
+  DriverCheckInServiceFactory driverCheckInServiceFactory =
+      defaultDriverCheckInServiceFactory,
+}) {
+  return Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => DriverCheckInScreen(
+        vehicleService: vehicleServiceFactory(session.accessToken),
+        driverCheckInService: driverCheckInServiceFactory(session.accessToken),
+        onManageVehicles: () => openVehicleManagement(
+          context,
+          session,
+          vehicleServiceFactory: vehicleServiceFactory,
+        ),
       ),
     ),
   );
@@ -260,6 +295,7 @@ class AuthenticatedHome extends StatelessWidget {
     this.parkingLotServiceFactory = defaultParkingLotServiceFactory,
     this.operatorLotManagementServiceFactory =
         defaultOperatorLotManagementServiceFactory,
+    this.driverCheckInServiceFactory = defaultDriverCheckInServiceFactory,
   });
 
   final AuthSession session;
@@ -272,6 +308,7 @@ class AuthenticatedHome extends StatelessWidget {
   final AdminApprovalsServiceFactory adminApprovalsServiceFactory;
   final ParkingLotServiceFactory parkingLotServiceFactory;
   final OperatorLotManagementServiceFactory operatorLotManagementServiceFactory;
+  final DriverCheckInServiceFactory driverCheckInServiceFactory;
 
   List<Widget> _buildAuthActions() {
     return [
@@ -331,7 +368,8 @@ class AuthenticatedHome extends StatelessWidget {
   }
 
   bool get _hasLotOwnerWorkspace =>
-      (session.capabilities['lot_owner'] ?? false) || session.role == 'LOT_OWNER';
+      (session.capabilities['lot_owner'] ?? false) ||
+      session.role == 'LOT_OWNER';
 
   bool get _hasOperatorWorkspace =>
       (session.capabilities['operator'] ?? false) || session.role == 'MANAGER';
@@ -362,7 +400,9 @@ class AuthenticatedHome extends StatelessWidget {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => ParkingLotRegistrationScreen(
-                parkingLotService: parkingLotServiceFactory(session.accessToken),
+                parkingLotService: parkingLotServiceFactory(
+                  session.accessToken,
+                ),
                 onSignOut: onSignOut,
               ),
             ),
@@ -408,6 +448,16 @@ class AuthenticatedHome extends StatelessWidget {
           title: const Text('ParkingApp'),
           actions: [
             IconButton(
+              icon: const Icon(Icons.qr_code_2_outlined),
+              tooltip: 'Mã check-in',
+              onPressed: () => openDriverCheckIn(
+                context,
+                session,
+                vehicleServiceFactory: vehicleServiceFactory,
+                driverCheckInServiceFactory: driverCheckInServiceFactory,
+              ),
+            ),
+            IconButton(
               icon: const Icon(Icons.directions_car_outlined),
               tooltip: 'Xe của tôi',
               onPressed: () => openVehicleManagement(
@@ -437,6 +487,7 @@ class AuthenticatedHome extends StatelessWidget {
       onSignOut: onSignOut,
       onSessionUpdated: onSessionUpdated,
       vehicleServiceFactory: vehicleServiceFactory,
+      driverCheckInServiceFactory: driverCheckInServiceFactory,
       applicationServiceFactory: applicationServiceFactory,
       operatorApplicationServiceFactory: operatorApplicationServiceFactory,
     );
@@ -510,6 +561,7 @@ class MapScreen extends StatefulWidget {
     required this.onSignOut,
     required this.onSessionUpdated,
     this.vehicleServiceFactory = defaultVehicleServiceFactory,
+    this.driverCheckInServiceFactory = defaultDriverCheckInServiceFactory,
     this.applicationServiceFactory = defaultLotOwnerApplicationServiceFactory,
     this.operatorApplicationServiceFactory =
         defaultOperatorApplicationServiceFactory,
@@ -520,6 +572,7 @@ class MapScreen extends StatefulWidget {
   final Future<void> Function() onSignOut;
   final void Function(AuthSession session) onSessionUpdated;
   final VehicleServiceFactory vehicleServiceFactory;
+  final DriverCheckInServiceFactory driverCheckInServiceFactory;
   final LotOwnerApplicationServiceFactory applicationServiceFactory;
   final OperatorApplicationServiceFactory operatorApplicationServiceFactory;
 
@@ -747,6 +800,16 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('ParkingApp'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.qr_code_2_outlined),
+            tooltip: 'Mã check-in',
+            onPressed: () => openDriverCheckIn(
+              context,
+              widget.session,
+              vehicleServiceFactory: widget.vehicleServiceFactory,
+              driverCheckInServiceFactory: widget.driverCheckInServiceFactory,
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.directions_car_outlined),
             tooltip: 'Xe của tôi',
