@@ -347,7 +347,8 @@ class AuthenticatedHome extends StatelessWidget {
       );
     }
 
-    if (session.role == 'MANAGER') {
+    if ((session.capabilities['operator'] ?? false) ||
+        session.role == 'MANAGER') {
       return OperatorLotManagementScreen(
         lotManagementService: operatorLotManagementServiceFactory(
           session.accessToken,

@@ -376,7 +376,9 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
       address: address,
       latitude: current.latitude,
       longitude: current.longitude,
-      currentAvailable: totalCapacity - current.occupiedCount,
+      currentAvailable: totalCapacity > current.occupiedCount
+          ? totalCapacity - current.occupiedCount
+          : 0,
       status: current.status,
       occupiedCount: current.occupiedCount,
       totalCapacity: totalCapacity,
@@ -558,6 +560,57 @@ void main() {
     expect(find.text('Điều hành bãi xe'), findsOneWidget);
     expect(find.text('Bai xe Le Thanh Ton'), findsOneWidget);
   });
+
+  testWidgets(
+    'ParkingApp routes operator-capable public session to operator workspace',
+    (WidgetTester tester) async {
+      final lotManagementService = FakeOperatorLotManagementService(
+        initialLots: const [
+          OperatorManagedParkingLot(
+            id: 18,
+            leaseId: 6,
+            lotOwnerId: 4,
+            name: 'Bai xe Mac Thi Buoi',
+            address: '6 Mac Thi Buoi, Quan 1',
+            latitude: 10.775,
+            longitude: 106.704,
+            currentAvailable: 5,
+            status: 'APPROVED',
+            occupiedCount: 1,
+            totalCapacity: 6,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AuthenticatedHome(
+            session: const AuthSession(
+              accessToken: 'access',
+              refreshToken: 'refresh',
+              role: 'DRIVER',
+              capabilities: {
+                'driver': true,
+                'lot_owner': false,
+                'operator': true,
+                'attendant': false,
+                'admin': false,
+                'public_account': true,
+              },
+            ),
+            authService: FakeAuthService(),
+            onSignOut: () async {},
+            onSessionUpdated: (_) {},
+            operatorLotManagementServiceFactory: (_) => lotManagementService,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OperatorLotManagementScreen), findsOneWidget);
+      expect(find.text('Bai xe Mac Thi Buoi'), findsOneWidget);
+    },
+  );
 
   testWidgets('ParkingApp routes lot owner session to parking lot workspace', (
     WidgetTester tester,
@@ -1358,5 +1411,51 @@ void main() {
     expect(find.text('Bai xe Dong Khoi Mo Rong'), findsOneWidget);
     expect(find.text('3/25 xe đang trong bãi'), findsOneWidget);
     expect(find.text('22 xe'), findsOneWidget);
+  });
+
+  testWidgets('Operator workspace floors available slots at zero', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 22,
+          leaseId: 10,
+          lotOwnerId: 5,
+          name: 'Bai xe Le Loi',
+          address: '45 Le Loi, Quan 1',
+          latitude: 10.7729,
+          longitude: 106.6983,
+          currentAvailable: 1,
+          status: 'APPROVED',
+          occupiedCount: 3,
+          totalCapacity: 4,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Cập nhật cấu hình'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tổng sức chứa tối đa'),
+      '2',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Lưu cấu hình'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('3/2 xe đang trong bãi'), findsOneWidget);
+    expect(find.text('0 xe'), findsOneWidget);
   });
 }

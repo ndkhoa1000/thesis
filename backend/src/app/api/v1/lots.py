@@ -92,7 +92,10 @@ async def _get_latest_parking_lot_config(
 ) -> ParkingLotConfig | None:
     config_result = await db.execute(
         select(ParkingLotConfig)
-        .where(ParkingLotConfig.parking_lot_id == parking_lot_id)
+        .where(
+            ParkingLotConfig.parking_lot_id == parking_lot_id,
+            ParkingLotConfig.vehicle_type == VehicleTypeAll.ALL.value,
+        )
         .order_by(ParkingLotConfig.created_at.desc(), ParkingLotConfig.id.desc())
         .limit(1)
     )

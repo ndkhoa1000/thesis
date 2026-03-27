@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
-from src.app.api.v1.lots import patch_operator_parking_lot, read_operator_parking_lots
+from src.app.api.v1.lots import _get_latest_parking_lot_config, patch_operator_parking_lot, read_operator_parking_lots
 from src.app.core.exceptions.http_exceptions import BadRequestException, NotFoundException
-from src.app.models.enums import LeaseStatus, ParkingLotStatus, UserRole
+from src.app.models.enums import LeaseStatus, ParkingLotStatus, UserRole, VehicleTypeAll
 from src.app.models.leases import LotLease
 from src.app.models.parking import ParkingLot, ParkingLotConfig
 from src.app.models.users import Manager
@@ -71,6 +71,19 @@ def _parking_lot_config(total_capacity: int = 10) -> ParkingLotConfig:
 
 
 class TestOperatorManagedLots:
+    @pytest.mark.asyncio
+    async def test_get_latest_parking_lot_config_filters_to_lot_wide_rows(self, mock_db):
+        config_result = MagicMock()
+        config_result.scalar_one_or_none.return_value = _parking_lot_config(total_capacity=20)
+        mock_db.execute = AsyncMock(return_value=config_result)
+
+        await _get_latest_parking_lot_config(mock_db, 13)
+
+        query = mock_db.execute.await_args.args[0]
+        compiled = query.compile()
+        assert compiled.params["parking_lot_id_1"] == 13
+        assert compiled.params["vehicle_type_1"] == VehicleTypeAll.ALL.value
+
     def test_operator_managed_lot_schema_supports_nullable_capacity(self):
         parking_lot = _parking_lot()
         lease = _active_lease(parking_lot_id=parking_lot.id)
@@ -166,6 +179,45 @@ class TestOperatorManagedLots:
         assert result.current_available == 26
         mock_db.add.assert_called_once()
         mock_db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_patch_operator_parking_lot_clamps_current_available_to_zero(self, mock_db):
+        manager_result = MagicMock()
+        manager_result.scalar_one_or_none.return_value = _manager_profile()
+        lease_result = MagicMock()
+        lease_result.scalar_one_or_none.return_value = _active_lease()
+        parking_lot = _parking_lot()
+        parking_lot_result = MagicMock()
+        parking_lot_result.scalar_one_or_none.return_value = parking_lot
+        active_sessions_result = MagicMock()
+        active_sessions_result.scalar_one.return_value = 12
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                manager_result,
+                lease_result,
+                parking_lot_result,
+                active_sessions_result,
+            ]
+        )
+        mock_db.add = Mock()
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        result = await patch_operator_parking_lot(
+            Mock(),
+            parking_lot.id,
+            OperatorManagedParkingLotUpdate(
+                name="Bai xe Nguyen Du Toi Gian",
+                address="5 Nguyen Du, Quan 1",
+                total_capacity=10,
+            ),
+            _manager_user(),
+            mock_db,
+        )
+
+        assert result.total_capacity == 10
+        assert result.occupied_count == 12
+        assert result.current_available == 0
 
     @pytest.mark.asyncio
     async def test_patch_operator_parking_lot_raises_not_found_without_active_lease(self, mock_db):
