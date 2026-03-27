@@ -21,6 +21,7 @@ from src.app.models.enums import CapabilityApplicationStatus
 from src.app.models.users import LotOwner, LotOwnerApplication
 from src.app.schemas.lot_owner_application import (
     LotOwnerApplicationCreate,
+    LotOwnerApplicationRead,
     LotOwnerApplicationReview,
 )
 
@@ -76,6 +77,14 @@ def _lot_owner(user_id: int = 1) -> LotOwner:
 
 
 class TestReadMyLotOwnerApplication:
+    def test_read_schema_supports_orm_objects(self):
+        application = _application()
+
+        result = LotOwnerApplicationRead.model_validate(application)
+
+        assert result.id == application.id
+        assert result.status == application.status
+
     @pytest.mark.asyncio
     async def test_returns_current_application(self, mock_db):
         application = _application()
@@ -181,6 +190,8 @@ class TestCreateMyLotOwnerApplication:
             mock_db,
         )
 
+        mock_db.add.assert_called_once()
+        assert result is not existing_record
         assert result.full_name == "Tran Thi B"
         assert result.status == CapabilityApplicationStatus.PENDING.value
         assert result.rejection_reason is None
@@ -247,6 +258,25 @@ class TestAdminLotOwnerApplications:
         )
 
         with pytest.raises(BadRequestException, match="Rejection reason"):
+            await review_lot_owner_application(
+                Mock(),
+                10,
+                payload,
+                _admin_user(),
+                mock_db,
+            )
+
+    @pytest.mark.asyncio
+    async def test_review_non_pending_application_raises_bad_request(self, mock_db):
+        app_result = MagicMock()
+        app_result.scalar_one_or_none.return_value = _application(
+            status=CapabilityApplicationStatus.APPROVED.value,
+        )
+        mock_db.execute = AsyncMock(return_value=app_result)
+
+        payload = LotOwnerApplicationReview(decision=CapabilityApplicationStatus.REJECTED, rejection_reason="late")
+
+        with pytest.raises(BadRequestException, match="Only pending"):
             await review_lot_owner_application(
                 Mock(),
                 10,

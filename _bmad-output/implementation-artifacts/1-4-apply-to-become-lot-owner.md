@@ -1,6 +1,6 @@
 # Story 1.4: Apply to Become Lot Owner
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -55,6 +55,13 @@ so that I can register parking lots and post them for lease without creating a s
   - [x] Add backend tests for successful submission, unauthorized review access, approval, rejection, and capability grant.
   - [x] Verify the same account identity is preserved before and after capability approval.
   - [x] Add focused mobile coverage for request submission or status rendering if a UI flow is added.
+
+### Review Findings
+
+- [x] [Review][Patch] Lot-owner application responses can fail FastAPI response validation because `LotOwnerApplicationRead` does not enable ORM attribute parsing even though the endpoints return SQLAlchemy models directly [backend/src/app/schemas/lot_owner_application.py:32]
+- [x] [Review][Patch] Admin review currently allows re-reviewing an already processed application, which can leave the account with an active `lot_owner` capability while the application record is later flipped to `REJECTED` [backend/src/app/api/v1/users.py:142]
+- [x] [Review][Patch] Rejected resubmission overwrites the same `lot_owner_application` row and clears prior review metadata, so the implementation does not preserve application/review history for future audits and also lacks a matching checked-in migration for the new persistence shape [backend/src/app/models/users.py:28]
+- [x] [Review][Defer] Public capability routing is still role-first in the mobile shell, so future additive-capability stories will likely need explicit workspace switching instead of relying on a single `user.role` landing path [mobile/lib/main.dart:238] — deferred, pre-existing
 
 ## Dev Notes
 
@@ -112,6 +119,8 @@ GPT-5.4
 - Added `GET /auth/me` plus mobile-side `AuthService.refreshSession()` so the app can refresh the current public session after capability changes without creating a second public account.
 - Added a new mobile `Hồ sơ Chủ bãi` screen reachable from the public workspace AppBar. The screen supports submit, pending/rejected/approved state rendering, refresh, and resubmission after rejection.
 - Verified backend tests in Docker (`44 passed`), Flutter widget tests locally (`8 passed`), and app boot on the connected Android device over ADB after wiring the new feature entrypoint.
+- Review fixes completed before close-out: `LotOwnerApplicationRead` now supports ORM serialization, admin review is limited to `PENDING` applications, rejected resubmission creates a new application row so prior review history is preserved, and a checked-in Alembic migration now creates `lot_owner_application`.
+- Post-review verification passed with backend Docker tests (`35 passed` across auth/lot-owner/vehicle suites) and local Flutter tests (`8 passed`).
 
 ### File List
 
@@ -135,3 +144,4 @@ GPT-5.4
 ### Change Log
 
 - 2026-03-27: Implemented Story 1.4 across backend and Flutter, including capability-application persistence, admin approval/rejection APIs, auth session refresh support, public mobile submission/status UI, backend unit tests, Flutter widget tests, and Android boot smoke validation.
+- 2026-03-27: Closed Story 1.4 after review fixes for ORM response serialization, single-review state-machine enforcement, preserved application history on resubmission, and the missing Alembic migration.

@@ -1,0 +1,47 @@
+"""add_lot_owner_application_table
+
+Revision ID: 9f8b7d6c5a4e
+Revises: ad35d5ac66d9
+Create Date: 2026-03-27 11:40:00.000000
+
+"""
+
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = "9f8b7d6c5a4e"
+down_revision: Union[str, None] = "ad35d5ac66d9"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    op.create_table(
+        "lot_owner_application",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("full_name", sa.String(length=100), nullable=False),
+        sa.Column("phone_number", sa.String(length=20), nullable=False),
+        sa.Column("business_license", sa.String(length=100), nullable=False),
+        sa.Column("document_reference", sa.String(length=255), nullable=False),
+        sa.Column("notes", sa.String(length=500), nullable=True),
+        sa.Column("status", sa.String(length=20), nullable=False, server_default="PENDING"),
+        sa.Column("rejection_reason", sa.String(length=255), nullable=True),
+        sa.Column("reviewed_by_user_id", sa.Integer(), nullable=True),
+        sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(["reviewed_by_user_id"], ["user.id"]),
+        sa.ForeignKeyConstraint(["user_id"], ["user.id"]),
+        sa.PrimaryKeyConstraint("id"),
+    )
+    op.create_index(op.f("ix_lot_owner_application_user_id"), "lot_owner_application", ["user_id"], unique=False)
+
+
+def downgrade() -> None:
+    op.drop_index(op.f("ix_lot_owner_application_user_id"), table_name="lot_owner_application")
+    op.drop_table("lot_owner_application")

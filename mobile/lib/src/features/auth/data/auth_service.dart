@@ -219,9 +219,7 @@ class BackendAuthService implements AuthService {
     try {
       final response = await _client.get<dynamic>(
         '/auth/me',
-        options: Options(
-          headers: {'Authorization': 'Bearer $nextAccessToken'},
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $nextAccessToken'}),
       );
       final responseData = response.data;
       if (responseData is! Map<String, dynamic>) {

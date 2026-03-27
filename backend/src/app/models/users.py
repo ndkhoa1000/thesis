@@ -30,7 +30,7 @@ class LotOwnerApplication(Base):
     __tablename__ = "lot_owner_application"
 
     id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True, init=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
     full_name: Mapped[str] = mapped_column(String(100))
     phone_number: Mapped[str] = mapped_column(String(20))
     business_license: Mapped[str] = mapped_column(String(100))

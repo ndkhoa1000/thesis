@@ -59,7 +59,12 @@ def _ensure_public_account(current_user: dict[str, Any]) -> None:
 
 
 async def _get_lot_owner_application_by_user_id(db: AsyncSession, user_id: int) -> LotOwnerApplication | None:
-    application_result = await db.execute(select(LotOwnerApplication).where(LotOwnerApplication.user_id == user_id).limit(1))
+    application_result = await db.execute(
+        select(LotOwnerApplication)
+        .where(LotOwnerApplication.user_id == user_id)
+        .order_by(LotOwnerApplication.created_at.desc(), LotOwnerApplication.id.desc())
+        .limit(1)
+    )
     return application_result.scalar_one_or_none()
 
 
@@ -97,20 +102,6 @@ async def create_my_lot_owner_application(
             raise DuplicateValueException("Lot owner application is already pending review")
         if existing_application.status == CapabilityApplicationStatus.APPROVED.value:
             raise DuplicateValueException("Lot owner capability is already approved for this account")
-
-        existing_application.full_name = payload.full_name
-        existing_application.phone_number = payload.phone_number
-        existing_application.business_license = payload.business_license
-        existing_application.document_reference = payload.document_reference
-        existing_application.notes = payload.notes
-        existing_application.status = CapabilityApplicationStatus.PENDING.value
-        existing_application.rejection_reason = None
-        existing_application.reviewed_by_user_id = None
-        existing_application.reviewed_at = None
-        existing_application.updated_at = _utcnow()
-        await db.commit()
-        await db.refresh(existing_application)
-        return existing_application
 
     application = LotOwnerApplication(
         user_id=current_user["id"],
@@ -151,6 +142,9 @@ async def review_lot_owner_application(
     application = application_result.scalar_one_or_none()
     if application is None:
         raise NotFoundException("Lot owner application not found")
+
+    if application.status != CapabilityApplicationStatus.PENDING.value:
+        raise BadRequestException("Only pending lot owner applications can be reviewed")
 
     if payload.decision == CapabilityApplicationStatus.REJECTED and not payload.rejection_reason:
         raise BadRequestException("Rejection reason is required when rejecting an application")

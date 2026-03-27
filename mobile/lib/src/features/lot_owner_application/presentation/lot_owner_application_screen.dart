@@ -54,21 +54,22 @@ class _LotOwnerApplicationScreenState extends State<LotOwnerApplicationScreen> {
       isScrollControlled: true,
       builder: (context) => _LotOwnerApplicationForm(
         existing: existing,
-        onSubmit: ({
-          required fullName,
-          required phoneNumber,
-          required businessLicense,
-          required documentReference,
-          notes,
-        }) async {
-          await widget.applicationService.submitApplication(
-            fullName: fullName,
-            phoneNumber: phoneNumber,
-            businessLicense: businessLicense,
-            documentReference: documentReference,
-            notes: notes,
-          );
-        },
+        onSubmit:
+            ({
+              required fullName,
+              required phoneNumber,
+              required businessLicense,
+              required documentReference,
+              notes,
+            }) async {
+              await widget.applicationService.submitApplication(
+                fullName: fullName,
+                phoneNumber: phoneNumber,
+                businessLicense: businessLicense,
+                documentReference: documentReference,
+                notes: notes,
+              );
+            },
       ),
     );
 
@@ -115,7 +116,9 @@ class _LotOwnerApplicationScreenState extends State<LotOwnerApplicationScreen> {
           return _ApplicationStatusView(
             session: widget.session,
             application: application,
-            onResubmit: application.isRejected ? () => _openForm(application) : null,
+            onResubmit: application.isRejected
+                ? () => _openForm(application)
+                : null,
           );
         },
       ),
@@ -236,7 +239,8 @@ class _ApplicationStatusView extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(message),
-                if (application.isApproved && !session.capabilities['lot_owner']!) ...[
+                if (application.isApproved &&
+                    !session.capabilities['lot_owner']!) ...[
                   const SizedBox(height: 12),
                   const Text(
                     'Ứng dụng sẽ làm mới phiên để cập nhật quyền khi trạng thái duyệt thay đổi.',
@@ -260,13 +264,26 @@ class _ApplicationStatusView extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Thông tin hồ sơ', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Thông tin hồ sơ',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 12),
                 _InfoRow(label: 'Họ tên', value: application.fullName),
-                _InfoRow(label: 'Số điện thoại', value: application.phoneNumber),
-                _InfoRow(label: 'Giấy phép/sở hữu', value: application.businessLicense),
-                _InfoRow(label: 'Tài liệu xác minh', value: application.documentReference),
-                if (application.notes != null) _InfoRow(label: 'Ghi chú', value: application.notes!),
+                _InfoRow(
+                  label: 'Số điện thoại',
+                  value: application.phoneNumber,
+                ),
+                _InfoRow(
+                  label: 'Giấy phép/sở hữu',
+                  value: application.businessLicense,
+                ),
+                _InfoRow(
+                  label: 'Tài liệu xác minh',
+                  value: application.documentReference,
+                ),
+                if (application.notes != null)
+                  _InfoRow(label: 'Ghi chú', value: application.notes!),
               ],
             ),
           ),
@@ -337,10 +354,7 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _LotOwnerApplicationForm extends StatefulWidget {
-  const _LotOwnerApplicationForm({
-    required this.onSubmit,
-    this.existing,
-  });
+  const _LotOwnerApplicationForm({required this.onSubmit, this.existing});
 
   final LotOwnerApplication? existing;
   final Future<void> Function({
@@ -349,10 +363,12 @@ class _LotOwnerApplicationForm extends StatefulWidget {
     required String businessLicense,
     required String documentReference,
     String? notes,
-  }) onSubmit;
+  })
+  onSubmit;
 
   @override
-  State<_LotOwnerApplicationForm> createState() => _LotOwnerApplicationFormState();
+  State<_LotOwnerApplicationForm> createState() =>
+      _LotOwnerApplicationFormState();
 }
 
 class _LotOwnerApplicationFormState extends State<_LotOwnerApplicationForm> {
@@ -367,11 +383,21 @@ class _LotOwnerApplicationFormState extends State<_LotOwnerApplicationForm> {
   @override
   void initState() {
     super.initState();
-    _fullNameController = TextEditingController(text: widget.existing?.fullName ?? '');
-    _phoneController = TextEditingController(text: widget.existing?.phoneNumber ?? '');
-    _licenseController = TextEditingController(text: widget.existing?.businessLicense ?? '');
-    _documentController = TextEditingController(text: widget.existing?.documentReference ?? '');
-    _notesController = TextEditingController(text: widget.existing?.notes ?? '');
+    _fullNameController = TextEditingController(
+      text: widget.existing?.fullName ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.existing?.phoneNumber ?? '',
+    );
+    _licenseController = TextEditingController(
+      text: widget.existing?.businessLicense ?? '',
+    );
+    _documentController = TextEditingController(
+      text: widget.existing?.documentReference ?? '',
+    );
+    _notesController = TextEditingController(
+      text: widget.existing?.notes ?? '',
+    );
   }
 
   @override
@@ -436,7 +462,9 @@ class _LotOwnerApplicationFormState extends State<_LotOwnerApplicationForm> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.existing == null ? 'Nộp hồ sơ Chủ bãi' : 'Cập nhật hồ sơ Chủ bãi',
+                widget.existing == null
+                    ? 'Nộp hồ sơ Chủ bãi'
+                    : 'Cập nhật hồ sơ Chủ bãi',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -473,7 +501,9 @@ class _LotOwnerApplicationFormState extends State<_LotOwnerApplicationForm> {
                 controller: _notesController,
                 minLines: 2,
                 maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Ghi chú (tuỳ chọn)'),
+                decoration: const InputDecoration(
+                  labelText: 'Ghi chú (tuỳ chọn)',
+                ),
               ),
               const SizedBox(height: 16),
               FilledButton(
@@ -484,7 +514,9 @@ class _LotOwnerApplicationFormState extends State<_LotOwnerApplicationForm> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Text(widget.existing == null ? 'Gửi hồ sơ' : 'Gửi lại hồ sơ'),
+                    : Text(
+                        widget.existing == null ? 'Gửi hồ sơ' : 'Gửi lại hồ sơ',
+                      ),
               ),
             ],
           ),
