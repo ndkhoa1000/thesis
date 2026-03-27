@@ -27,6 +27,15 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
           checkedInAt: DateTime(2026, 3, 27, 8, 30),
         );
   }
+
+  @override
+  Future<AttendantCheckInResult> checkInWalkIn({
+    required String vehicleType,
+    required String plateImagePath,
+    String? overviewImagePath,
+  }) async {
+    throw UnimplementedError();
+  }
 }
 
 Widget _fakeScanner(

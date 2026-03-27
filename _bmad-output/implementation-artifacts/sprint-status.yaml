@@ -57,7 +57,7 @@ development_status:
   epic-4: in-progress
   4-1-driver-generates-check-in-qr: done
   4-2-attendant-scans-qr-for-check-in: done
-  4-3-manual-license-plate-check-in: backlog
+  4-3-manual-license-plate-check-in: done
   4-4-driver-generates-check-out-qr: backlog
   4-5-attendant-scans-qr-for-check-out-calculates-fee: backlog
   4-6-record-payment-finalize-session: backlog

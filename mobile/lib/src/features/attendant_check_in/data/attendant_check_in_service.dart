@@ -31,6 +31,12 @@ class AttendantCheckInResult {
 
 abstract class AttendantCheckInService {
   Future<AttendantCheckInResult> checkInDriver({required String token});
+
+  Future<AttendantCheckInResult> checkInWalkIn({
+    required String vehicleType,
+    required String plateImagePath,
+    String? overviewImagePath,
+  });
 }
 
 class BackendAttendantCheckInService implements AttendantCheckInService {
@@ -58,6 +64,43 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
       if (raw is! Map<String, dynamic>) {
         throw const AttendantCheckInException(
           'Phản hồi check-in từ máy chủ không hợp lệ.',
+        );
+      }
+      return AttendantCheckInResult.fromJson(raw);
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantCheckInResult> checkInWalkIn({
+    required String vehicleType,
+    required String plateImagePath,
+    String? overviewImagePath,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'vehicle_type': vehicleType,
+        'plate_image': await MultipartFile.fromFile(
+          plateImagePath,
+          filename: plateImagePath.split('/').last,
+        ),
+        if (overviewImagePath != null)
+          'overview_image': await MultipartFile.fromFile(
+            overviewImagePath,
+            filename: overviewImagePath.split('/').last,
+          ),
+      });
+
+      final response = await _dio.post<dynamic>(
+        '/sessions/attendant-walk-in-check-in',
+        data: formData,
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AttendantCheckInException(
+          'Phan hoi walk-in check-in tu may chu khong hop le.',
         );
       }
       return AttendantCheckInResult.fromJson(raw);

@@ -1,10 +1,11 @@
 """Parking session endpoints, driver token issuance, and attendant check-in."""
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from secrets import token_urlsafe
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,7 @@ from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
 from ...core.security import ALGORITHM, SECRET_KEY
 from ...models.parking import ParkingLot
-from ...models.enums import SessionStatus, UserRole
+from ...models.enums import SessionStatus, UserRole, VehicleType
 from ...models.sessions import ParkingSession
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
@@ -23,6 +24,7 @@ from ...schemas.vehicle import VehicleRead
 
 router = APIRouter(tags=["sessions"])
 DRIVER_CHECK_IN_TOKEN_TTL = timedelta(minutes=5)
+WALK_IN_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "walk_in_check_in"
 
 
 def _utcnow() -> datetime:
@@ -94,6 +96,35 @@ def _decode_driver_check_in_token(token: str) -> dict[str, Any]:
         raise BadRequestException("Invalid QR code. Please try again.")
 
     return payload
+
+
+def _normalize_walk_in_vehicle_type(vehicle_type: str) -> str:
+    normalized = vehicle_type.strip().upper()
+    allowed = {member.value for member in VehicleType}
+    if normalized not in allowed:
+        raise BadRequestException("Unsupported vehicle type for walk-in check-in")
+    return normalized
+
+
+def _build_walk_in_license_plate() -> str:
+    return f"WALK-IN-{token_urlsafe(4).replace('-', '').replace('_', '').upper()}"
+
+
+async def _store_walk_in_image(upload: UploadFile) -> str:
+    content_type = upload.content_type or ""
+    if not content_type.startswith("image/"):
+        raise BadRequestException("Walk-in photo upload must be an image")
+
+    payload = await upload.read()
+    if not payload:
+        raise BadRequestException("Walk-in plate photo is required")
+
+    suffix = Path(upload.filename or "walk-in.jpg").suffix or ".jpg"
+    WALK_IN_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{token_urlsafe(6)}{suffix}"
+    stored_path = WALK_IN_IMAGE_DIR / stored_name
+    stored_path.write_bytes(payload)
+    return stored_path.relative_to(Path(__file__).resolve().parents[2]).as_posix()
 
 
 @router.get("/sessions", status_code=200)
@@ -188,6 +219,53 @@ async def attendant_check_in_with_driver_qr(
         driver_id=token_payload["driver_id"],
         attendant_checkin_id=attendant.id,
         vehicle_type=vehicle.vehicle_type,
+    )
+    parking_lot.current_available -= 1
+    db.add(created_session)
+    await db.commit()
+    await db.refresh(created_session)
+
+    return AttendantCheckInRead(
+        session_id=created_session.id,
+        parking_lot_id=parking_lot.id,
+        current_available=parking_lot.current_available,
+        license_plate=created_session.license_plate,
+        vehicle_type=created_session.vehicle_type,
+        checked_in_at=created_session.checkin_time,
+    )
+
+
+@router.post("/sessions/attendant-walk-in-check-in", response_model=AttendantCheckInRead, status_code=201)
+async def attendant_check_in_walk_in_vehicle(
+    request: Request,
+    vehicle_type: Annotated[str, Form(...)],
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+    plate_image: Annotated[UploadFile | None, File(...)] = None,
+    overview_image: Annotated[UploadFile | None, File()] = None,
+) -> AttendantCheckInRead:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant)
+
+    if plate_image is None:
+      raise BadRequestException("A plate photo is required for walk-in check-in")
+
+    normalized_vehicle_type = _normalize_walk_in_vehicle_type(vehicle_type)
+    plate_image_path = await _store_walk_in_image(plate_image)
+    if overview_image is not None:
+        content_type = overview_image.content_type or ""
+        if not content_type.startswith("image/"):
+            raise BadRequestException("Walk-in photo upload must be an image")
+
+    if parking_lot.current_available <= 0:
+        raise BadRequestException("Lot is full - no available spots.")
+
+    created_session = ParkingSession(
+        parking_lot_id=parking_lot.id,
+        license_plate=_build_walk_in_license_plate(),
+        attendant_checkin_id=attendant.id,
+        vehicle_type=normalized_vehicle_type,
+        checkin_image=plate_image_path,
     )
     parking_lot.current_available -= 1
     db.add(created_session)
