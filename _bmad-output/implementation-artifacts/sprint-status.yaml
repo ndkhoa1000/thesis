@@ -53,7 +53,7 @@ development_status:
   3-1-configure-lot-details-capacity: done
   3-2-set-operating-hours-pricing-rules: done
   3-3-create-attendant-accounts: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
   epic-4: backlog
   4-1-driver-generates-check-in-qr: backlog
   4-2-attendant-scans-qr-for-check-in: backlog
