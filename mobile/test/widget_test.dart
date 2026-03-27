@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +12,8 @@ import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_ap
 import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'package:parking_app/src/features/operator_application/data/operator_application_service.dart';
 import 'package:parking_app/src/features/operator_application/presentation/operator_application_screen.dart';
+import 'package:parking_app/src/features/operator_lot_management/data/operator_lot_management_service.dart';
+import 'package:parking_app/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart';
 import 'package:parking_app/src/features/parking_lot_registration/data/parking_lot_service.dart';
 import 'package:parking_app/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
 import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
@@ -175,6 +179,8 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
     List<AdminApprovalItem>? parkingLotApplications,
     List<AdminManagedUser>? managedUsers,
     List<AdminManagedParkingLot>? managedParkingLots,
+    this.userActivationCompleter,
+    this.parkingLotStatusCompleter,
   }) : _lotOwnerApplications = List<AdminApprovalItem>.from(
          lotOwnerApplications ?? const [],
        ),
@@ -194,6 +200,10 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
   final List<AdminApprovalItem> _parkingLotApplications;
   final List<AdminManagedUser> _managedUsers;
   final List<AdminManagedParkingLot> _managedParkingLots;
+  final Completer<void>? userActivationCompleter;
+  final Completer<void>? parkingLotStatusCompleter;
+  int userActivationCallCount = 0;
+  int parkingLotStatusCallCount = 0;
 
   @override
   Future<AdminApprovalsDashboard> loadDashboard() async {
@@ -204,9 +214,9 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
         _parkingLotApplications,
       ),
       managedUsers: List<AdminManagedUser>.from(_managedUsers),
-      managedParkingLots: List<AdminManagedParkingLot>.from(
-        _managedParkingLots,
-      ),
+      managedParkingLots: _managedParkingLots
+          .where((lot) => lot.canSuspend || lot.canReopen)
+          .toList(growable: false),
     );
   }
 
@@ -234,6 +244,10 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
     required int userId,
     required bool isActive,
   }) async {
+    userActivationCallCount += 1;
+    if (userActivationCompleter != null) {
+      await userActivationCompleter!.future;
+    }
     final index = _managedUsers.indexWhere((user) => user.id == userId);
     final current = _managedUsers[index];
     final updated = AdminManagedUser(
@@ -255,6 +269,10 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
     required int parkingLotId,
     required String status,
   }) async {
+    parkingLotStatusCallCount += 1;
+    if (parkingLotStatusCompleter != null) {
+      await parkingLotStatusCompleter!.future;
+    }
     final index = _managedParkingLots.indexWhere(
       (lot) => lot.id == parkingLotId,
     );
@@ -322,6 +340,53 @@ class FakeParkingLotService implements ParkingLotService {
   @override
   Future<List<ParkingLotRegistration>> getMyParkingLots() async {
     return List<ParkingLotRegistration>.from(_parkingLots);
+  }
+}
+
+class FakeOperatorLotManagementService implements OperatorLotManagementService {
+  FakeOperatorLotManagementService({
+    List<OperatorManagedParkingLot>? initialLots,
+  }) : _parkingLots = List<OperatorManagedParkingLot>.from(
+         initialLots ?? const [],
+       );
+
+  final List<OperatorManagedParkingLot> _parkingLots;
+
+  @override
+  Future<List<OperatorManagedParkingLot>> getManagedParkingLots() async {
+    return List<OperatorManagedParkingLot>.from(_parkingLots);
+  }
+
+  @override
+  Future<OperatorManagedParkingLot> updateManagedParkingLot({
+    required int parkingLotId,
+    required String name,
+    required String address,
+    required int totalCapacity,
+    String? description,
+    String? coverImage,
+  }) async {
+    final index = _parkingLots.indexWhere((lot) => lot.id == parkingLotId);
+    final current = _parkingLots[index];
+    final updated = OperatorManagedParkingLot(
+      id: current.id,
+      leaseId: current.leaseId,
+      lotOwnerId: current.lotOwnerId,
+      name: name,
+      address: address,
+      latitude: current.latitude,
+      longitude: current.longitude,
+      currentAvailable: totalCapacity - current.occupiedCount,
+      status: current.status,
+      occupiedCount: current.occupiedCount,
+      totalCapacity: totalCapacity,
+      description: description,
+      coverImage: coverImage,
+      createdAt: current.createdAt,
+      updatedAt: DateTime(2026, 3, 27),
+    );
+    _parkingLots[index] = updated;
+    return updated;
   }
 }
 
@@ -441,6 +506,57 @@ void main() {
     expect(find.byType(AdminApprovalsScreen), findsOneWidget);
     expect(find.text('Điều phối hệ thống'), findsOneWidget);
     expect(find.text('Nguyen Van A'), findsOneWidget);
+  });
+
+  testWidgets('ParkingApp routes manager session to operator lot workspace', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 11,
+          leaseId: 3,
+          lotOwnerId: 7,
+          name: 'Bai xe Le Thanh Ton',
+          address: '8 Le Thanh Ton, Quan 1',
+          latitude: 10.777,
+          longitude: 106.705,
+          currentAvailable: 16,
+          status: 'APPROVED',
+          occupiedCount: 4,
+          totalCapacity: 20,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthenticatedHome(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'MANAGER',
+            capabilities: {
+              'driver': true,
+              'lot_owner': false,
+              'operator': true,
+              'attendant': false,
+              'admin': false,
+              'public_account': true,
+            },
+          ),
+          authService: FakeAuthService(),
+          onSignOut: () async {},
+          onSessionUpdated: (_) {},
+          operatorLotManagementServiceFactory: (_) => lotManagementService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OperatorLotManagementScreen), findsOneWidget);
+    expect(find.text('Điều hành bãi xe'), findsOneWidget);
+    expect(find.text('Bai xe Le Thanh Ton'), findsOneWidget);
   });
 
   testWidgets('ParkingApp routes lot owner session to parking lot workspace', (
@@ -1082,5 +1198,165 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Đang hoạt động'), findsOneWidget);
+  });
+
+  testWidgets('Admin operations tab excludes pending and rejected lots', (
+    WidgetTester tester,
+  ) async {
+    final approvalsService = FakeAdminApprovalsService(
+      managedParkingLots: const [
+        AdminManagedParkingLot(
+          id: 14,
+          lotOwnerId: 2,
+          name: 'Bai xe Ham Nghi',
+          address: '12 Ham Nghi, Quan 1',
+          currentAvailable: 8,
+          status: 'APPROVED',
+          ownerName: 'Pham Van D',
+          ownerPhone: '0909444555',
+        ),
+        AdminManagedParkingLot(
+          id: 15,
+          lotOwnerId: 2,
+          name: 'Bai xe Pending',
+          address: '15 Ham Nghi, Quan 1',
+          currentAvailable: 0,
+          status: 'PENDING',
+          ownerName: 'Pham Van D',
+        ),
+        AdminManagedParkingLot(
+          id: 16,
+          lotOwnerId: 2,
+          name: 'Bai xe Rejected',
+          address: '16 Ham Nghi, Quan 1',
+          currentAvailable: 0,
+          status: 'REJECTED',
+          ownerName: 'Pham Van D',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminApprovalsScreen(
+          approvalsService: approvalsService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Vận hành bãi'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Ham Nghi'), findsOneWidget);
+    expect(find.text('Bai xe Pending'), findsNothing);
+    expect(find.text('Bai xe Rejected'), findsNothing);
+  });
+
+  testWidgets('Admin user action is disabled while request is pending', (
+    WidgetTester tester,
+  ) async {
+    final completer = Completer<void>();
+    final approvalsService = FakeAdminApprovalsService(
+      managedUsers: const [
+        AdminManagedUser(
+          id: 5,
+          name: 'Le Thi C',
+          username: 'lethic',
+          email: 'c@example.com',
+          phone: '0909888777',
+          role: 'LOT_OWNER',
+          isActive: true,
+          isSuperuser: false,
+        ),
+      ],
+      userActivationCompleter: completer,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminApprovalsScreen(
+          approvalsService: approvalsService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Người dùng'));
+    await tester.pumpAndSettle();
+
+    final buttonFinder = find.widgetWithText(FilledButton, 'Vô hiệu hóa');
+    await tester.tap(buttonFinder);
+    await tester.pump();
+
+    final button = tester.widget<FilledButton>(buttonFinder);
+    expect(button.onPressed, isNull);
+    expect(approvalsService.userActivationCallCount, 1);
+
+    await tester.tap(buttonFinder, warnIfMissed: false);
+    await tester.pump();
+    expect(approvalsService.userActivationCallCount, 1);
+
+    completer.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đã khóa'), findsOneWidget);
+  });
+
+  testWidgets('Operator workspace can update lot details and capacity', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 21,
+          leaseId: 9,
+          lotOwnerId: 5,
+          name: 'Bai xe Dong Khoi',
+          address: '18 Dong Khoi, Quan 1',
+          latitude: 10.776,
+          longitude: 106.703,
+          currentAvailable: 12,
+          status: 'APPROVED',
+          occupiedCount: 3,
+          totalCapacity: 15,
+          description: 'Gan trung tam thuong mai',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Dong Khoi'), findsOneWidget);
+    expect(find.text('3/15 xe đang trong bãi'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Cập nhật cấu hình'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tên bãi xe'),
+      'Bai xe Dong Khoi Mo Rong',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tổng sức chứa tối đa'),
+      '25',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Lưu cấu hình'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Dong Khoi Mo Rong'), findsOneWidget);
+    expect(find.text('3/25 xe đang trong bãi'), findsOneWidget);
+    expect(find.text('22 xe'), findsOneWidget);
   });
 }

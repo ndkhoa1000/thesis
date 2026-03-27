@@ -279,7 +279,7 @@ class BackendAdminApprovalsService implements AdminApprovalsService {
       final managedParkingLots = _parseList(
         parkingLotResponse.data,
         AdminManagedParkingLot.fromJson,
-      );
+      ).where((lot) => lot.canSuspend || lot.canReopen).toList(growable: false);
 
       return AdminApprovalsDashboard(
         lotOwnerApplications: lotOwnerItems,

@@ -6,3 +6,7 @@
 
 - Create a dedicated UX hardening story for public/admin shells to standardize navigation, reduce placeholder-first layouts, and finish Vietnamese localization for visible role/workspace labels.
 - Prefer a shared shell/navigation pattern before Epic 3 expands the Operator workspace further, otherwise role-specific placeholders will continue to diverge.
+
+## Deferred from: code review of 2-3-admin-system-management-lot-suspension (2026-03-27)
+
+- Clarify whether Admins may deactivate other privileged accounts in admin account moderation flows — deferred because tập trung vào các flow chính, policy cho admin không cần thiết cho hiện tại.

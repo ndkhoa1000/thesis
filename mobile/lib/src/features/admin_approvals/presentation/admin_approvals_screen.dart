@@ -18,6 +18,7 @@ class AdminApprovalsScreen extends StatefulWidget {
 
 class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
   late Future<AdminApprovalsDashboard> _dashboardFuture;
+  final Set<String> _pendingActions = <String>{};
 
   @override
   void initState() {
@@ -31,22 +32,55 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
     });
   }
 
-  Future<void> _approve(AdminApprovalItem item) async {
+  Future<void> _runPendingAction(
+    String actionKey,
+    Future<void> Function() action,
+  ) async {
+    if (_pendingActions.contains(actionKey)) {
+      return;
+    }
+
+    setState(() {
+      _pendingActions.add(actionKey);
+    });
+
     try {
-      await widget.approvalsService.approve(
-        type: item.type,
-        applicationId: item.id,
-      );
+      await action();
+    } finally {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã duyệt ${item.typeLabel.toLowerCase()}.')),
-      );
-      _reload();
-    } on AdminApprovalsException catch (error) {
-      _showError(error.message);
+      setState(() {
+        _pendingActions.remove(actionKey);
+      });
     }
+  }
+
+  String _approvalActionKey(AdminApprovalItem item) =>
+      'approval:${item.type.name}:${item.id}';
+
+  String _userActionKey(AdminManagedUser user) => 'user:${user.id}';
+
+  String _parkingLotActionKey(AdminManagedParkingLot lot) => 'lot:${lot.id}';
+
+  Future<void> _approve(AdminApprovalItem item) async {
+    await _runPendingAction(_approvalActionKey(item), () async {
+      try {
+        await widget.approvalsService.approve(
+          type: item.type,
+          applicationId: item.id,
+        );
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã duyệt ${item.typeLabel.toLowerCase()}.')),
+        );
+        _reload();
+      } on AdminApprovalsException catch (error) {
+        _showError(error.message);
+      }
+    });
   }
 
   Future<void> _reject(AdminApprovalItem item) async {
@@ -58,66 +92,74 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
       return;
     }
 
-    try {
-      await widget.approvalsService.reject(
-        type: item.type,
-        applicationId: item.id,
-        rejectionReason: rejectionReason.trim(),
-      );
-      if (!mounted) {
-        return;
+    await _runPendingAction(_approvalActionKey(item), () async {
+      try {
+        await widget.approvalsService.reject(
+          type: item.type,
+          applicationId: item.id,
+          rejectionReason: rejectionReason.trim(),
+        );
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã từ chối ${item.typeLabel.toLowerCase()}.'),
+          ),
+        );
+        _reload();
+      } on AdminApprovalsException catch (error) {
+        _showError(error.message);
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã từ chối ${item.typeLabel.toLowerCase()}.')),
-      );
-      _reload();
-    } on AdminApprovalsException catch (error) {
-      _showError(error.message);
-    }
+    });
   }
 
   Future<void> _toggleUserActivation(AdminManagedUser user) async {
     final nextIsActive = !user.isActive;
-    try {
-      await widget.approvalsService.updateUserActivation(
-        userId: user.id,
-        isActive: nextIsActive,
-      );
-      if (!mounted) {
-        return;
+    await _runPendingAction(_userActionKey(user), () async {
+      try {
+        await widget.approvalsService.updateUserActivation(
+          userId: user.id,
+          isActive: nextIsActive,
+        );
+        if (!mounted) {
+          return;
+        }
+        final message = nextIsActive
+            ? 'Đã kích hoạt tài khoản ${user.name}.'
+            : 'Đã vô hiệu hóa tài khoản ${user.name}.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+        _reload();
+      } on AdminApprovalsException catch (error) {
+        _showError(error.message);
       }
-      final message = nextIsActive
-          ? 'Đã kích hoạt tài khoản ${user.name}.'
-          : 'Đã vô hiệu hóa tài khoản ${user.name}.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-      _reload();
-    } on AdminApprovalsException catch (error) {
-      _showError(error.message);
-    }
+    });
   }
 
   Future<void> _toggleParkingLotStatus(AdminManagedParkingLot lot) async {
     final nextStatus = lot.canSuspend ? 'CLOSED' : 'APPROVED';
-    try {
-      await widget.approvalsService.updateParkingLotStatus(
-        parkingLotId: lot.id,
-        status: nextStatus,
-      );
-      if (!mounted) {
-        return;
+    await _runPendingAction(_parkingLotActionKey(lot), () async {
+      try {
+        await widget.approvalsService.updateParkingLotStatus(
+          parkingLotId: lot.id,
+          status: nextStatus,
+        );
+        if (!mounted) {
+          return;
+        }
+        final message = nextStatus == 'CLOSED'
+            ? 'Đã tạm dừng bãi xe ${lot.name}.'
+            : 'Đã mở lại bãi xe ${lot.name}.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+        _reload();
+      } on AdminApprovalsException catch (error) {
+        _showError(error.message);
       }
-      final message = nextStatus == 'CLOSED'
-          ? 'Đã tạm dừng bãi xe ${lot.name}.'
-          : 'Đã mở lại bãi xe ${lot.name}.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-      _reload();
-    } on AdminApprovalsException catch (error) {
-      _showError(error.message);
-    }
+    });
   }
 
   void _showError(String message) {
@@ -185,6 +227,7 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
               children: [
                 _ApprovalsList(
                   items: dashboard.lotOwnerApplications,
+                  pendingActionKeys: _pendingActions,
                   emptyTitle: 'Không có hồ sơ Chủ bãi chờ duyệt',
                   emptyMessage:
                       'Danh sách này sẽ hiển thị các hồ sơ công khai đang chờ Admin xét duyệt.',
@@ -193,6 +236,7 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
                 ),
                 _ApprovalsList(
                   items: dashboard.operatorApplications,
+                  pendingActionKeys: _pendingActions,
                   emptyTitle: 'Không có hồ sơ Operator chờ duyệt',
                   emptyMessage:
                       'Danh sách này sẽ hiển thị các hồ sơ Operator đang chờ Admin xét duyệt.',
@@ -201,6 +245,7 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
                 ),
                 _ApprovalsList(
                   items: dashboard.parkingLotApplications,
+                  pendingActionKeys: _pendingActions,
                   emptyTitle: 'Không có đăng ký bãi xe chờ duyệt',
                   emptyMessage:
                       'Các bãi xe do Lot Owner khai báo sẽ xuất hiện tại đây để Admin xét duyệt.',
@@ -209,10 +254,12 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
                 ),
                 _ManagedUsersList(
                   users: dashboard.managedUsers,
+                  pendingActionKeys: _pendingActions,
                   onToggleActivation: _toggleUserActivation,
                 ),
                 _ManagedParkingLotsList(
                   lots: dashboard.managedParkingLots,
+                  pendingActionKeys: _pendingActions,
                   onToggleStatus: _toggleParkingLotStatus,
                 ),
               ],
@@ -227,6 +274,7 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
 class _ApprovalsList extends StatelessWidget {
   const _ApprovalsList({
     required this.items,
+    required this.pendingActionKeys,
     required this.emptyTitle,
     required this.emptyMessage,
     required this.onApprove,
@@ -234,6 +282,7 @@ class _ApprovalsList extends StatelessWidget {
   });
 
   final List<AdminApprovalItem> items;
+  final Set<String> pendingActionKeys;
   final String emptyTitle;
   final String emptyMessage;
   final Future<void> Function(AdminApprovalItem item) onApprove;
@@ -249,6 +298,9 @@ class _ApprovalsList extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       itemBuilder: (context, index) {
         final item = items[index];
+        final isPending = pendingActionKeys.contains(
+          'approval:${item.type.name}:${item.id}',
+        );
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -306,7 +358,7 @@ class _ApprovalsList extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => onReject(item),
+                        onPressed: isPending ? null : () => onReject(item),
                         icon: const Icon(Icons.close),
                         label: const Text('Từ chối'),
                       ),
@@ -314,7 +366,7 @@ class _ApprovalsList extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: FilledButton.icon(
-                        onPressed: () => onApprove(item),
+                        onPressed: isPending ? null : () => onApprove(item),
                         icon: const Icon(Icons.check),
                         label: const Text('Duyệt'),
                       ),
@@ -335,10 +387,12 @@ class _ApprovalsList extends StatelessWidget {
 class _ManagedUsersList extends StatelessWidget {
   const _ManagedUsersList({
     required this.users,
+    required this.pendingActionKeys,
     required this.onToggleActivation,
   });
 
   final List<AdminManagedUser> users;
+  final Set<String> pendingActionKeys;
   final Future<void> Function(AdminManagedUser user) onToggleActivation;
 
   @override
@@ -357,6 +411,7 @@ class _ManagedUsersList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final user = users[index];
+        final isPending = pendingActionKeys.contains('user:${user.id}');
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
@@ -390,7 +445,9 @@ class _ManagedUsersList extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerRight,
                   child: FilledButton.icon(
-                    onPressed: () => onToggleActivation(user),
+                    onPressed: isPending
+                        ? null
+                        : () => onToggleActivation(user),
                     icon: Icon(
                       user.isActive ? Icons.block : Icons.check_circle,
                     ),
@@ -411,10 +468,12 @@ class _ManagedUsersList extends StatelessWidget {
 class _ManagedParkingLotsList extends StatelessWidget {
   const _ManagedParkingLotsList({
     required this.lots,
+    required this.pendingActionKeys,
     required this.onToggleStatus,
   });
 
   final List<AdminManagedParkingLot> lots;
+  final Set<String> pendingActionKeys;
   final Future<void> Function(AdminManagedParkingLot lot) onToggleStatus;
 
   @override
@@ -433,7 +492,9 @@ class _ManagedParkingLotsList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final lot = lots[index];
-        final canToggle = lot.canSuspend || lot.canReopen;
+        final canToggle =
+            (lot.canSuspend || lot.canReopen) &&
+            !pendingActionKeys.contains('lot:${lot.id}');
         return Card(
           child: Padding(
             padding: const EdgeInsets.all(16),

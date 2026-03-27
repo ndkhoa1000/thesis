@@ -44,13 +44,13 @@ development_status:
   1-4-apply-to-become-lot-owner: done
   1-5-apply-to-become-operator: done
   epic-1-retrospective: done
-  epic-2: in-progress
+  epic-2: done
   2-1-register-new-parking-lot: done
   2-2-admin-dashboard-pending-approvals: done
-  2-3-admin-system-management-lot-suspension: review
+  2-3-admin-system-management-lot-suspension: done
   epic-2-retrospective: optional
-  epic-3: backlog
-  3-1-configure-lot-details-capacity: backlog
+  epic-3: in-progress
+  3-1-configure-lot-details-capacity: review
   3-2-set-operating-hours-pricing-rules: backlog
   3-3-create-attendant-accounts: backlog
   epic-3-retrospective: optional

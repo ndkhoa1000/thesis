@@ -13,6 +13,8 @@ import 'src/features/lot_owner_application/data/lot_owner_application_service.da
 import 'src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'src/features/operator_application/data/operator_application_service.dart';
 import 'src/features/operator_application/presentation/operator_application_screen.dart';
+import 'src/features/operator_lot_management/data/operator_lot_management_service.dart';
+import 'src/features/operator_lot_management/presentation/operator_lot_management_screen.dart';
 import 'src/features/parking_lot_registration/data/parking_lot_service.dart';
 import 'src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
 import 'src/features/vehicles/data/vehicle_service.dart';
@@ -27,6 +29,8 @@ typedef AdminApprovalsServiceFactory =
     AdminApprovalsService Function(String accessToken);
 typedef ParkingLotServiceFactory =
     ParkingLotService Function(String accessToken);
+typedef OperatorLotManagementServiceFactory =
+    OperatorLotManagementService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -64,6 +68,16 @@ AdminApprovalsService defaultAdminApprovalsServiceFactory(String accessToken) {
 ParkingLotService defaultParkingLotServiceFactory(String accessToken) {
   final apiClient = ApiClient();
   return BackendParkingLotService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+OperatorLotManagementService defaultOperatorLotManagementServiceFactory(
+  String accessToken,
+) {
+  final apiClient = ApiClient();
+  return BackendOperatorLotManagementService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -244,6 +258,8 @@ class AuthenticatedHome extends StatelessWidget {
         defaultOperatorApplicationServiceFactory,
     this.adminApprovalsServiceFactory = defaultAdminApprovalsServiceFactory,
     this.parkingLotServiceFactory = defaultParkingLotServiceFactory,
+    this.operatorLotManagementServiceFactory =
+        defaultOperatorLotManagementServiceFactory,
   });
 
   final AuthSession session;
@@ -255,6 +271,7 @@ class AuthenticatedHome extends StatelessWidget {
   final OperatorApplicationServiceFactory operatorApplicationServiceFactory;
   final AdminApprovalsServiceFactory adminApprovalsServiceFactory;
   final ParkingLotServiceFactory parkingLotServiceFactory;
+  final OperatorLotManagementServiceFactory operatorLotManagementServiceFactory;
 
   List<Widget> _buildAuthActions() {
     return [
@@ -331,10 +348,11 @@ class AuthenticatedHome extends StatelessWidget {
     }
 
     if (session.role == 'MANAGER') {
-      return _buildWorkspacePlaceholder(
-        title: 'Operator Workspace',
-        message:
-            'Đăng nhập thành công ở workspace Operator. Các chức năng vận hành bãi xe sẽ được mở dần ở Epic 3.',
+      return OperatorLotManagementScreen(
+        lotManagementService: operatorLotManagementServiceFactory(
+          session.accessToken,
+        ),
+        onSignOut: onSignOut,
       );
     }
 

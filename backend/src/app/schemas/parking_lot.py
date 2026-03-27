@@ -58,6 +58,40 @@ class ParkingLotAdminRead(ParkingLotRead):
     owner_business_license: str | None = None
 
 
+class OperatorManagedParkingLotRead(ParkingLotRead):
+    lease_id: int
+    total_capacity: int | None = None
+    occupied_count: int
+
+
+class OperatorManagedParkingLotUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(min_length=2, max_length=100)]
+    address: Annotated[str, Field(min_length=5, max_length=255)]
+    total_capacity: Annotated[int, Field(ge=1, le=100000)]
+    description: Annotated[str | None, Field(max_length=1000, default=None)]
+    cover_image: Annotated[str | None, Field(max_length=255, default=None)]
+
+    @field_validator("name", "address", mode="before")
+    @classmethod
+    def strip_required_text_update(cls, value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Field must be a string")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Field is required")
+        return stripped
+
+    @field_validator("description", "cover_image", mode="before")
+    @classmethod
+    def strip_optional_text_update(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+
 class ParkingLotReview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

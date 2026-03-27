@@ -1,21 +1,31 @@
-"""Parking lot endpoints for Story 2-1 and admin approvals."""
+"""Parking lot endpoints for registration, admin review, and operator management."""
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
-from ...models.enums import ParkingLotStatus, UserRole
-from ...models.parking import ParkingLot
+from ...models.enums import LeaseStatus, ParkingLotStatus, SessionStatus, UserRole, VehicleTypeAll
+from ...models.leases import LotLease
+from ...models.parking import ParkingLot, ParkingLotConfig
+from ...models.sessions import ParkingSession
 from ...models.user import User
-from ...models.users import LotOwner
-from ...schemas.parking_lot import ParkingLotAdminRead, ParkingLotCreate, ParkingLotRead, ParkingLotReview, ParkingLotStatusUpdate
+from ...models.users import LotOwner, Manager
+from ...schemas.parking_lot import (
+    OperatorManagedParkingLotRead,
+    OperatorManagedParkingLotUpdate,
+    ParkingLotAdminRead,
+    ParkingLotCreate,
+    ParkingLotRead,
+    ParkingLotReview,
+    ParkingLotStatusUpdate,
+)
 
 router = APIRouter(tags=["lots"])
 
@@ -42,6 +52,19 @@ async def _require_lot_owner_profile(db: AsyncSession, current_user: dict[str, A
     return lot_owner
 
 
+async def _get_manager_profile(db: AsyncSession, user_id: int) -> Manager | None:
+    manager_result = await db.execute(select(Manager).where(Manager.user_id == user_id).limit(1))
+    return manager_result.scalar_one_or_none()
+
+
+async def _require_manager_profile(db: AsyncSession, current_user: dict[str, Any]) -> Manager:
+    _ensure_public_account(current_user)
+    manager = await _get_manager_profile(db, current_user["id"])
+    if manager is None:
+        raise ForbiddenException("Operator capability is required to manage leased parking lots")
+    return manager
+
+
 async def _get_parking_lot(db: AsyncSession, parking_lot_id: int) -> ParkingLot | None:
     parking_lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == parking_lot_id).limit(1))
     return parking_lot_result.scalar_one_or_none()
@@ -61,6 +84,47 @@ async def _get_parking_lot_owner_snapshot(
     if owner_snapshot is None:
         return None, None, None
     return owner_snapshot
+
+
+async def _get_latest_parking_lot_config(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> ParkingLotConfig | None:
+    config_result = await db.execute(
+        select(ParkingLotConfig)
+        .where(ParkingLotConfig.parking_lot_id == parking_lot_id)
+        .order_by(ParkingLotConfig.created_at.desc(), ParkingLotConfig.id.desc())
+        .limit(1)
+    )
+    return config_result.scalar_one_or_none()
+
+
+async def _count_active_sessions(db: AsyncSession, parking_lot_id: int) -> int:
+    active_sessions_result = await db.execute(
+        select(func.count(ParkingSession.id)).where(
+            ParkingSession.parking_lot_id == parking_lot_id,
+            ParkingSession.status == SessionStatus.CHECKED_IN.value,
+        )
+    )
+    return int(active_sessions_result.scalar_one() or 0)
+
+
+async def _get_active_lease_for_manager(
+    db: AsyncSession,
+    manager_id: int,
+    parking_lot_id: int,
+) -> LotLease | None:
+    lease_result = await db.execute(
+        select(LotLease)
+        .where(
+            LotLease.manager_id == manager_id,
+            LotLease.parking_lot_id == parking_lot_id,
+            LotLease.status == LeaseStatus.ACTIVE.value,
+        )
+        .order_by(LotLease.created_at.desc(), LotLease.id.desc())
+        .limit(1)
+    )
+    return lease_result.scalar_one_or_none()
 
 
 def _build_admin_read(
@@ -86,6 +150,33 @@ def _build_admin_read(
             "owner_name": owner_name,
             "owner_phone": owner_phone,
             "owner_business_license": owner_business_license,
+        }
+    )
+
+
+def _build_operator_read(
+    parking_lot: ParkingLot,
+    lease: LotLease,
+    total_capacity: int | None,
+    occupied_count: int,
+) -> OperatorManagedParkingLotRead:
+    return OperatorManagedParkingLotRead.model_validate(
+        {
+            "id": parking_lot.id,
+            "lease_id": lease.id,
+            "lot_owner_id": parking_lot.lot_owner_id,
+            "name": parking_lot.name,
+            "address": parking_lot.address,
+            "latitude": float(parking_lot.latitude),
+            "longitude": float(parking_lot.longitude),
+            "current_available": parking_lot.current_available,
+            "status": parking_lot.status,
+            "description": parking_lot.description,
+            "cover_image": parking_lot.cover_image,
+            "created_at": parking_lot.created_at,
+            "updated_at": parking_lot.updated_at,
+            "total_capacity": total_capacity,
+            "occupied_count": occupied_count,
         }
     )
 
@@ -116,6 +207,85 @@ async def read_my_parking_lots(
         .order_by(ParkingLot.created_at.desc(), ParkingLot.id.desc())
     )
     return list(lots_result.scalars().all())
+
+
+@router.get("/operator/parking-lots", response_model=list[OperatorManagedParkingLotRead])
+async def read_operator_parking_lots(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> list[OperatorManagedParkingLotRead]:
+    manager = await _require_manager_profile(db, current_user)
+    leases_result = await db.execute(
+        select(LotLease, ParkingLot)
+        .join(ParkingLot, LotLease.parking_lot_id == ParkingLot.id)
+        .where(
+            LotLease.manager_id == manager.id,
+            LotLease.status == LeaseStatus.ACTIVE.value,
+        )
+        .order_by(LotLease.created_at.desc(), LotLease.id.desc())
+    )
+
+    managed_lots: list[OperatorManagedParkingLotRead] = []
+    for lease, parking_lot in leases_result.all():
+        latest_config = await _get_latest_parking_lot_config(db, parking_lot.id)
+        occupied_count = await _count_active_sessions(db, parking_lot.id)
+        managed_lots.append(
+            _build_operator_read(
+                parking_lot,
+                lease,
+                latest_config.total_capacity if latest_config else None,
+                occupied_count,
+            )
+        )
+    return managed_lots
+
+
+@router.patch("/operator/parking-lots/{parking_lot_id}", response_model=OperatorManagedParkingLotRead)
+async def patch_operator_parking_lot(
+    request: Request,
+    parking_lot_id: int,
+    payload: OperatorManagedParkingLotUpdate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> OperatorManagedParkingLotRead:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    parking_lot = await _get_parking_lot(db, parking_lot_id)
+    if parking_lot is None:
+        raise NotFoundException("Parking lot not found")
+
+    if parking_lot.status not in {ParkingLotStatus.APPROVED.value, ParkingLotStatus.CLOSED.value}:
+        raise BadRequestException("Only approved or suspended parking lots can be configured")
+
+    occupied_count = await _count_active_sessions(db, parking_lot.id)
+    parking_lot.name = payload.name
+    parking_lot.address = payload.address
+    parking_lot.description = payload.description
+    parking_lot.cover_image = payload.cover_image
+    parking_lot.current_available = max(payload.total_capacity - occupied_count, 0)
+    parking_lot.updated_at = _utcnow()
+
+    parking_lot_config = ParkingLotConfig(
+        parking_lot_id=parking_lot.id,
+        set_by=manager.id,
+        total_capacity=payload.total_capacity,
+        vehicle_type=VehicleTypeAll.ALL.value,
+    )
+    db.add(parking_lot_config)
+
+    await db.commit()
+    await db.refresh(parking_lot)
+
+    return _build_operator_read(
+        parking_lot,
+        lease,
+        parking_lot_config.total_capacity,
+        occupied_count,
+    )
 
 
 @router.post("/user/me/parking-lots", response_model=ParkingLotRead, status_code=201)

@@ -1,6 +1,6 @@
 # Story 2.3: Admin System Management & Lot Suspension
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -48,6 +48,12 @@ so that I can maintain a safe ecosystem.
   - [x] Add Flutter widget coverage for user activation and parking-lot suspension/reopen actions.
   - [x] Run focused verification where the local environment supports it.
 
+### Review Findings
+
+- [x] [Review][Defer] Clarify whether Admins may deactivate other privileged accounts [backend/src/app/api/v1/users.py:357] — deferred: tập trung vào các flow chính, policy cho admin không cần thiết cho hiện tại
+- [x] [Review][Patch] Exclude pending/rejected lots from the operations tab [mobile/lib/src/features/admin_approvals/data/admin_approvals_service.dart:279]
+- [x] [Review][Patch] Disable repeated admin actions while a request is in flight [mobile/lib/src/features/admin_approvals/presentation/admin_approvals_screen.dart:101]
+
 ## Dev Notes
 
 ### Story Foundation
@@ -93,7 +99,7 @@ GPT-5.4
 - Rebuilt the mobile Admin service after a failed patch merge and expanded the Admin screen into a five-tab operational workspace.
 - Added Flutter widget coverage for the new user activation and parking-lot suspension flows.
 - Focused Flutter verification passed locally with `flutter test test/widget_test.dart`.
-- Focused backend pytest could not run to completion in the current environment because `backend/tests/conftest.py` depends on the missing package `faker`.
+- Focused backend verification passed in Docker with `tests/test_admin_system_management.py` after running the test suite through the compose `pytest` service.
 
 ### File List
 
@@ -112,4 +118,4 @@ GPT-5.4
 
 - 2026-03-27: Implemented Story 2.3 backend Admin user-management and parking-lot suspension APIs plus focused backend test coverage.
 - 2026-03-27: Expanded the mobile Admin workspace to include user activation management and parking-lot suspension/reopen controls in the same dashboard.
-- 2026-03-27: Verified focused Flutter widget coverage successfully; backend pytest remains blocked in this environment until `faker` is installed.
+- 2026-03-27: Verified focused Flutter widget coverage locally and confirmed backend admin tests pass when executed inside the Docker test container.
