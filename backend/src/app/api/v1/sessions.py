@@ -1,6 +1,7 @@
-"""Parking session endpoints, driver token issuance, and attendant check-in."""
+"""Parking session endpoints, driver token issuance, and attendant gate flows."""
 
 from datetime import UTC, datetime, timedelta
+from math import ceil
 from pathlib import Path
 from secrets import token_urlsafe
 from typing import Annotated, Any
@@ -14,16 +15,24 @@ from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
 from ...core.security import ALGORITHM, SECRET_KEY
-from ...models.parking import ParkingLot
-from ...models.enums import SessionStatus, UserRole, VehicleType
+from ...models.parking import ParkingLot, Pricing
+from ...models.enums import PricingMode, SessionStatus, UserRole, VehicleType, VehicleTypeAll
 from ...models.sessions import ParkingSession
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
-from ...schemas.session import AttendantCheckInCreate, AttendantCheckInRead, DriverCheckInTokenCreate, DriverCheckInTokenRead
+from ...schemas.session import (
+    AttendantCheckInCreate,
+    AttendantCheckInRead,
+    DriverActiveSessionRead,
+    DriverCheckInTokenCreate,
+    DriverCheckInTokenRead,
+    DriverCheckOutTokenRead,
+)
 from ...schemas.vehicle import VehicleRead
 
 router = APIRouter(tags=["sessions"])
 DRIVER_CHECK_IN_TOKEN_TTL = timedelta(minutes=5)
+DRIVER_CHECK_OUT_TOKEN_TTL = timedelta(minutes=5)
 WALK_IN_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "walk_in_check_in"
 
 
@@ -81,6 +90,22 @@ def _build_driver_check_in_token(driver: Driver, vehicle: Vehicle, expires_at: d
     return jwt.encode(payload, SECRET_KEY.get_secret_value(), algorithm=ALGORITHM)
 
 
+def _build_driver_check_out_token(session: ParkingSession, parking_lot: ParkingLot, expires_at: datetime) -> str:
+    issued_at = _utcnow()
+    payload = {
+        "purpose": "driver_check_out",
+        "session_id": session.id,
+        "driver_id": session.driver_id,
+        "parking_lot_id": parking_lot.id,
+        "license_plate": session.license_plate,
+        "vehicle_type": session.vehicle_type,
+        "jti": token_urlsafe(18),
+        "iat": issued_at.replace(tzinfo=None),
+        "exp": expires_at.replace(tzinfo=None),
+    }
+    return jwt.encode(payload, SECRET_KEY.get_secret_value(), algorithm=ALGORITHM)
+
+
 def _decode_driver_check_in_token(token: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, SECRET_KEY.get_secret_value(), algorithms=[ALGORITHM])
@@ -110,6 +135,48 @@ def _build_walk_in_license_plate() -> str:
     return f"WALK-IN-{token_urlsafe(4).replace('-', '').replace('_', '').upper()}"
 
 
+async def _get_active_session_for_driver(db: AsyncSession, driver_id: int) -> ParkingSession | None:
+    active_session_result = await db.execute(
+        select(ParkingSession)
+        .where(
+            ParkingSession.driver_id == driver_id,
+            ParkingSession.status == SessionStatus.CHECKED_IN.value,
+        )
+        .order_by(ParkingSession.id.desc())
+        .limit(1)
+    )
+    return active_session_result.scalar_one_or_none()
+
+
+async def _get_latest_pricing(db: AsyncSession, parking_lot_id: int) -> Pricing | None:
+    pricing_result = await db.execute(
+        select(Pricing)
+        .where(
+            Pricing.parking_lot_id == parking_lot_id,
+            Pricing.vehicle_type == VehicleTypeAll.ALL.value,
+        )
+        .order_by(Pricing.id.desc())
+        .limit(1)
+    )
+    return pricing_result.scalar_one_or_none()
+
+
+def _calculate_estimated_cost(session: ParkingSession, pricing: Pricing | None) -> float:
+    if pricing is None:
+        return 0.0
+
+    amount = float(pricing.price_amount)
+    if pricing.pricing_mode == PricingMode.SESSION.value:
+        return amount
+
+    elapsed_seconds = max((_utcnow() - session.checkin_time).total_seconds(), 0)
+    elapsed_hours = max(1, ceil(elapsed_seconds / 3600))
+    if pricing.pricing_mode == PricingMode.HOURLY.value:
+        return float(elapsed_hours * amount)
+
+    return amount
+
+
 async def _store_walk_in_image(upload: UploadFile) -> str:
     content_type = upload.content_type or ""
     if not content_type.startswith("image/"):
@@ -136,6 +203,69 @@ async def list_sessions(
     return {"message": "sessions endpoint scaffold"}
 
 
+@router.get("/sessions/driver-active-session", response_model=DriverActiveSessionRead, status_code=200)
+async def get_driver_active_session(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> DriverActiveSessionRead:
+    driver = await _get_driver_for_user(db, current_user)
+    active_session = await _get_active_session_for_driver(db, driver.id)
+    if active_session is None:
+        raise NotFoundException("No active parking session found")
+
+    parking_lot_result = await db.execute(
+        select(ParkingLot).where(ParkingLot.id == active_session.parking_lot_id).limit(1)
+    )
+    parking_lot = parking_lot_result.scalar_one_or_none()
+    if parking_lot is None:
+        raise NotFoundException("Assigned parking lot not found")
+
+    pricing = await _get_latest_pricing(db, parking_lot.id)
+    elapsed_minutes = max(int((_utcnow() - active_session.checkin_time).total_seconds() // 60), 0)
+
+    return DriverActiveSessionRead(
+        session_id=active_session.id,
+        parking_lot_id=parking_lot.id,
+        parking_lot_name=parking_lot.name,
+        license_plate=active_session.license_plate,
+        vehicle_type=active_session.vehicle_type,
+        checked_in_at=active_session.checkin_time,
+        elapsed_minutes=elapsed_minutes,
+        estimated_cost=_calculate_estimated_cost(active_session, pricing),
+        pricing_mode=pricing.pricing_mode if pricing is not None else None,
+    )
+
+
+@router.post("/sessions/driver-check-out-token", response_model=DriverCheckOutTokenRead, status_code=201)
+async def create_driver_check_out_token(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> DriverCheckOutTokenRead:
+    driver = await _get_driver_for_user(db, current_user)
+    active_session = await _get_active_session_for_driver(db, driver.id)
+    if active_session is None:
+        raise NotFoundException("No active parking session found")
+
+    parking_lot_result = await db.execute(
+        select(ParkingLot).where(ParkingLot.id == active_session.parking_lot_id).limit(1)
+    )
+    parking_lot = parking_lot_result.scalar_one_or_none()
+    if parking_lot is None:
+        raise NotFoundException("Assigned parking lot not found")
+
+    expires_at = _utcnow() + DRIVER_CHECK_OUT_TOKEN_TTL
+    token = _build_driver_check_out_token(active_session, parking_lot, expires_at)
+    return DriverCheckOutTokenRead(
+        token=token,
+        expires_at=expires_at,
+        expires_in_seconds=int(DRIVER_CHECK_OUT_TOKEN_TTL.total_seconds()),
+        session_id=active_session.id,
+        license_plate=active_session.license_plate,
+    )
+
+
 @router.post("/sessions/driver-check-in-token", response_model=DriverCheckInTokenRead, status_code=201)
 async def create_driver_check_in_token(
     request: Request,
@@ -152,15 +282,7 @@ async def create_driver_check_in_token(
     if vehicle.driver_id != driver.id:
         raise ForbiddenException("Vehicle does not belong to current driver")
 
-    active_session_result = await db.execute(
-        select(ParkingSession)
-        .where(
-            ParkingSession.driver_id == driver.id,
-            ParkingSession.status == SessionStatus.CHECKED_IN.value,
-        )
-        .limit(1)
-    )
-    active_session = active_session_result.scalar_one_or_none()
+    active_session = await _get_active_session_for_driver(db, driver.id)
     if active_session is not None:
         raise BadRequestException("Current parking session is already in progress")
 

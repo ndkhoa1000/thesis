@@ -35,11 +35,34 @@ class FakeVehicleService implements VehicleService {
 }
 
 class FakeDriverCheckInService implements DriverCheckInService {
-  FakeDriverCheckInService({this.errorMessage, this.response});
+  FakeDriverCheckInService({
+    this.errorMessage,
+    this.response,
+    this.activeSession,
+    this.activeSessionErrorMessage,
+    this.checkOutResponse,
+    this.checkOutErrorMessage,
+  });
 
   final String? errorMessage;
   final DriverCheckInQr? response;
+  final DriverActiveSession? activeSession;
+  final String? activeSessionErrorMessage;
+  final DriverCheckOutQr? checkOutResponse;
+  final String? checkOutErrorMessage;
   int? lastVehicleId;
+  int get activeSessionCallCount => _activeSessionCallCount;
+  int _activeSessionCallCount = 0;
+  bool checkOutQrRequested = false;
+
+  @override
+  Future<DriverActiveSession?> getActiveSession() async {
+    _activeSessionCallCount += 1;
+    if (activeSessionErrorMessage != null) {
+      throw DriverCheckInException(activeSessionErrorMessage!);
+    }
+    return activeSession;
+  }
 
   @override
   Future<DriverCheckInQr> createCheckInQr({required int vehicleId}) async {
@@ -57,6 +80,22 @@ class FakeDriverCheckInService implements DriverCheckInService {
             licensePlate: '59A-12345',
             vehicleType: 'MOTORBIKE',
           ),
+        );
+  }
+
+  @override
+  Future<DriverCheckOutQr> createCheckOutQr() async {
+    checkOutQrRequested = true;
+    if (checkOutErrorMessage != null) {
+      throw DriverCheckInException(checkOutErrorMessage!);
+    }
+    return checkOutResponse ??
+        DriverCheckOutQr(
+          token: 'checkout-token',
+          expiresAt: DateTime(2026, 3, 27, 11, 15),
+          expiresInSeconds: 300,
+          sessionId: 88,
+          licensePlate: '30A-99999',
         );
   }
 }
@@ -156,5 +195,85 @@ void main() {
     expect(find.text('30A-99999'), findsAtLeastNWidgets(1));
     expect(find.text('Ô tô'), findsOneWidget);
     expect(find.textContaining('Mã có hiệu lực đến'), findsOneWidget);
+  });
+
+  testWidgets('renders active session summary and checkout QR action', (
+    tester,
+  ) async {
+    final driverService = FakeDriverCheckInService(
+      activeSession: DriverActiveSession(
+        sessionId: 88,
+        parkingLotId: 13,
+        parkingLotName: 'Bãi xe Lê Lợi',
+        licensePlate: '30A-99999',
+        vehicleType: 'CAR',
+        checkedInAt: DateTime(2026, 3, 27, 8, 0),
+        elapsedMinutes: 95,
+        estimatedCost: 30000,
+        pricingMode: 'HOURLY',
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildSubject(
+        vehicleService: FakeVehicleService(
+          vehicles: const [
+            Vehicle(id: 2, licensePlate: '30A-99999', vehicleType: 'CAR'),
+          ],
+        ),
+        driverCheckInService: driverService,
+        onManageVehicles: () async {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Phiên gửi xe đang hoạt động'), findsOneWidget);
+    expect(find.text('Bãi xe Lê Lợi'), findsOneWidget);
+    expect(find.text('30A-99999'), findsWidgets);
+    expect(find.textContaining('95 phút'), findsOneWidget);
+    expect(find.textContaining('30.000'), findsOneWidget);
+
+    await tester.tap(find.text('Hiện mã check-out'));
+    await tester.pumpAndSettle();
+
+    expect(driverService.checkOutQrRequested, isTrue);
+    expect(find.textContaining('Mã có hiệu lực đến'), findsOneWidget);
+  });
+
+  testWidgets('falls back to check-in flow when no active session exists', (
+    tester,
+  ) async {
+    final driverService = FakeDriverCheckInService(
+      response: DriverCheckInQr(
+        token: 'signed-token-2',
+        expiresAt: DateTime(2026, 3, 27, 8, 45),
+        expiresInSeconds: 300,
+        vehicle: const Vehicle(
+          id: 2,
+          licensePlate: '30A-99999',
+          vehicleType: 'CAR',
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildSubject(
+        vehicleService: FakeVehicleService(
+          vehicles: const [
+            Vehicle(id: 2, licensePlate: '30A-99999', vehicleType: 'CAR'),
+          ],
+        ),
+        driverCheckInService: driverService,
+        onManageVehicles: () async {},
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(driverService.activeSessionCallCount, 1);
+    expect(find.text('Tạo lại mã QR'), findsOneWidget);
+    expect(
+      find.textContaining('Đưa mã này cho attendant quét'),
+      findsOneWidget,
+    );
   });
 }

@@ -4,11 +4,12 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../data/attendant_check_in_service.dart';
 
-typedef AttendantScannerBuilder = Widget Function(
-  BuildContext context,
-  Future<void> Function(String token) onDetect,
-  bool isBusy,
-);
+typedef AttendantScannerBuilder =
+    Widget Function(
+      BuildContext context,
+      Future<void> Function(String token) onDetect,
+      bool isBusy,
+    );
 
 typedef AttendantImageCapture = Future<String?> Function();
 
@@ -374,9 +375,9 @@ class _WalkInPanel extends StatelessWidget {
         children: [
           Text(
             'Walk-in check-in',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
