@@ -56,7 +56,7 @@ class TestCreateDriverCheckInToken:
         vehicle_result.scalar_one_or_none.return_value = vehicle
 
         active_session_result = MagicMock()
-        active_session_result.scalar_one_or_none.return_value = None
+        active_session_result.scalars.return_value.all.return_value = []
 
         mock_db.execute = AsyncMock(
             side_effect=[driver_result, vehicle_result, active_session_result]
@@ -110,7 +110,9 @@ class TestCreateDriverCheckInToken:
         vehicle_result.scalar_one_or_none.return_value = _make_vehicle(vehicle_id=10, driver_id=1)
 
         active_session_result = MagicMock()
-        active_session_result.scalar_one_or_none.return_value = _make_active_session()
+        active_session_result.scalars.return_value.all.return_value = [
+            _make_active_session(),
+        ]
 
         mock_db.execute = AsyncMock(
             side_effect=[driver_result, vehicle_result, active_session_result]

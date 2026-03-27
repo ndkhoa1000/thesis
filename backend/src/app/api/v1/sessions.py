@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
@@ -143,22 +143,38 @@ async def _get_active_session_for_driver(db: AsyncSession, driver_id: int) -> Pa
             ParkingSession.status == SessionStatus.CHECKED_IN.value,
         )
         .order_by(ParkingSession.id.desc())
-        .limit(1)
+        .limit(2)
     )
-    return active_session_result.scalar_one_or_none()
+    active_sessions = list(active_session_result.scalars().all())
+    if len(active_sessions) > 1:
+        raise BadRequestException("Multiple active parking sessions found for this driver")
+    return active_sessions[0] if active_sessions else None
 
 
-async def _get_latest_pricing(db: AsyncSession, parking_lot_id: int) -> Pricing | None:
+async def _get_latest_pricing(
+    db: AsyncSession,
+    parking_lot_id: int,
+    vehicle_type: str,
+) -> Pricing | None:
+    today = _utcnow().date()
     pricing_result = await db.execute(
         select(Pricing)
         .where(
             Pricing.parking_lot_id == parking_lot_id,
-            Pricing.vehicle_type == VehicleTypeAll.ALL.value,
+            Pricing.vehicle_type.in_([vehicle_type, VehicleTypeAll.ALL.value]),
+            or_(Pricing.effective_from.is_(None), Pricing.effective_from <= today),
+            or_(Pricing.effective_to.is_(None), Pricing.effective_to >= today),
         )
         .order_by(Pricing.id.desc())
-        .limit(1)
     )
-    return pricing_result.scalar_one_or_none()
+    pricing_rows = list(pricing_result.scalars().all())
+    for pricing in pricing_rows:
+        if pricing.vehicle_type == vehicle_type:
+            return pricing
+    for pricing in pricing_rows:
+        if pricing.vehicle_type == VehicleTypeAll.ALL.value:
+            return pricing
+    return None
 
 
 def _calculate_estimated_cost(session: ParkingSession, pricing: Pricing | None) -> float:
@@ -221,7 +237,7 @@ async def get_driver_active_session(
     if parking_lot is None:
         raise NotFoundException("Assigned parking lot not found")
 
-    pricing = await _get_latest_pricing(db, parking_lot.id)
+    pricing = await _get_latest_pricing(db, parking_lot.id, active_session.vehicle_type)
     elapsed_minutes = max(int((_utcnow() - active_session.checkin_time).total_seconds() // 60), 0)
 
     return DriverActiveSessionRead(

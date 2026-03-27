@@ -39,6 +39,7 @@ class FakeDriverCheckInService implements DriverCheckInService {
     this.errorMessage,
     this.response,
     this.activeSession,
+    this.activeSessions,
     this.activeSessionErrorMessage,
     this.checkOutResponse,
     this.checkOutErrorMessage,
@@ -47,6 +48,7 @@ class FakeDriverCheckInService implements DriverCheckInService {
   final String? errorMessage;
   final DriverCheckInQr? response;
   final DriverActiveSession? activeSession;
+  final List<DriverActiveSession?>? activeSessions;
   final String? activeSessionErrorMessage;
   final DriverCheckOutQr? checkOutResponse;
   final String? checkOutErrorMessage;
@@ -60,6 +62,13 @@ class FakeDriverCheckInService implements DriverCheckInService {
     _activeSessionCallCount += 1;
     if (activeSessionErrorMessage != null) {
       throw DriverCheckInException(activeSessionErrorMessage!);
+    }
+    if (activeSessions case final states?) {
+      final index = _activeSessionCallCount - 1;
+      if (index < states.length) {
+        return states[index];
+      }
+      return states.isEmpty ? null : states.last;
     }
     return activeSession;
   }
@@ -142,30 +151,48 @@ void main() {
     expect(manageVehiclesCalled, isTrue);
   });
 
-  testWidgets('shows backend block when an active session already exists', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      buildSubject(
-        vehicleService: FakeVehicleService(
-          vehicles: const [
-            Vehicle(id: 1, licensePlate: '59A-12345', vehicleType: 'MOTORBIKE'),
-          ],
-        ),
-        driverCheckInService: FakeDriverCheckInService(
-          errorMessage: 'Current parking session is already in progress',
-        ),
-        onManageVehicles: () async {},
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'switches into active-session mode when backend reports an active session',
+    (tester) async {
+      final driverService = FakeDriverCheckInService(
+        activeSessions: [
+          null,
+          DriverActiveSession(
+            sessionId: 88,
+            parkingLotId: 13,
+            parkingLotName: 'Bãi xe Lê Lợi',
+            licensePlate: '30A-99999',
+            vehicleType: 'CAR',
+            checkedInAt: DateTime(2026, 3, 27, 8, 0),
+            elapsedMinutes: 95,
+            estimatedCost: 30000,
+            pricingMode: 'HOURLY',
+          ),
+        ],
+        errorMessage: 'Current parking session is already in progress',
+      );
 
-    expect(
-      find.text('Current parking session is already in progress'),
-      findsOneWidget,
-    );
-    expect(find.byType(Card), findsWidgets);
-  });
+      await tester.pumpWidget(
+        buildSubject(
+          vehicleService: FakeVehicleService(
+            vehicles: const [
+              Vehicle(
+                id: 1,
+                licensePlate: '59A-12345',
+                vehicleType: 'MOTORBIKE',
+              ),
+            ],
+          ),
+          driverCheckInService: driverService,
+          onManageVehicles: () async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Phiên gửi xe đang hoạt động'), findsOneWidget);
+      expect(driverService.activeSessionCallCount, 2);
+    },
+  );
 
   testWidgets('renders QR after successful token issuance', (tester) async {
     await tester.pumpWidget(
@@ -276,4 +303,131 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'refreshes into active-session mode when check-in QR races with an active session',
+    (tester) async {
+      final driverService = FakeDriverCheckInService(
+        activeSessions: [
+          null,
+          DriverActiveSession(
+            sessionId: 88,
+            parkingLotId: 13,
+            parkingLotName: 'Bãi xe Lê Lợi',
+            licensePlate: '30A-99999',
+            vehicleType: 'CAR',
+            checkedInAt: DateTime(2026, 3, 27, 8, 0),
+            elapsedMinutes: 95,
+            estimatedCost: 30000,
+            pricingMode: 'HOURLY',
+          ),
+        ],
+        errorMessage: 'Current parking session is already in progress',
+      );
+
+      await tester.pumpWidget(
+        buildSubject(
+          vehicleService: FakeVehicleService(
+            vehicles: const [
+              Vehicle(id: 2, licensePlate: '30A-99999', vehicleType: 'CAR'),
+            ],
+          ),
+          driverCheckInService: driverService,
+          onManageVehicles: () async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Phiên gửi xe đang hoạt động'), findsOneWidget);
+      expect(driverService.activeSessionCallCount, 2);
+    },
+  );
+
+  testWidgets(
+    'returns to idle flow when checkout QR request finds no active session',
+    (tester) async {
+      final driverService = FakeDriverCheckInService(
+        activeSessions: [
+          DriverActiveSession(
+            sessionId: 88,
+            parkingLotId: 13,
+            parkingLotName: 'Bãi xe Lê Lợi',
+            licensePlate: '30A-99999',
+            vehicleType: 'CAR',
+            checkedInAt: DateTime(2026, 3, 27, 8, 0),
+            elapsedMinutes: 95,
+            estimatedCost: 30000,
+            pricingMode: 'HOURLY',
+          ),
+          null,
+        ],
+        checkOutErrorMessage: 'No active parking session found',
+        response: DriverCheckInQr(
+          token: 'signed-token-2',
+          expiresAt: DateTime(2026, 3, 27, 8, 45),
+          expiresInSeconds: 300,
+          vehicle: const Vehicle(
+            id: 2,
+            licensePlate: '30A-99999',
+            vehicleType: 'CAR',
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildSubject(
+          vehicleService: FakeVehicleService(
+            vehicles: const [
+              Vehicle(id: 2, licensePlate: '30A-99999', vehicleType: 'CAR'),
+            ],
+          ),
+          driverCheckInService: driverService,
+          onManageVehicles: () async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Hiện mã check-out'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tạo lại mã QR'), findsOneWidget);
+      expect(find.text('Phiên gửi xe đang hoạt động'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'keeps checkout action pinned in bottom navigation bar for active sessions',
+    (tester) async {
+      final driverService = FakeDriverCheckInService(
+        activeSession: DriverActiveSession(
+          sessionId: 88,
+          parkingLotId: 13,
+          parkingLotName: 'Bãi xe Lê Lợi',
+          licensePlate: '30A-99999',
+          vehicleType: 'CAR',
+          checkedInAt: DateTime(2026, 3, 27, 8, 0),
+          elapsedMinutes: 95,
+          estimatedCost: 30000,
+          pricingMode: 'CUSTOM',
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildSubject(
+          vehicleService: FakeVehicleService(
+            vehicles: const [
+              Vehicle(id: 2, licensePlate: '30A-99999', vehicleType: 'CAR'),
+            ],
+          ),
+          driverCheckInService: driverService,
+          onManageVehicles: () async {},
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Giá tùy chỉnh'), findsOneWidget);
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.bottomNavigationBar, isNotNull);
+    },
+  );
 }

@@ -124,7 +124,7 @@ class BackendDriverCheckInService implements DriverCheckInService {
       }
       return DriverActiveSession.fromJson(raw);
     } on DioException catch (error) {
-      if (error.response?.statusCode == 404) {
+      if (_isNoActiveSessionError(error)) {
         return null;
       }
       throw DriverCheckInException(_extractMessage(error));
@@ -172,6 +172,15 @@ class BackendDriverCheckInService implements DriverCheckInService {
       return data['detail'] as String;
     }
     return 'Không thể tạo mã check-in lúc này. Vui lòng thử lại.';
+  }
+
+  bool _isNoActiveSessionError(DioException error) {
+    final data = error.response?.data;
+    if (error.response?.statusCode != 404) {
+      return false;
+    }
+    return data is Map<String, dynamic> &&
+        data['detail'] == 'No active parking session found';
   }
 }
 

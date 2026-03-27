@@ -1,6 +1,6 @@
 # Story 4.4: Driver Generates Check-Out QR
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -43,6 +43,15 @@ so that I can leave the lot without extra gate friction.
   - [x] Add backend tests for active-session lookup, no-active-session handling, and checkout-token issuance tied to the active session.
   - [x] Add Flutter widget coverage for the active-session rendering path, checkout QR display, and the fallback to the existing check-in state when no session is active.
   - [x] Verify backend in Docker and Flutter locally after wiring the flow.
+
+### Review Findings
+
+- [x] [Review][Patch] Duplicate active sessions are silently masked instead of rejected [backend/src/app/api/v1/sessions.py:138]
+- [x] [Review][Patch] Mobile collapses every active-session 404 into "no active session" [mobile/lib/src/features/driver_check_in/data/driver_check_in_service.dart:115]
+- [x] [Review][Patch] Idle check-in UI can remain stale when a session becomes active during QR generation [mobile/lib/src/features/driver_check_in/presentation/driver_check_in_screen.dart:76]
+- [x] [Review][Patch] Checkout UI can remain stale when the active session disappears before QR generation [mobile/lib/src/features/driver_check_in/presentation/driver_check_in_screen.dart:124]
+- [x] [Review][Patch] Estimated cost preview can use an inapplicable pricing rule and misrepresent non-HOURLY modes [backend/src/app/api/v1/sessions.py:151]
+- [x] [Review][Patch] Check-out primary action is not anchored to a fixed bottom thumb-zone action area [mobile/lib/src/features/driver_check_in/presentation/driver_check_in_screen.dart:205]
 
 ## Dev Notes
 
@@ -125,7 +134,8 @@ GPT-5.4
 - Added `GET /sessions/driver-active-session` and `POST /sessions/driver-check-out-token`, keeping QR state resolution server-side and deriving the estimated cost preview from the lot's latest pricing rule.
 - Extended the existing driver parking screen to branch between idle check-in and active-session checkout states, show the lot/session summary, and render a backend-issued check-out QR on demand.
 - Added focused backend and Flutter coverage for active-session lookup, no-active-session fallback, and checkout QR rendering.
-- Validated Story 4.4 with the full backend test suite (`117 passed`) and the full Flutter test suite (`38 passed`).
+- Validated Story 4.4 with the full backend test suite (`119 passed`) and the full Flutter test suite (`41 passed`).
+- Addressed all review patch findings: duplicate active-session detection, safer 404 handling, state refresh on session-race transitions, pricing-rule selection, pricing-mode labeling, and fixed thumb-zone checkout action placement.
 
 ### File List
 
@@ -142,3 +152,4 @@ GPT-5.4
 
 - 2026-03-27: Created Story 4.4 implementation artifact with driver checkout QR state-machine guardrails, active-session preview scope, and focused backend/mobile integration guidance.
 - 2026-03-27: Implemented driver active-session checkout preview, backend-issued check-out QR contract, regression coverage, and full validation for Story 4.4.
+- 2026-03-28: Applied code-review fixes, revalidated full backend and Flutter suites, and closed Story 4.4 as done.

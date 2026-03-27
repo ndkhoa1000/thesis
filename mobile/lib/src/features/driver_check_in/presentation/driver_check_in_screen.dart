@@ -106,6 +106,10 @@ class _DriverCheckInScreenState extends State<DriverCheckInScreen> {
         _isGeneratingQr = false;
       });
     } on DriverCheckInException catch (error) {
+      if (error.message == 'Current parking session is already in progress') {
+        await _loadDriverParkingState();
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _currentQr = null;
@@ -135,6 +139,10 @@ class _DriverCheckInScreenState extends State<DriverCheckInScreen> {
         _isGeneratingCheckOutQr = false;
       });
     } on DriverCheckInException catch (error) {
+      if (error.message == 'No active parking session found') {
+        await _loadDriverParkingState();
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _currentCheckOutQr = null;
@@ -164,12 +172,43 @@ class _DriverCheckInScreenState extends State<DriverCheckInScreen> {
     return buffer.toString();
   }
 
+  String _pricingModeLabel(String? pricingMode) {
+    switch (pricingMode) {
+      case 'SESSION':
+        return 'Giá theo lượt';
+      case 'HOURLY':
+        return 'Giá theo giờ';
+      case 'DAILY':
+        return 'Giá theo ngày';
+      case 'MONTHLY':
+        return 'Giá theo tháng';
+      case 'CUSTOM':
+        return 'Giá tùy chỉnh';
+      default:
+        return 'Giá hiện hành';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(_activeSession == null ? 'Mã check-in' : 'Phiên gửi xe'),
       ),
+      bottomNavigationBar: _activeSession == null
+          ? null
+          : SafeArea(
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: FilledButton.icon(
+                onPressed: _isGeneratingCheckOutQr ? null : _generateCheckOutQr,
+                icon: const Icon(Icons.qr_code_2_outlined),
+                label: Text(
+                  _isGeneratingCheckOutQr
+                      ? 'Đang tạo mã...'
+                      : 'Hiện mã check-out',
+                ),
+              ),
+            ),
       body: SafeArea(child: _buildBody(context)),
     );
   }
@@ -240,24 +279,10 @@ class _DriverCheckInScreenState extends State<DriverCheckInScreen> {
                     ),
                     if (_activeSession!.pricingMode != null) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        _activeSession!.pricingMode == 'SESSION'
-                            ? 'Giá theo lượt'
-                            : 'Giá theo giờ',
-                      ),
+                      Text(_pricingModeLabel(_activeSession!.pricingMode)),
                     ],
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _isGeneratingCheckOutQr ? null : _generateCheckOutQr,
-              icon: const Icon(Icons.qr_code_2_outlined),
-              label: Text(
-                _isGeneratingCheckOutQr
-                    ? 'Đang tạo mã...'
-                    : 'Hiện mã check-out',
               ),
             ),
             const SizedBox(height: 16),
@@ -305,6 +330,7 @@ class _DriverCheckInScreenState extends State<DriverCheckInScreen> {
                   ),
                 ),
               ),
+            const SizedBox(height: 96),
           ],
         ),
       );
