@@ -241,6 +241,8 @@ N/A
 **Goal:** Drivers can check-in/out and attendants process payments.
 **FRs covered:** FR8, FR9, FR10, FR11, FR12, FR13, FR14, FR15, FR16, FR17, FR18, FR19, FR20
 
+> **Readiness Note (post Epic 3 retrospective):** Epic 3 now provides the core setup contracts this epic depends on: active leased-lot access, lot-wide capacity, operating hours, pricing rules, and dedicated Attendant accounts. Epic 4 stories should treat inactive-account enforcement as a hard precondition for gate integrity, and should not couple to temporary validation bridges for role switching or lease bootstrap beyond using them to reach the workflow during interim testing.
+
 #### Story 4.1: Driver Generates Check-In QR
 **As a** Driver,
 **I want** to generate a check-in QR code,
@@ -439,6 +441,8 @@ N/A
 **Goal:** Operators and Owners establish contracts and track revenue.
 **FRs covered:** FR31, FR32, FR37, FR38, FR39, FR40, FR42
 
+> **Readiness Note (post Epic 3 retrospective):** Epic 8 is no longer only a business-management enhancement. Proper lease creation and acceptance now directly determine whether Operator workflows are naturally reachable in the app. This epic should replace the temporary lease-bootstrap path used for Epic 3 UAT with the first-class contract lifecycle.
+
 #### Story 8.1: Create Lease Contract
 **As a** Lot Owner,
 **I want** to send a lease contract to an Operator,
@@ -475,6 +479,8 @@ N/A
 **UX Refs:** `ux-design-specification.md` §Design System Foundation, §Spacing & Layout Foundation, §Design Direction Decision, §Component Strategy
 
 > **Implementation Constraint:** This epic runs LAST before thesis demo, after all business logic epics (1–8) are complete. Stories in Epics 3–8 implement screens as self-contained widgets; Epic 9 wraps them in correct shells. No story in Epics 3–8 should hardcode shell structure or layout dimensions.
+>
+> **Readiness Note (post Epic 3 retrospective):** Multi-capability public users now have a proven routing requirement, not just a UX preference. Epic 9 must absorb the current temporary workspace-switch bridge into durable role-aware shells and navigation. This epic should be treated as workflow validation infrastructure, not cosmetic polish.
 
 #### Story 9.1: App Routing Foundation & Dual Theme System
 **As a** developer,
