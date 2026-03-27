@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:parking_app/main.dart';
 import 'package:parking_app/src/features/auth/data/auth_service.dart';
+import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_application_service.dart';
+import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
 import 'package:parking_app/src/features/vehicles/presentation/vehicle_screen.dart';
 
@@ -16,6 +18,9 @@ class FakeAuthService implements AuthService {
 
   @override
   Future<AuthSession?> restoreSession() async => session;
+
+  @override
+  Future<AuthSession?> refreshSession() async => session;
 
   @override
   Future<AuthSession> register({
@@ -95,6 +100,36 @@ class FakeVehicleService implements VehicleService {
 
   @override
   Future<List<Vehicle>> listVehicles() async => List<Vehicle>.from(_vehicles);
+}
+
+class FakeLotOwnerApplicationService implements LotOwnerApplicationService {
+  FakeLotOwnerApplicationService({this.application});
+
+  LotOwnerApplication? application;
+
+  @override
+  Future<LotOwnerApplication?> getMyApplication() async => application;
+
+  @override
+  Future<LotOwnerApplication> submitApplication({
+    required String fullName,
+    required String phoneNumber,
+    required String businessLicense,
+    required String documentReference,
+    String? notes,
+  }) async {
+    application = LotOwnerApplication(
+      id: 1,
+      userId: 1,
+      fullName: fullName,
+      phoneNumber: phoneNumber,
+      businessLicense: businessLicense,
+      documentReference: documentReference,
+      status: 'PENDING',
+      notes: notes,
+    );
+    return application!;
+  }
 }
 
 void main() {
@@ -193,7 +228,9 @@ void main() {
                 'public_account': true,
               },
             ),
+            authService: FakeAuthService(),
             onSignOut: () async {},
+            onSessionUpdated: (_) {},
             vehicleServiceFactory: (_) => vehicleService,
           ),
         ),
@@ -202,6 +239,7 @@ void main() {
 
       expect(find.textContaining('quản lý xe của mình'), findsOneWidget);
       expect(find.byTooltip('Xe của tôi'), findsOneWidget);
+      expect(find.byTooltip('Chủ bãi'), findsOneWidget);
       expect(find.byTooltip('Đăng xuất'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Xe của tôi'));
@@ -275,5 +313,98 @@ void main() {
 
     expect(authService.signOutCalled, isTrue);
     expect(find.widgetWithText(FilledButton, 'Đăng nhập'), findsOneWidget);
+  });
+
+  testWidgets('Public workspace can open lot owner application screen', (
+    WidgetTester tester,
+  ) async {
+    final applicationService = FakeLotOwnerApplicationService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AuthenticatedHome(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'DRIVER',
+            capabilities: {
+              'driver': true,
+              'lot_owner': false,
+              'operator': false,
+              'attendant': false,
+              'admin': false,
+              'public_account': true,
+            },
+          ),
+          authService: FakeAuthService(),
+          onSignOut: () async {},
+          onSessionUpdated: (_) {},
+          applicationServiceFactory: (_) => applicationService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Chủ bãi').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LotOwnerApplicationScreen), findsOneWidget);
+    expect(find.text('Nộp hồ sơ Chủ bãi'), findsWidgets);
+  });
+
+  testWidgets('Lot owner application screen submits and shows pending status', (
+    WidgetTester tester,
+  ) async {
+    final applicationService = FakeLotOwnerApplicationService();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LotOwnerApplicationScreen(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'DRIVER',
+            capabilities: {
+              'driver': true,
+              'lot_owner': false,
+              'operator': false,
+              'attendant': false,
+              'admin': false,
+              'public_account': true,
+            },
+          ),
+          authService: FakeAuthService(),
+          applicationService: applicationService,
+          onSessionUpdated: (_) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nộp hồ sơ Chủ bãi').first);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Họ và tên'),
+      'Nguyen Van A',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Số điện thoại'),
+      '0909123456',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Giấy phép kinh doanh / sở hữu'),
+      'BL-001',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Link tài liệu xác minh'),
+      'https://example.com/doc.pdf',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Gửi hồ sơ'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đang chờ duyệt'), findsOneWidget);
+    expect(find.text('Nguyen Van A'), findsOneWidget);
   });
 }

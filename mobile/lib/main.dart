@@ -7,14 +7,28 @@ import 'src/core/auth/token_store.dart';
 import 'src/core/network/api_client.dart';
 import 'src/features/auth/data/auth_service.dart';
 import 'src/features/auth/presentation/auth_gate.dart';
+import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
+import 'src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import 'src/features/vehicles/data/vehicle_service.dart';
 import 'src/features/vehicles/presentation/vehicle_screen.dart';
 
 typedef VehicleServiceFactory = VehicleService Function(String accessToken);
+typedef LotOwnerApplicationServiceFactory =
+    LotOwnerApplicationService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
   return BackendVehicleService(dio: apiClient.client, accessToken: accessToken);
+}
+
+LotOwnerApplicationService defaultLotOwnerApplicationServiceFactory(
+  String accessToken,
+) {
+  final apiClient = ApiClient();
+  return BackendLotOwnerApplicationService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
 }
 
 void openVehicleManagement(
@@ -27,6 +41,27 @@ void openVehicleManagement(
     MaterialPageRoute<void>(
       builder: (_) => VehicleScreen(
         vehicleService: vehicleServiceFactory(session.accessToken),
+      ),
+    ),
+  );
+}
+
+void openLotOwnerApplication(
+  BuildContext context,
+  AuthSession session, {
+  required AuthService authService,
+  required void Function(AuthSession session) onSessionUpdated,
+  LotOwnerApplicationServiceFactory applicationServiceFactory =
+      defaultLotOwnerApplicationServiceFactory,
+}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => LotOwnerApplicationScreen(
+        session: session,
+        authService: authService,
+        applicationService: applicationServiceFactory(session.accessToken),
+        onSessionUpdated: onSessionUpdated,
       ),
     ),
   );
@@ -125,8 +160,13 @@ class MyApp extends StatelessWidget {
       ),
       home: AuthGate(
         authService: authService,
-        authenticatedBuilder: (_, session, onSignOut) =>
-            AuthenticatedHome(session: session, onSignOut: onSignOut),
+        authenticatedBuilder: (_, session, onSignOut, onSessionUpdated) =>
+            AuthenticatedHome(
+              session: session,
+              authService: authService,
+              onSignOut: onSignOut,
+              onSessionUpdated: onSessionUpdated,
+            ),
       ),
     );
   }
@@ -136,16 +176,43 @@ class AuthenticatedHome extends StatelessWidget {
   const AuthenticatedHome({
     super.key,
     required this.session,
+    required this.authService,
     required this.onSignOut,
+    required this.onSessionUpdated,
     this.vehicleServiceFactory = defaultVehicleServiceFactory,
+    this.applicationServiceFactory = defaultLotOwnerApplicationServiceFactory,
   });
 
   final AuthSession session;
+  final AuthService authService;
   final Future<void> Function() onSignOut;
+  final void Function(AuthSession session) onSessionUpdated;
   final VehicleServiceFactory vehicleServiceFactory;
+  final LotOwnerApplicationServiceFactory applicationServiceFactory;
 
   List<Widget> _buildAuthActions() {
     return [
+      IconButton(
+        icon: const Icon(Icons.logout),
+        tooltip: 'Đăng xuất',
+        onPressed: onSignOut,
+      ),
+    ];
+  }
+
+  List<Widget> _buildPublicActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.storefront_outlined),
+        tooltip: 'Chủ bãi',
+        onPressed: () => openLotOwnerApplication(
+          context,
+          session,
+          authService: authService,
+          onSessionUpdated: onSessionUpdated,
+          applicationServiceFactory: applicationServiceFactory,
+        ),
+      ),
       IconButton(
         icon: const Icon(Icons.logout),
         tooltip: 'Đăng xuất',
@@ -219,7 +286,7 @@ class AuthenticatedHome extends StatelessWidget {
                 vehicleServiceFactory: vehicleServiceFactory,
               ),
             ),
-            ..._buildAuthActions(),
+            ..._buildPublicActions(context),
           ],
         ),
         body: const Center(
@@ -236,8 +303,11 @@ class AuthenticatedHome extends StatelessWidget {
 
     return MapScreen(
       session: session,
+      authService: authService,
       onSignOut: onSignOut,
+      onSessionUpdated: onSessionUpdated,
       vehicleServiceFactory: vehicleServiceFactory,
+      applicationServiceFactory: applicationServiceFactory,
     );
   }
 }
@@ -246,13 +316,19 @@ class MapScreen extends StatefulWidget {
   const MapScreen({
     super.key,
     required this.session,
+    required this.authService,
     required this.onSignOut,
+    required this.onSessionUpdated,
     this.vehicleServiceFactory = defaultVehicleServiceFactory,
+    this.applicationServiceFactory = defaultLotOwnerApplicationServiceFactory,
   });
 
   final AuthSession session;
+  final AuthService authService;
   final Future<void> Function() onSignOut;
+  final void Function(AuthSession session) onSessionUpdated;
   final VehicleServiceFactory vehicleServiceFactory;
+  final LotOwnerApplicationServiceFactory applicationServiceFactory;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -491,6 +567,17 @@ class _MapScreenState extends State<MapScreen> {
             icon: const Icon(Icons.layers),
             onPressed: _changeStyle,
             tooltip: 'Đổi kiểu bản đồ',
+          ),
+          IconButton(
+            icon: const Icon(Icons.storefront_outlined),
+            tooltip: 'Chủ bãi',
+            onPressed: () => openLotOwnerApplication(
+              context,
+              widget.session,
+              authService: widget.authService,
+              onSessionUpdated: widget.onSessionUpdated,
+              applicationServiceFactory: widget.applicationServiceFactory,
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.logout),

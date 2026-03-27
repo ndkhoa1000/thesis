@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import DuplicateValueException
 from ...core.schemas import Token
@@ -76,6 +77,21 @@ def build_auth_response(
     *,
     capabilities: dict[str, bool] | None = None,
 ) -> dict[str, Any]:
+    user_payload = build_auth_user_payload(user, capabilities=capabilities)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": user_payload,
+    }
+
+
+def build_auth_user_payload(
+    user: Any,
+    *,
+    capabilities: dict[str, bool] | None = None,
+) -> dict[str, Any]:
     user_payload = {
         "id": _value(user, "id"),
         "name": _value(user, "name"),
@@ -85,13 +101,7 @@ def build_auth_response(
         "is_active": _value(user, "is_active"),
         "capabilities": capabilities or _fallback_capabilities(user),
     }
-
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-        "user": {key: value for key, value in user_payload.items() if value is not None},
-    }
+    return {key: value for key, value in user_payload.items() if value is not None}
 
 
 def _derive_name_from_email(email: str) -> str:
@@ -158,3 +168,12 @@ async def register_user(
             "public_account": True,
         },
     )
+
+
+@router.get("/me")
+async def read_auth_me(
+    current_user: dict[str, Any] = Depends(get_current_user),
+    db: AsyncSession = Depends(async_get_db),
+) -> dict[str, Any]:
+    capabilities = await resolve_auth_capabilities(current_user, db)
+    return {"user": build_auth_user_payload(current_user, capabilities=capabilities)}

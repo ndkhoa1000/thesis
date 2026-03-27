@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -13,14 +14,20 @@ from ...core.security import blacklist_token, get_password_hash, oauth2_scheme
 from ...crud.crud_rate_limit import crud_rate_limits
 from ...crud.crud_tier import crud_tiers
 from ...crud.crud_users import crud_users
-from ...models.enums import UserRole, VehicleType
-from ...models.users import Driver
+from ...models.enums import CapabilityApplicationStatus, UserRole, VehicleType
+from ...models.user import User
+from ...models.users import Driver, LotOwner, LotOwnerApplication
+from ...schemas.lot_owner_application import LotOwnerApplicationCreate, LotOwnerApplicationRead, LotOwnerApplicationReview
 from ...models.vehicles import Vehicle
 from ...schemas.tier import TierRead
 from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserTierUpdate, UserUpdate
 from ...schemas.vehicle import VehicleCreate, VehicleRead
 
 router = APIRouter(tags=["users"])
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 def normalize_license_plate(license_plate: str) -> str:
@@ -44,6 +51,142 @@ async def _get_driver_for_user(db: AsyncSession, current_user: dict[str, Any]) -
     if driver is None:
         raise ForbiddenException("Driver profile not found for current account")
     return driver
+
+
+def _ensure_public_account(current_user: dict[str, Any]) -> None:
+    if current_user.get("role") in {UserRole.ATTENDANT.value, UserRole.ADMIN.value} or current_user.get("is_superuser"):
+        raise ForbiddenException("Only public accounts can manage lot owner applications")
+
+
+async def _get_lot_owner_application_by_user_id(db: AsyncSession, user_id: int) -> LotOwnerApplication | None:
+    application_result = await db.execute(select(LotOwnerApplication).where(LotOwnerApplication.user_id == user_id).limit(1))
+    return application_result.scalar_one_or_none()
+
+
+async def _get_lot_owner_profile(db: AsyncSession, user_id: int) -> LotOwner | None:
+    lot_owner_result = await db.execute(select(LotOwner).where(LotOwner.user_id == user_id).limit(1))
+    return lot_owner_result.scalar_one_or_none()
+
+
+@router.get("/user/me/lot-owner-application", response_model=LotOwnerApplicationRead | None)
+async def read_my_lot_owner_application(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> LotOwnerApplication | None:
+    _ensure_public_account(current_user)
+    return await _get_lot_owner_application_by_user_id(db, current_user["id"])
+
+
+@router.post("/user/me/lot-owner-application", response_model=LotOwnerApplicationRead, status_code=201)
+async def create_my_lot_owner_application(
+    request: Request,
+    payload: LotOwnerApplicationCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> LotOwnerApplication:
+    _ensure_public_account(current_user)
+
+    existing_capability = await _get_lot_owner_profile(db, current_user["id"])
+    if existing_capability is not None:
+        raise DuplicateValueException("Lot owner capability is already active for this account")
+
+    existing_application = await _get_lot_owner_application_by_user_id(db, current_user["id"])
+    if existing_application is not None:
+        if existing_application.status == CapabilityApplicationStatus.PENDING.value:
+            raise DuplicateValueException("Lot owner application is already pending review")
+        if existing_application.status == CapabilityApplicationStatus.APPROVED.value:
+            raise DuplicateValueException("Lot owner capability is already approved for this account")
+
+        existing_application.full_name = payload.full_name
+        existing_application.phone_number = payload.phone_number
+        existing_application.business_license = payload.business_license
+        existing_application.document_reference = payload.document_reference
+        existing_application.notes = payload.notes
+        existing_application.status = CapabilityApplicationStatus.PENDING.value
+        existing_application.rejection_reason = None
+        existing_application.reviewed_by_user_id = None
+        existing_application.reviewed_at = None
+        existing_application.updated_at = _utcnow()
+        await db.commit()
+        await db.refresh(existing_application)
+        return existing_application
+
+    application = LotOwnerApplication(
+        user_id=current_user["id"],
+        full_name=payload.full_name,
+        phone_number=payload.phone_number,
+        business_license=payload.business_license,
+        document_reference=payload.document_reference,
+        notes=payload.notes,
+        status=CapabilityApplicationStatus.PENDING.value,
+    )
+    db.add(application)
+    await db.commit()
+    await db.refresh(application)
+    return application
+
+
+@router.get("/admin/lot-owner-applications", response_model=list[LotOwnerApplicationRead])
+async def read_lot_owner_applications(
+    request: Request,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> Sequence[LotOwnerApplication]:
+    applications_result = await db.execute(
+        select(LotOwnerApplication).order_by(LotOwnerApplication.created_at.desc(), LotOwnerApplication.id.desc())
+    )
+    return list(applications_result.scalars().all())
+
+
+@router.post("/admin/lot-owner-applications/{application_id}/review", response_model=LotOwnerApplicationRead)
+async def review_lot_owner_application(
+    request: Request,
+    application_id: int,
+    payload: LotOwnerApplicationReview,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> LotOwnerApplication:
+    application_result = await db.execute(select(LotOwnerApplication).where(LotOwnerApplication.id == application_id).limit(1))
+    application = application_result.scalar_one_or_none()
+    if application is None:
+        raise NotFoundException("Lot owner application not found")
+
+    if payload.decision == CapabilityApplicationStatus.REJECTED and not payload.rejection_reason:
+        raise BadRequestException("Rejection reason is required when rejecting an application")
+
+    reviewed_at = _utcnow()
+    application.status = payload.decision.value
+    application.rejection_reason = payload.rejection_reason if payload.decision == CapabilityApplicationStatus.REJECTED else None
+    application.reviewed_by_user_id = current_superuser["id"]
+    application.reviewed_at = reviewed_at
+    application.updated_at = reviewed_at
+
+    if payload.decision == CapabilityApplicationStatus.APPROVED:
+        user_result = await db.execute(select(User).where(User.id == application.user_id).limit(1))
+        user = user_result.scalar_one_or_none()
+        if user is None:
+            raise NotFoundException("Applicant user not found")
+
+        lot_owner = await _get_lot_owner_profile(db, application.user_id)
+        if lot_owner is None:
+            db.add(
+                LotOwner(
+                    user_id=application.user_id,
+                    business_license=application.business_license,
+                    verified_at=reviewed_at,
+                )
+            )
+        else:
+            lot_owner.business_license = application.business_license
+            lot_owner.verified_at = reviewed_at
+
+        if user.role in {UserRole.DRIVER.value, UserRole.LOT_OWNER.value}:
+            user.role = UserRole.LOT_OWNER.value
+
+    await db.commit()
+    await db.refresh(application)
+    return application
 
 
 @router.get("/user/me/vehicles", response_model=list[VehicleRead])

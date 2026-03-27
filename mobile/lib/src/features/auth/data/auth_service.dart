@@ -8,6 +8,8 @@ import '../../../core/network/api_client.dart';
 abstract class AuthService {
   Future<AuthSession?> restoreSession();
 
+  Future<AuthSession?> refreshSession();
+
   Future<AuthSession> register({
     required String email,
     required String password,
@@ -192,6 +194,64 @@ class BackendAuthService implements AuthService {
     } on AuthException {
       await _tokenStore.clear();
       return null;
+    }
+  }
+
+  @override
+  Future<AuthSession?> refreshSession() async {
+    final accessToken = await _tokenStore.readAccessToken();
+    final refreshToken = await _tokenStore.readRefreshToken();
+    final rememberSession = await _tokenStore.readRememberSession();
+    final sessionExpiresAt = await _tokenStore.readSessionExpiresAt();
+
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      return null;
+    }
+
+    var nextAccessToken = accessToken;
+    if (_isAccessTokenExpiredOrNearExpiry(accessToken)) {
+      nextAccessToken = await _refreshAccessToken(refreshToken);
+    }
+
+    try {
+      final response = await _client.get<dynamic>(
+        '/auth/me',
+        options: Options(
+          headers: {'Authorization': 'Bearer $nextAccessToken'},
+        ),
+      );
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
+        throw const AuthException('Phản hồi phiên hiện tại không hợp lệ.');
+      }
+
+      final user = responseData['user'];
+      if (user is! Map<String, dynamic>) {
+        throw const AuthException('Thiếu thông tin người dùng hiện tại.');
+      }
+
+      final session = AuthSession.fromAuthResponse({
+        'access_token': nextAccessToken,
+        'refresh_token': refreshToken,
+        'user': user,
+      });
+
+      await _tokenStore.saveSession(
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        userPayload: session.toStoredUserPayload(),
+        rememberSession: rememberSession,
+        sessionExpiresAt: sessionExpiresAt,
+      );
+      return session;
+    } on DioException catch (error) {
+      if (error.response == null) {
+        throw AuthException(_connectionHelpMessage);
+      }
+      throw const AuthException('Không thể đồng bộ phiên đăng nhập lúc này.');
     }
   }
 

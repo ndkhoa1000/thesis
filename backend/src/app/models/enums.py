@@ -11,6 +11,12 @@ class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
 
 
+class CapabilityApplicationStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class VehicleType(str, enum.Enum):
     MOTORBIKE = "MOTORBIKE"
     CAR = "CAR"

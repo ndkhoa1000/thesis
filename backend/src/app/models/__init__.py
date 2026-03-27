@@ -8,6 +8,7 @@ from .user import User
 from .enums import (
     AnnouncementType,
     BookingStatus,
+    CapabilityApplicationStatus,
     FeatureType,
     LeaseContractStatus,
     LeaseStatus,
@@ -26,7 +27,7 @@ from .enums import (
     VehicleType,
     VehicleTypeAll,
 )
-from .users import Attendant, Driver, LotOwner, Manager
+from .users import Attendant, Driver, LotOwner, LotOwnerApplication, Manager
 from .parking import ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLotTag, Pricing, Slot
 from .leases import LeaseContract, LotLease
 from .vehicles import Subscription, SubscriptionLot, Vehicle

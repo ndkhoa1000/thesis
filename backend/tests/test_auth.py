@@ -90,6 +90,51 @@ class TestRegisterUser:
 
 class TestAuthTokenFlows:
     @pytest.mark.asyncio
+    async def test_auth_me_returns_current_capabilities(self, mock_db):
+        from src.app.api.v1.auth import read_auth_me
+
+        current_user = {
+            "id": 1,
+            "username": "tester",
+            "email": "tester@example.com",
+            "role": "DRIVER",
+            "is_active": True,
+        }
+
+        with patch(
+            "src.app.api.v1.auth.resolve_auth_capabilities",
+            new=AsyncMock(
+                return_value={
+                    "driver": True,
+                    "lot_owner": True,
+                    "operator": False,
+                    "attendant": False,
+                    "admin": False,
+                    "public_account": True,
+                }
+            ),
+        ):
+            result = await read_auth_me(current_user, mock_db)
+
+        assert result == {
+            "user": {
+                "id": 1,
+                "username": "tester",
+                "email": "tester@example.com",
+                "role": "DRIVER",
+                "is_active": True,
+                "capabilities": {
+                    "driver": True,
+                    "lot_owner": True,
+                    "operator": False,
+                    "attendant": False,
+                    "admin": False,
+                    "public_account": True,
+                },
+            }
+        }
+
+    @pytest.mark.asyncio
     async def test_login_returns_refresh_token_in_body(self, mock_db):
         from src.app.api.v1.login import login_for_access_token
 

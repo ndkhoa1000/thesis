@@ -16,6 +16,7 @@ class AuthGate extends StatefulWidget {
     BuildContext context,
     AuthSession session,
     Future<void> Function() onSignOut,
+    void Function(AuthSession session) onSessionUpdated,
   )
   authenticatedBuilder;
 
@@ -52,6 +53,12 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
+  void _handleSessionUpdated(AuthSession session) {
+    setState(() {
+      _session = session;
+    });
+  }
+
   Future<void> _handleSignOut() async {
     await widget.authService.signOut();
     if (!mounted) {
@@ -72,7 +79,12 @@ class _AuthGateState extends State<AuthGate> {
 
     final session = _session;
     if (session != null) {
-      return widget.authenticatedBuilder(context, session, _handleSignOut);
+      return widget.authenticatedBuilder(
+        context,
+        session,
+        _handleSignOut,
+        _handleSessionUpdated,
+      );
     }
 
     if (_showLogin) {
