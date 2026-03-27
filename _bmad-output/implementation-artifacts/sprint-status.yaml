@@ -48,7 +48,7 @@ development_status:
   2-1-register-new-parking-lot: done
   2-2-admin-dashboard-pending-approvals: done
   2-3-admin-system-management-lot-suspension: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
   epic-3: in-progress
   3-1-configure-lot-details-capacity: review
   3-2-set-operating-hours-pricing-rules: backlog
