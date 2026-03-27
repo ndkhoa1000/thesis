@@ -7,6 +7,30 @@ import 'src/core/auth/token_store.dart';
 import 'src/core/network/api_client.dart';
 import 'src/features/auth/data/auth_service.dart';
 import 'src/features/auth/presentation/auth_gate.dart';
+import 'src/features/vehicles/data/vehicle_service.dart';
+import 'src/features/vehicles/presentation/vehicle_screen.dart';
+
+typedef VehicleServiceFactory = VehicleService Function(String accessToken);
+
+VehicleService defaultVehicleServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendVehicleService(dio: apiClient.client, accessToken: accessToken);
+}
+
+void openVehicleManagement(
+  BuildContext context,
+  AuthSession session, {
+  VehicleServiceFactory vehicleServiceFactory = defaultVehicleServiceFactory,
+}) {
+  Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => VehicleScreen(
+        vehicleService: vehicleServiceFactory(session.accessToken),
+      ),
+    ),
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,24 +125,41 @@ class MyApp extends StatelessWidget {
       ),
       home: AuthGate(
         authService: authService,
-        authenticatedBuilder: (_, session) =>
-            AuthenticatedHome(session: session),
+        authenticatedBuilder: (_, session, onSignOut) =>
+            AuthenticatedHome(session: session, onSignOut: onSignOut),
       ),
     );
   }
 }
 
 class AuthenticatedHome extends StatelessWidget {
-  const AuthenticatedHome({super.key, required this.session});
+  const AuthenticatedHome({
+    super.key,
+    required this.session,
+    required this.onSignOut,
+    this.vehicleServiceFactory = defaultVehicleServiceFactory,
+  });
 
   final AuthSession session;
+  final Future<void> Function() onSignOut;
+  final VehicleServiceFactory vehicleServiceFactory;
+
+  List<Widget> _buildAuthActions() {
+    return [
+      IconButton(
+        icon: const Icon(Icons.logout),
+        tooltip: 'Đăng xuất',
+        onPressed: onSignOut,
+      ),
+    ];
+  }
 
   Widget _buildWorkspacePlaceholder({
     required String title,
     required String message,
   }) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text(title), actions: _buildAuthActions()),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -166,12 +207,26 @@ class AuthenticatedHome extends StatelessWidget {
         dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dotenv.env['ACCESS_TOKEN'];
     if (mapboxToken == null || mapboxToken.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('ParkingApp')),
+        appBar: AppBar(
+          title: const Text('ParkingApp'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.directions_car_outlined),
+              tooltip: 'Xe của tôi',
+              onPressed: () => openVehicleManagement(
+                context,
+                session,
+                vehicleServiceFactory: vehicleServiceFactory,
+              ),
+            ),
+            ..._buildAuthActions(),
+          ],
+        ),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'Xác thực thành công. Hãy thêm MAPBOX_ACCESS_TOKEN vào mobile/.env để bật bản đồ thử nghiệm cho workspace public.',
+              'Xác thực thành công. Bạn vẫn có thể quản lý xe của mình ngay bây giờ. Hãy thêm MAPBOX_ACCESS_TOKEN vào mobile/.env để bật bản đồ thử nghiệm cho workspace public.',
               textAlign: TextAlign.center,
             ),
           ),
@@ -179,12 +234,25 @@ class AuthenticatedHome extends StatelessWidget {
       );
     }
 
-    return const MapScreen();
+    return MapScreen(
+      session: session,
+      onSignOut: onSignOut,
+      vehicleServiceFactory: vehicleServiceFactory,
+    );
   }
 }
 
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  const MapScreen({
+    super.key,
+    required this.session,
+    required this.onSignOut,
+    this.vehicleServiceFactory = defaultVehicleServiceFactory,
+  });
+
+  final AuthSession session;
+  final Future<void> Function() onSignOut;
+  final VehicleServiceFactory vehicleServiceFactory;
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -411,9 +479,23 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
+            icon: const Icon(Icons.directions_car_outlined),
+            tooltip: 'Xe của tôi',
+            onPressed: () => openVehicleManagement(
+              context,
+              widget.session,
+              vehicleServiceFactory: widget.vehicleServiceFactory,
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.layers),
             onPressed: _changeStyle,
             tooltip: 'Đổi kiểu bản đồ',
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Đăng xuất',
+            onPressed: widget.onSignOut,
           ),
         ],
       ),

@@ -133,6 +133,8 @@ N/A
 * **Then** I am authenticated as one public `user` identity and navigated to the workspace indicated by its current primary role
 * **And** public accounts can access any approved Driver, LotOwner, and Operator workspaces linked to that same `user` identity through capability records
 * **And** Attendant and Admin accounts log in through separate credentials rather than switching from a public account session.
+* **And** the user may explicitly choose to remember the public session for up to 1 day on that device; otherwise the app must require login again on the next launch.
+* **And** authenticated shells expose a logout action that clears the local session and returns the user to the login screen.
 
 #### Story 1.3: Manage License Plates
 **As a** driver,

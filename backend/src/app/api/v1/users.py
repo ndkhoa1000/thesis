@@ -1,20 +1,105 @@
+from collections.abc import Sequence
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import DuplicateValueException, ForbiddenException, NotFoundException
+from ...core.exceptions.http_exceptions import BadRequestException, DuplicateValueException, ForbiddenException, NotFoundException
 from ...core.security import blacklist_token, get_password_hash, oauth2_scheme
 from ...crud.crud_rate_limit import crud_rate_limits
 from ...crud.crud_tier import crud_tiers
 from ...crud.crud_users import crud_users
+from ...models.enums import UserRole, VehicleType
+from ...models.users import Driver
+from ...models.vehicles import Vehicle
 from ...schemas.tier import TierRead
 from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserTierUpdate, UserUpdate
+from ...schemas.vehicle import VehicleCreate, VehicleRead
 
 router = APIRouter(tags=["users"])
+
+
+def normalize_license_plate(license_plate: str) -> str:
+    normalized = " ".join(license_plate.strip().upper().split())
+    if not normalized:
+        raise BadRequestException("License plate is required")
+    return normalized
+
+
+async def _get_driver_for_user(db: AsyncSession, current_user: dict[str, Any]) -> Driver:
+    is_public_capable = current_user.get("role") in {
+        UserRole.DRIVER.value,
+        UserRole.LOT_OWNER.value,
+        UserRole.MANAGER.value,
+    }
+    if not is_public_capable:
+        raise ForbiddenException("Only driver-capable public accounts can manage vehicles")
+
+    driver_result = await db.execute(select(Driver).where(Driver.user_id == current_user["id"]).limit(1))
+    driver = driver_result.scalar_one_or_none()
+    if driver is None:
+        raise ForbiddenException("Driver profile not found for current account")
+    return driver
+
+
+@router.get("/user/me/vehicles", response_model=list[VehicleRead])
+async def read_my_vehicles(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> Sequence[Vehicle]:
+    driver = await _get_driver_for_user(db, current_user)
+    vehicles_result = await db.execute(
+        select(Vehicle).where(Vehicle.driver_id == driver.id).order_by(Vehicle.created_at.desc(), Vehicle.id.desc())
+    )
+    return list(vehicles_result.scalars().all())
+
+
+@router.post("/user/me/vehicles", response_model=VehicleRead, status_code=201)
+async def create_my_vehicle(
+    request: Request,
+    payload: VehicleCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> Vehicle:
+    driver = await _get_driver_for_user(db, current_user)
+    normalized_plate = normalize_license_plate(payload.license_plate)
+
+    duplicate_result = await db.execute(select(Vehicle.id).where(Vehicle.license_plate == normalized_plate).limit(1))
+    if duplicate_result.scalar_one_or_none() is not None:
+        raise DuplicateValueException("License plate is already registered")
+
+    vehicle_type = payload.vehicle_type.value if isinstance(payload.vehicle_type, VehicleType) else str(payload.vehicle_type)
+    created_vehicle = Vehicle(driver_id=driver.id, license_plate=normalized_plate, vehicle_type=vehicle_type)
+    db.add(created_vehicle)
+    await db.commit()
+    await db.refresh(created_vehicle)
+    return created_vehicle
+
+
+@router.delete("/user/me/vehicles/{vehicle_id}")
+async def erase_my_vehicle(
+    request: Request,
+    vehicle_id: int,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> dict[str, str]:
+    driver = await _get_driver_for_user(db, current_user)
+    vehicle_result = await db.execute(select(Vehicle).where(Vehicle.id == vehicle_id).limit(1))
+    vehicle = vehicle_result.scalar_one_or_none()
+
+    if vehicle is None:
+        raise NotFoundException("Vehicle not found")
+    if vehicle.driver_id != driver.id:
+        raise ForbiddenException("Vehicle does not belong to current driver")
+
+    await db.delete(vehicle)
+    await db.commit()
+    return {"message": "Vehicle deleted"}
 
 
 @router.post("/user", response_model=UserRead, status_code=201)

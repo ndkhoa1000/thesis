@@ -15,8 +15,9 @@ so that I can access the parking platform features securely.
 1. Given I am on the login screen, when I enter my correct email and password, then I am authenticated as one `user` identity and receive the backend token contract used by mobile.
 2. Public accounts resolve to the current primary public workspace from `user.role`, while preserving access to any approved public capabilities linked to that same `user` identity through `driver`, `lot_owner`, and `manager` records.
 3. Attendant and Admin accounts authenticate through separate credentials and enter dedicated account flows rather than public workspace switching.
-4. The mobile app stores the issued tokens securely and restores the authenticated session on app restart.
-5. Login failures return clear backend-driven error messages for invalid credentials or inactive access.
+4. The mobile app lets the user choose whether to remember the session on the current device; remembered sessions may restore automatically for up to 1 day and otherwise must fall back to the login screen.
+5. Authenticated workspaces expose a logout action that revokes the backend session, clears local storage, and returns the app to the login screen.
+6. Login failures return clear backend-driven error messages for invalid credentials or inactive access.
 
 ## Implementation Clarifications
 
@@ -25,6 +26,7 @@ so that I can access the parking platform features securely.
 - `user.role` should be treated as the current primary public workspace, not the full capability list.
 - Attendant and Admin remain separate-account flows and must not be merged into the public workspace-switching model.
 - The login response should be consistent with the token-body strategy already introduced in Story 1.1.
+- Mobile-side remembered-session behavior is a product policy layered on top of backend JWT expiry: the device may keep a remembered public session for at most 1 day before forcing re-authentication.
 
 ## Tasks / Subtasks
 
@@ -39,16 +41,17 @@ so that I can access the parking platform features securely.
   - [x] Ensure Attendant and Admin logins remain dedicated sessions rather than entering the public workspace model.
   - [x] Preserve the token-body strategy introduced for mobile in Story 1.1.
 
-- [x] Task 3: Implement mobile session bootstrap and workspace entry (AC: 2, 3, 4)
+- [x] Task 3: Implement mobile session bootstrap and workspace entry (AC: 2, 3, 4, 5)
   - [x] Add the login screen and auth service call using the backend contract.
-  - [x] Restore the saved session on app start and route to the correct initial workspace.
+  - [x] Restore only valid remembered sessions on app start and route to the correct initial workspace.
   - [x] Use `user.role` as the default public workspace while keeping room for later workspace switching when additional public capabilities are approved.
   - [x] Keep Attendant/Admin entry separate from the public workspace shell.
+  - [x] Expose a logout action from authenticated shells so the user can return to the login screen.
 
-- [x] Task 4: Harden logout and token lifecycle around the new contract (AC: 3, 4)
+- [x] Task 4: Harden logout and token lifecycle around the new contract (AC: 3, 4, 5)
   - [x] Ensure logout revokes tokens server-side and clears secure local storage.
   - [x] Confirm refresh behavior remains compatible with mobile-stored refresh tokens.
-  - [x] Verify that app restart restores only valid sessions.
+  - [x] Verify that app restart restores only valid remembered sessions and forces login after the 1-day remembered-session window.
 
 - [x] Task 5: Test login, session restoration, and role/capability routing (AC: 1, 2, 3, 4, 5)
   - [x] Add backend tests for successful login, failed login, and response contract correctness.
@@ -121,6 +124,8 @@ GPT-5.4
 - Extended backend login/register auth responses with explicit capability flags suitable for mobile session restore and workspace routing.
 - Added capability resolution that derives public access from linked `driver`, `lot_owner`, `manager` rows while preserving separate-account handling for Attendant and Admin.
 - Refactored Flutter auth bootstrap around `AuthSession`, secure persisted user payloads, login UI, and session restoration on app restart.
+- Tightened session bootstrap so only remembered sessions restore across launches, remembered sessions expire after 1 day, and expired access tokens are refreshed during restore before the app trusts the session.
+- Added explicit logout actions to authenticated shells so the user can clear session state and return to the login screen without reinstalling or clearing app data.
 - Added workspace-aware authenticated placeholders so Admin, Attendant, Operator, LotOwner, and public flows land in distinct shells.
 - Verified backend auth coverage in containers and Flutter widget coverage locally after fixing contract and selector regressions.
 - Verified manual register/login flow on the connected Android device after configuring `API_BASE_URL` and `adb reverse` for the local backend.
@@ -144,3 +149,4 @@ GPT-5.4
 ### Change Log
 
 - 2026-03-26: Implemented Story 1.2 login/session flow across backend and Flutter, including capability-aware auth payloads, secure session restoration, role-based shell routing, backend auth tests, and Flutter widget tests.
+- 2026-03-27: Corrected the mobile auth-shell behavior after bug review by adding a 1-day remember-session option, restore-time access-token refresh, and explicit logout actions in authenticated shells.

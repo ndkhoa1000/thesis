@@ -11,12 +11,20 @@ abstract class AuthService {
   Future<AuthSession> register({
     required String email,
     required String password,
+    bool rememberSession = false,
   });
 
-  Future<AuthSession> login({required String email, required String password});
+  Future<AuthSession> login({
+    required String email,
+    required String password,
+    bool rememberSession = false,
+  });
 
   Future<void> signOut();
 }
+
+const _rememberSessionDuration = Duration(days: 1);
+const _accessTokenRefreshSkew = Duration(minutes: 1);
 
 class AuthSession {
   const AuthSession({
@@ -139,6 +147,8 @@ class BackendAuthService implements AuthService {
     final accessToken = await _tokenStore.readAccessToken();
     final refreshToken = await _tokenStore.readRefreshToken();
     final userPayload = await _tokenStore.readUserPayload();
+    final rememberSession = await _tokenStore.readRememberSession();
+    final sessionExpiresAt = await _tokenStore.readSessionExpiresAt();
     if (accessToken == null ||
         accessToken.isEmpty ||
         refreshToken == null ||
@@ -148,9 +158,34 @@ class BackendAuthService implements AuthService {
       return null;
     }
 
+    if (!rememberSession ||
+        sessionExpiresAt == null ||
+        sessionExpiresAt.isEmpty ||
+        _isRememberedSessionExpired(sessionExpiresAt)) {
+      await _tokenStore.clear();
+      return null;
+    }
+
+    var nextAccessToken = accessToken;
+    if (_isAccessTokenExpiredOrNearExpiry(accessToken)) {
+      try {
+        nextAccessToken = await _refreshAccessToken(refreshToken);
+        await _tokenStore.saveSession(
+          accessToken: nextAccessToken,
+          refreshToken: refreshToken,
+          userPayload: userPayload,
+          rememberSession: true,
+          sessionExpiresAt: sessionExpiresAt,
+        );
+      } on AuthException {
+        await _tokenStore.clear();
+        return null;
+      }
+    }
+
     try {
       return AuthSession.fromStoredPayload(
-        accessToken: accessToken,
+        accessToken: nextAccessToken,
         refreshToken: refreshToken,
         userPayload: userPayload,
       );
@@ -164,10 +199,12 @@ class BackendAuthService implements AuthService {
   Future<AuthSession> register({
     required String email,
     required String password,
+    bool rememberSession = false,
   }) async {
     final session = await _authenticate(
       path: '/auth/register',
       payload: {'email': email, 'password': password},
+      rememberSession: rememberSession,
     );
     return session;
   }
@@ -176,11 +213,13 @@ class BackendAuthService implements AuthService {
   Future<AuthSession> login({
     required String email,
     required String password,
+    bool rememberSession = false,
   }) async {
     final session = await _authenticate(
       path: '/login',
       payload: {'username': email, 'password': password},
       options: Options(contentType: Headers.formUrlEncodedContentType),
+      rememberSession: rememberSession,
     );
     return session;
   }
@@ -188,6 +227,7 @@ class BackendAuthService implements AuthService {
   Future<AuthSession> _authenticate({
     required String path,
     required Map<String, dynamic> payload,
+    required bool rememberSession,
     Options? options,
   }) async {
     try {
@@ -202,10 +242,18 @@ class BackendAuthService implements AuthService {
       }
 
       final session = AuthSession.fromAuthResponse(responseData);
+      final sessionExpiresAt = rememberSession
+          ? DateTime.now()
+                .toUtc()
+                .add(_rememberSessionDuration)
+                .toIso8601String()
+          : null;
       await _tokenStore.saveSession(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
         userPayload: session.toStoredUserPayload(),
+        rememberSession: rememberSession,
+        sessionExpiresAt: sessionExpiresAt,
       );
       return session;
     } on DioException catch (error) {
@@ -238,6 +286,77 @@ class BackendAuthService implements AuthService {
       }
     } finally {
       await _tokenStore.clear();
+    }
+  }
+
+  bool _isRememberedSessionExpired(String sessionExpiresAt) {
+    final expiry = DateTime.tryParse(sessionExpiresAt)?.toUtc();
+    if (expiry == null) {
+      return true;
+    }
+    return !expiry.isAfter(DateTime.now().toUtc());
+  }
+
+  bool _isAccessTokenExpiredOrNearExpiry(String token) {
+    final payload = _decodeJwtPayload(token);
+    final exp = payload['exp'];
+    if (exp is! num) {
+      return true;
+    }
+
+    final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+      exp.toInt() * 1000,
+      isUtc: true,
+    );
+    return !expiresAt.isAfter(
+      DateTime.now().toUtc().add(_accessTokenRefreshSkew),
+    );
+  }
+
+  Map<String, dynamic> _decodeJwtPayload(String token) {
+    final segments = token.split('.');
+    if (segments.length != 3) {
+      return const {};
+    }
+
+    try {
+      final normalized = base64Url.normalize(segments[1]);
+      final decoded = utf8.decode(base64Url.decode(normalized));
+      final payload = jsonDecode(decoded);
+      if (payload is Map<String, dynamic>) {
+        return payload;
+      }
+    } catch (_) {
+      return const {};
+    }
+
+    return const {};
+  }
+
+  Future<String> _refreshAccessToken(String refreshToken) async {
+    try {
+      final response = await _client.post<dynamic>(
+        '/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
+        throw const AuthException(
+          'Phản hồi làm mới phiên đăng nhập không hợp lệ.',
+        );
+      }
+
+      final accessToken = responseData['access_token'] as String?;
+      if (accessToken == null || accessToken.isEmpty) {
+        throw const AuthException(
+          'Thiếu access token mới khi khôi phục phiên đăng nhập.',
+        );
+      }
+      return accessToken;
+    } on DioException catch (_) {
+      throw const AuthException(
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
     }
   }
 }

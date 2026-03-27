@@ -23,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _submitting = false;
+  bool _rememberSession = false;
 
   @override
   void dispose() {
@@ -44,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final session = await widget.authService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
+        rememberSession: _rememberSession,
       );
       if (!mounted) {
         return;
@@ -116,6 +118,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                       return null;
                     },
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: _rememberSession,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Lưu đăng nhập trong 1 ngày'),
+                    subtitle: const Text(
+                      'Nếu không chọn, ứng dụng sẽ yêu cầu đăng nhập lại ở lần mở sau.',
+                    ),
+                    onChanged: _submitting
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _rememberSession = value ?? false;
+                            });
+                          },
                   ),
                   const SizedBox(height: 24),
                   FilledButton(
