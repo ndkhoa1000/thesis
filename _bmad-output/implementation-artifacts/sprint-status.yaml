@@ -47,7 +47,7 @@ development_status:
   epic-2: in-progress
   2-1-register-new-parking-lot: done
   2-2-admin-dashboard-pending-approvals: done
-  2-3-admin-system-management-lot-suspension: backlog
+  2-3-admin-system-management-lot-suspension: review
   epic-2-retrospective: optional
   epic-3: backlog
   3-1-configure-lot-details-capacity: backlog
@@ -83,5 +83,13 @@ development_status:
   8-3-operator-revenue-dashboard: backlog
   epic-8-retrospective: optional
   epic-9: backlog
-  9-1-system-push-notifications: backlog
+  9-1-app-routing-foundation-dual-theme: backlog
+  9-2-driver-workspace-shell: backlog
+  9-3-attendant-workspace-shell: backlog
+  9-4-management-workspace-shells: backlog
+  9-5-admin-workspace-shell: backlog
+  9-6-shared-ui-components-localization: backlog
   epic-9-retrospective: optional
+  epic-10: backlog
+  10-1-system-push-notifications: backlog
+  epic-10-retrospective: optional

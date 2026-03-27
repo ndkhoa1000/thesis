@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastcrud import PaginatedListResponse, compute_offset, paginated_response
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
@@ -21,7 +21,7 @@ from ...schemas.lot_owner_application import LotOwnerApplicationCreate, LotOwner
 from ...schemas.operator_application import OperatorApplicationCreate, OperatorApplicationRead, OperatorApplicationReview
 from ...models.vehicles import Vehicle
 from ...schemas.tier import TierRead
-from ...schemas.user import UserCreate, UserCreateInternal, UserRead, UserTierUpdate, UserUpdate
+from ...schemas.user import AdminUserActivationUpdate, AdminUserRead, UserCreate, UserCreateInternal, UserRead, UserTierUpdate, UserUpdate
 from ...schemas.vehicle import VehicleCreate, VehicleRead
 
 router = APIRouter(tags=["users"])
@@ -87,6 +87,11 @@ async def _get_operator_application_by_user_id(db: AsyncSession, user_id: int) -
 async def _get_manager_profile(db: AsyncSession, user_id: int) -> Manager | None:
     manager_result = await db.execute(select(Manager).where(Manager.user_id == user_id).limit(1))
     return manager_result.scalar_one_or_none()
+
+
+async def _get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
+    user_result = await db.execute(select(User).where(User.id == user_id, User.is_deleted.is_(False)).limit(1))
+    return user_result.scalar_one_or_none()
 
 
 @router.get("/user/me/lot-owner-application", response_model=LotOwnerApplicationRead | None)
@@ -311,6 +316,52 @@ async def review_operator_application(
     await db.commit()
     await db.refresh(application)
     return application
+
+
+@router.get("/admin/users", response_model=list[AdminUserRead])
+async def read_admin_users(
+    request: Request,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+    search: str | None = None,
+) -> Sequence[User]:
+    query = select(User).where(User.is_deleted.is_(False))
+
+    normalized_search = search.strip() if search else None
+    if normalized_search:
+        search_term = f"%{normalized_search}%"
+        query = query.where(
+            or_(
+                User.name.ilike(search_term),
+                User.username.ilike(search_term),
+                User.email.ilike(search_term),
+            )
+        )
+
+    users_result = await db.execute(query.order_by(User.created_at.desc(), User.id.desc()))
+    return list(users_result.scalars().all())
+
+
+@router.patch("/admin/users/{user_id}/activation", response_model=AdminUserRead)
+async def patch_admin_user_activation(
+    request: Request,
+    user_id: int,
+    payload: AdminUserActivationUpdate,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> User:
+    user = await _get_user_by_id(db, user_id)
+    if user is None:
+        raise NotFoundException("User not found")
+
+    if user.id == current_superuser["id"] and payload.is_active is False:
+        raise BadRequestException("Admin cannot deactivate the current account")
+
+    user.is_active = payload.is_active
+    user.updated_at = _utcnow()
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
 @router.get("/user/me/vehicles", response_model=list[VehicleRead])

@@ -469,11 +469,107 @@ N/A
 * **When** I check my dashboard
 * **Then** I see total revenue and my operator share.
 
-### Epic 9: Notifications (Phase 2)
-**Goal:** Users receive proactive in-app alerts.
-**FRs covered:** FR47, FR48
+### Epic 9: UX Shell & Navigation Foundation
+**Goal:** Establish standardized workspace shells, routing, theme profiles, and shared components for all 5 actor contexts, aligned with the Divergent Dual-Context UX strategy.
+**FRs covered:** (cross-cutting — no new FRs; directly enables correct delivery of NFR17 and all UX spec requirements across Epics 1–8)
+**UX Refs:** `ux-design-specification.md` §Design System Foundation, §Spacing & Layout Foundation, §Design Direction Decision, §Component Strategy
 
-#### Story 9.1: System Push Notifications
+> **Implementation Constraint:** This epic runs LAST before thesis demo, after all business logic epics (1–8) are complete. Stories in Epics 3–8 implement screens as self-contained widgets; Epic 9 wraps them in correct shells. No story in Epics 3–8 should hardcode shell structure or layout dimensions.
+
+#### Story 9.1: App Routing Foundation & Dual Theme System
+**As a** developer,
+**I want** a centralized routing system and two ThemeData profiles,
+**So that** all workspace screens consistently use correct themes and navigation from the start.
+
+**Acceptance Criteria:**
+* **Given** the app launches
+* **When** authentication state resolves
+* **Then** `go_router` routes the user to the correct workspace entry point by session role
+* **And** unauthenticated users are routed to `AuthGate`; authenticated users land in their workspace
+* **And** `AppTheme.light()` (MD3, primary `#1A73E8`, standard MD3 paddings) is applied to Driver, Operator, LotOwner, and Admin workspaces
+* **And** `AppTheme.dark()` (oversized typography, dark surface `#121212`, high contrast) is applied exclusively to the Attendant workspace
+* **And** `main.dart` delegates app bootstrap to a dedicated `app.dart`; service factories are initialized once and injected via constructor or provider
+* **And** the architecture.md `go_router` navigation entry is met.
+
+#### Story 9.2: Driver Workspace Shell
+**As a** Driver,
+**I want** a consistent app shell with clear bottom navigation,
+**So that** I can access all driving features predictably without hidden icon-bar actions.
+
+**Acceptance Criteria:**
+* **Given** I am authenticated as a Driver
+* **When** the workspace loads
+* **Then** a `BottomNavigationBar` with 3 tabs is shown: **Bản đồ** (home), **Lịch sử**, **Cá nhân**
+* **And** all Driver screens use `AppTheme.light()`
+* **And** primary actions are anchored to the bottom Thumb-Zone (Single-Tap Full-Width Buttons per UX spec)
+* **And** the existing `MapScreen` integrates as the Bản đồ tab without any functional changes
+* **And** Lịch sử tab shows `EmptyView` with placeholder message until Story 5.3 is implemented
+* **And** Cá nhân tab exposes vehicle management entry point and capability application shortcuts
+
+#### Story 9.3: Attendant Workspace Shell
+**As an** Attendant,
+**I want** a dedicated dark-mode shell optimized for gate operations,
+**So that** the correct high-contrast, edge-to-edge Dark UI is in place for all Epic 4 stories.
+
+**Acceptance Criteria:**
+* **Given** I am authenticated as an Attendant
+* **When** the workspace loads
+* **Then** `AppTheme.dark()` is applied; `Scaffold` background is `#121212`
+* **And** the shell uses edge-to-edge layout: status bar integrates into the dark header zone, no wasted AppBar padding
+* **And** the screen body uses proportional layout — top 50% reserved for camera/viewfinder, bottom 50% for interaction zone (via `Expanded`/`Flex` per UX spec §Responsive Strategy)
+* **And** a dark header label shows the assigned lot name when available: "BÃI XE — [Tên bãi]"
+* **And** the existing placeholder text is replaced with this proper shell entry
+* **And** the shell is ready to accept the gate scanning screen from Story 4.2 without structural changes
+
+#### Story 9.4: Management Workspace Shells (Operator & Lot Owner)
+**As an** Operator or Lot Owner,
+**I want** a management workspace organized by function,
+**So that** I can navigate between lot management, financial, and operational tasks clearly.
+
+**Acceptance Criteria:**
+* **[Operator Shell]** NavigationBar with tabs: **Bãi xe**, **Nhân viên**, **Doanh thu**
+* **[Operator Shell]** Existing Operator screens integrate as correct tab content; empty tabs show `EmptyView` until respective Epic 3/6/8 stories are implemented
+* **[Lot Owner Shell]** NavigationBar with tabs: **Bãi của tôi**, **Hợp đồng**, **Cá nhân**
+* **[Lot Owner Shell]** Existing `ParkingLotRegistrationScreen` is accessible from the Bãi của tôi tab; other tabs show `EmptyView` until Epic 8 stories are implemented
+* **[Both]** Light theme applies consistently; no feature logic changes — only shell structure is added
+
+#### Story 9.5: Admin Workspace Shell
+**As an** Admin,
+**I want** a clear workspace structure organized by administrative function,
+**So that** approvals, user management, and lot suspension are navigable from one place.
+
+**Acceptance Criteria:**
+* **Given** I am authenticated as an Admin
+* **When** the workspace loads
+* **Then** a tab structure is shown: **Duyệt hồ sơ**, **Người dùng**, **Bãi xe**
+* **And** the existing `AdminApprovalsScreen` integrates as the Duyệt hồ sơ tab with no functional changes
+* **And** Người dùng and Bãi xe tabs show `EmptyView` until Story 2.3 and later admin stories are implemented
+* **And** `AdminApprovalsScreen` is no longer a standalone workspace entry; it is routed through `AdminShell`
+* **And** Light theme applies
+
+#### Story 9.6: Shared UI Components & Localization
+**As** any app user,
+**I want** consistent loading, error, and empty states across all workspaces,
+**So that** the UI feels coherent and polished for the thesis demo.
+
+**Acceptance Criteria:**
+* **Given** any workspace is in a loading, error, or empty state
+* **When** those states render
+* **Then** they use shared widgets: `LoadingView`, `ErrorView`, `EmptyView` (Light and Dark variants)
+* **And** all workspace labels use Vietnamese:
+  - Role display names: Tài xế, Nhân viên, Vận hành viên, Chủ bãi xe, Quản trị viên
+  - Navigation tab labels: per Stories 9.2–9.5 acceptance criteria
+  - User-facing error messages: Vietnamese strings
+* **And** all existing English placeholder workspace title strings are removed
+* **And** each shared widget is used by at least one screen per workspace to validate integration
+
+---
+
+### Epic 10: Notifications (Phase 2)
+**Goal:** Users receive proactive in-app alerts.
+**FRs covered:** FR49, FR50
+
+#### Story 10.1: System Push Notifications
 **As a** User,
 **I want** to receive push notifications for important events,
 **So that** I am alerted of booking expirations or approvals.

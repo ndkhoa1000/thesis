@@ -15,7 +15,7 @@ from ...models.enums import ParkingLotStatus, UserRole
 from ...models.parking import ParkingLot
 from ...models.user import User
 from ...models.users import LotOwner
-from ...schemas.parking_lot import ParkingLotAdminRead, ParkingLotCreate, ParkingLotRead, ParkingLotReview
+from ...schemas.parking_lot import ParkingLotAdminRead, ParkingLotCreate, ParkingLotRead, ParkingLotReview, ParkingLotStatusUpdate
 
 router = APIRouter(tags=["lots"])
 
@@ -45,6 +45,22 @@ async def _require_lot_owner_profile(db: AsyncSession, current_user: dict[str, A
 async def _get_parking_lot(db: AsyncSession, parking_lot_id: int) -> ParkingLot | None:
     parking_lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == parking_lot_id).limit(1))
     return parking_lot_result.scalar_one_or_none()
+
+
+async def _get_parking_lot_owner_snapshot(
+    db: AsyncSession,
+    lot_owner_id: int,
+) -> tuple[str | None, str | None, str | None]:
+    owner_result = await db.execute(
+        select(User.name, User.phone, LotOwner.business_license)
+        .join(User, LotOwner.user_id == User.id)
+        .where(LotOwner.id == lot_owner_id)
+        .limit(1)
+    )
+    owner_snapshot = owner_result.one_or_none()
+    if owner_snapshot is None:
+        return None, None, None
+    return owner_snapshot
 
 
 def _build_admin_read(
@@ -169,3 +185,33 @@ async def review_parking_lot(
     await db.commit()
     await db.refresh(parking_lot)
     return parking_lot
+
+
+@router.patch("/admin/parking-lots/{parking_lot_id}/status", response_model=ParkingLotAdminRead)
+async def patch_parking_lot_status(
+    request: Request,
+    parking_lot_id: int,
+    payload: ParkingLotStatusUpdate,
+    current_superuser: Annotated[dict, Depends(get_current_superuser)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ParkingLotAdminRead:
+    parking_lot = await _get_parking_lot(db, parking_lot_id)
+    if parking_lot is None:
+        raise NotFoundException("Parking lot not found")
+
+    if payload.status == ParkingLotStatus.CLOSED and parking_lot.status != ParkingLotStatus.APPROVED.value:
+        raise BadRequestException("Only approved parking lots can be suspended")
+
+    if payload.status == ParkingLotStatus.APPROVED and parking_lot.status != ParkingLotStatus.CLOSED.value:
+        raise BadRequestException("Only suspended parking lots can be reopened")
+
+    parking_lot.status = payload.status.value
+    parking_lot.updated_at = _utcnow()
+    await db.commit()
+    await db.refresh(parking_lot)
+
+    owner_name, owner_phone, owner_business_license = await _get_parking_lot_owner_snapshot(
+        db,
+        parking_lot.lot_owner_id,
+    )
+    return _build_admin_read(parking_lot, owner_name, owner_phone, owner_business_license)

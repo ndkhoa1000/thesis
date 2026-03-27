@@ -76,6 +76,50 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
     }
   }
 
+  Future<void> _toggleUserActivation(AdminManagedUser user) async {
+    final nextIsActive = !user.isActive;
+    try {
+      await widget.approvalsService.updateUserActivation(
+        userId: user.id,
+        isActive: nextIsActive,
+      );
+      if (!mounted) {
+        return;
+      }
+      final message = nextIsActive
+          ? 'Đã kích hoạt tài khoản ${user.name}.'
+          : 'Đã vô hiệu hóa tài khoản ${user.name}.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      _reload();
+    } on AdminApprovalsException catch (error) {
+      _showError(error.message);
+    }
+  }
+
+  Future<void> _toggleParkingLotStatus(AdminManagedParkingLot lot) async {
+    final nextStatus = lot.canSuspend ? 'CLOSED' : 'APPROVED';
+    try {
+      await widget.approvalsService.updateParkingLotStatus(
+        parkingLotId: lot.id,
+        status: nextStatus,
+      );
+      if (!mounted) {
+        return;
+      }
+      final message = nextStatus == 'CLOSED'
+          ? 'Đã tạm dừng bãi xe ${lot.name}.'
+          : 'Đã mở lại bãi xe ${lot.name}.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+      _reload();
+    } on AdminApprovalsException catch (error) {
+      _showError(error.message);
+    }
+  }
+
   void _showError(String message) {
     if (!mounted) {
       return;
@@ -88,15 +132,18 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Phê duyệt hệ thống'),
+          title: const Text('Điều phối hệ thống'),
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'Chủ bãi'),
               Tab(text: 'Operator'),
               Tab(text: 'Bãi xe'),
+              Tab(text: 'Người dùng'),
+              Tab(text: 'Vận hành bãi'),
             ],
           ),
           actions: [
@@ -159,6 +206,14 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
                       'Các bãi xe do Lot Owner khai báo sẽ xuất hiện tại đây để Admin xét duyệt.',
                   onApprove: _approve,
                   onReject: _reject,
+                ),
+                _ManagedUsersList(
+                  users: dashboard.managedUsers,
+                  onToggleActivation: _toggleUserActivation,
+                ),
+                _ManagedParkingLotsList(
+                  lots: dashboard.managedParkingLots,
+                  onToggleStatus: _toggleParkingLotStatus,
                 ),
               ],
             );
@@ -273,6 +328,163 @@ class _ApprovalsList extends StatelessWidget {
       },
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemCount: items.length,
+    );
+  }
+}
+
+class _ManagedUsersList extends StatelessWidget {
+  const _ManagedUsersList({
+    required this.users,
+    required this.onToggleActivation,
+  });
+
+  final List<AdminManagedUser> users;
+  final Future<void> Function(AdminManagedUser user) onToggleActivation;
+
+  @override
+  Widget build(BuildContext context) {
+    if (users.isEmpty) {
+      return const _EmptyState(
+        title: 'Không có tài khoản để quản lý',
+        message:
+            'Danh sách tài khoản hệ thống sẽ xuất hiện tại đây để Admin kích hoạt hoặc vô hiệu hóa.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: users.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final user = users[index];
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        user.name,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    Chip(
+                      label: Text(user.isActive ? 'Đang hoạt động' : 'Đã khóa'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(label: 'Username', value: user.username),
+                _InfoRow(label: 'Email', value: user.email),
+                if ((user.phone ?? '').isNotEmpty)
+                  _InfoRow(label: 'Số điện thoại', value: user.phone!),
+                _InfoRow(label: 'Vai trò', value: user.roleLabel),
+                _InfoRow(
+                  label: 'Phân quyền hệ thống',
+                  value: user.isSuperuser ? 'Superuser' : 'Tài khoản chuẩn',
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => onToggleActivation(user),
+                    icon: Icon(
+                      user.isActive ? Icons.block : Icons.check_circle,
+                    ),
+                    label: Text(
+                      user.isActive ? 'Vô hiệu hóa' : 'Kích hoạt lại',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ManagedParkingLotsList extends StatelessWidget {
+  const _ManagedParkingLotsList({
+    required this.lots,
+    required this.onToggleStatus,
+  });
+
+  final List<AdminManagedParkingLot> lots;
+  final Future<void> Function(AdminManagedParkingLot lot) onToggleStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    if (lots.isEmpty) {
+      return const _EmptyState(
+        title: 'Không có bãi xe để quản lý',
+        message:
+            'Các bãi xe đã duyệt hoặc đang tạm dừng sẽ xuất hiện tại đây để Admin điều phối vận hành.',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: lots.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final lot = lots[index];
+        final canToggle = lot.canSuspend || lot.canReopen;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        lot.name,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    Chip(label: Text(lot.statusLabel)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _InfoRow(label: 'Địa chỉ', value: lot.address),
+                if ((lot.ownerName ?? '').isNotEmpty)
+                  _InfoRow(label: 'Chủ bãi', value: lot.ownerName!),
+                if ((lot.ownerPhone ?? '').isNotEmpty)
+                  _InfoRow(label: 'Liên hệ', value: lot.ownerPhone!),
+                _InfoRow(
+                  label: 'Chỗ trống hiện tại',
+                  value: lot.currentAvailable.toString(),
+                ),
+                if ((lot.description ?? '').isNotEmpty)
+                  _InfoRow(label: 'Mô tả', value: lot.description!),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: canToggle ? () => onToggleStatus(lot) : null,
+                    icon: Icon(
+                      lot.canSuspend ? Icons.pause_circle : Icons.play_circle,
+                    ),
+                    label: Text(
+                      lot.canSuspend
+                          ? 'Tạm dừng bãi xe'
+                          : lot.canReopen
+                          ? 'Mở lại bãi xe'
+                          : 'Không khả dụng',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

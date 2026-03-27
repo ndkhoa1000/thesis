@@ -44,6 +44,21 @@ class UserRead(BaseModel):
     tier_id: int | None
 
 
+class AdminUserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    username: str
+    email: EmailStr
+    phone: str | None = None
+    role: str
+    is_active: bool
+    is_superuser: bool
+    created_at: datetime
+    updated_at: datetime | None = None
+
+
 class UserCreate(UserBase):
     model_config = ConfigDict(extra="forbid")
 
@@ -95,6 +110,12 @@ class UserUpdateInternal(UserUpdate):
 
 class UserTierUpdate(BaseModel):
     tier_id: int
+
+
+class AdminUserActivationUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    is_active: bool
 
 
 class UserDelete(BaseModel):

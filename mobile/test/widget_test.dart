@@ -173,6 +173,8 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
     List<AdminApprovalItem>? lotOwnerApplications,
     List<AdminApprovalItem>? operatorApplications,
     List<AdminApprovalItem>? parkingLotApplications,
+    List<AdminManagedUser>? managedUsers,
+    List<AdminManagedParkingLot>? managedParkingLots,
   }) : _lotOwnerApplications = List<AdminApprovalItem>.from(
          lotOwnerApplications ?? const [],
        ),
@@ -181,11 +183,17 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
        ),
        _parkingLotApplications = List<AdminApprovalItem>.from(
          parkingLotApplications ?? const [],
+       ),
+       _managedUsers = List<AdminManagedUser>.from(managedUsers ?? const []),
+       _managedParkingLots = List<AdminManagedParkingLot>.from(
+         managedParkingLots ?? const [],
        );
 
   final List<AdminApprovalItem> _lotOwnerApplications;
   final List<AdminApprovalItem> _operatorApplications;
   final List<AdminApprovalItem> _parkingLotApplications;
+  final List<AdminManagedUser> _managedUsers;
+  final List<AdminManagedParkingLot> _managedParkingLots;
 
   @override
   Future<AdminApprovalsDashboard> loadDashboard() async {
@@ -194,6 +202,10 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
       operatorApplications: List<AdminApprovalItem>.from(_operatorApplications),
       parkingLotApplications: List<AdminApprovalItem>.from(
         _parkingLotApplications,
+      ),
+      managedUsers: List<AdminManagedUser>.from(_managedUsers),
+      managedParkingLots: List<AdminManagedParkingLot>.from(
+        _managedParkingLots,
       ),
     );
   }
@@ -215,6 +227,53 @@ class FakeAdminApprovalsService implements AdminApprovalsService {
   }) async {
     final item = _removeItem(type, applicationId);
     return item;
+  }
+
+  @override
+  Future<AdminManagedUser> updateUserActivation({
+    required int userId,
+    required bool isActive,
+  }) async {
+    final index = _managedUsers.indexWhere((user) => user.id == userId);
+    final current = _managedUsers[index];
+    final updated = AdminManagedUser(
+      id: current.id,
+      name: current.name,
+      username: current.username,
+      email: current.email,
+      phone: current.phone,
+      role: current.role,
+      isActive: isActive,
+      isSuperuser: current.isSuperuser,
+    );
+    _managedUsers[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<AdminManagedParkingLot> updateParkingLotStatus({
+    required int parkingLotId,
+    required String status,
+  }) async {
+    final index = _managedParkingLots.indexWhere(
+      (lot) => lot.id == parkingLotId,
+    );
+    final current = _managedParkingLots[index];
+    final updated = AdminManagedParkingLot(
+      id: current.id,
+      lotOwnerId: current.lotOwnerId,
+      name: current.name,
+      address: current.address,
+      currentAvailable: current.currentAvailable,
+      status: status,
+      ownerName: current.ownerName,
+      ownerPhone: current.ownerPhone,
+      ownerBusinessLicense: current.ownerBusinessLicense,
+      description: current.description,
+      coverImage: current.coverImage,
+    );
+    _managedParkingLots[index] = updated;
+    return updated;
   }
 
   AdminApprovalItem _removeItem(ApprovalSubjectType type, int applicationId) {
@@ -380,7 +439,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AdminApprovalsScreen), findsOneWidget);
-    expect(find.text('Phê duyệt hệ thống'), findsOneWidget);
+    expect(find.text('Điều phối hệ thống'), findsOneWidget);
     expect(find.text('Nguyen Van A'), findsOneWidget);
   });
 
@@ -927,5 +986,101 @@ void main() {
 
     expect(find.text('Bai xe Nguyen Hue'), findsNothing);
     expect(find.text('Không có đăng ký bãi xe chờ duyệt'), findsOneWidget);
+  });
+
+  testWidgets('Admin dashboard can deactivate and reactivate a user', (
+    WidgetTester tester,
+  ) async {
+    final approvalsService = FakeAdminApprovalsService(
+      managedUsers: const [
+        AdminManagedUser(
+          id: 5,
+          name: 'Le Thi C',
+          username: 'lethic',
+          email: 'c@example.com',
+          phone: '0909888777',
+          role: 'LOT_OWNER',
+          isActive: true,
+          isSuperuser: false,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminApprovalsScreen(
+          approvalsService: approvalsService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Người dùng'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Le Thi C'), findsOneWidget);
+    expect(find.text('Đang hoạt động'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Vô hiệu hóa'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đã khóa'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Kích hoạt lại'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Kích hoạt lại'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đang hoạt động'), findsOneWidget);
+  });
+
+  testWidgets('Admin dashboard can suspend and reopen a parking lot', (
+    WidgetTester tester,
+  ) async {
+    final approvalsService = FakeAdminApprovalsService(
+      managedParkingLots: const [
+        AdminManagedParkingLot(
+          id: 14,
+          lotOwnerId: 2,
+          name: 'Bai xe Ham Nghi',
+          address: '12 Ham Nghi, Quan 1',
+          currentAvailable: 8,
+          status: 'APPROVED',
+          ownerName: 'Pham Van D',
+          ownerPhone: '0909444555',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AdminApprovalsScreen(
+          approvalsService: approvalsService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Vận hành bãi'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Ham Nghi'), findsOneWidget);
+    expect(find.text('Đang hoạt động'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Tạm dừng bãi xe'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đã tạm dừng'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Mở lại bãi xe'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Mở lại bãi xe'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đang hoạt động'), findsOneWidget);
   });
 }

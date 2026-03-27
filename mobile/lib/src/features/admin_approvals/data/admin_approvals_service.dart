@@ -90,16 +90,118 @@ class AdminApprovalItem {
   }
 }
 
+class AdminManagedUser {
+  const AdminManagedUser({
+    required this.id,
+    required this.name,
+    required this.username,
+    required this.email,
+    required this.phone,
+    required this.role,
+    required this.isActive,
+    required this.isSuperuser,
+  });
+
+  final int id;
+  final String name;
+  final String username;
+  final String email;
+  final String? phone;
+  final String role;
+  final bool isActive;
+  final bool isSuperuser;
+
+  String get roleLabel => switch (role) {
+    'ADMIN' => 'Admin',
+    'ATTENDANT' => 'Attendant',
+    'MANAGER' => 'Operator',
+    'LOT_OWNER' => 'Chủ bãi',
+    _ => 'Driver',
+  };
+
+  factory AdminManagedUser.fromJson(Map<String, dynamic> json) {
+    return AdminManagedUser(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      username: json['username'] as String,
+      email: json['email'] as String,
+      phone: json['phone'] as String?,
+      role: json['role'] as String,
+      isActive: json['is_active'] as bool? ?? true,
+      isSuperuser: json['is_superuser'] as bool? ?? false,
+    );
+  }
+}
+
+class AdminManagedParkingLot {
+  const AdminManagedParkingLot({
+    required this.id,
+    required this.lotOwnerId,
+    required this.name,
+    required this.address,
+    required this.currentAvailable,
+    required this.status,
+    this.ownerName,
+    this.ownerPhone,
+    this.ownerBusinessLicense,
+    this.description,
+    this.coverImage,
+  });
+
+  final int id;
+  final int lotOwnerId;
+  final String name;
+  final String address;
+  final int currentAvailable;
+  final String status;
+  final String? ownerName;
+  final String? ownerPhone;
+  final String? ownerBusinessLicense;
+  final String? description;
+  final String? coverImage;
+
+  bool get canSuspend => status == 'APPROVED';
+  bool get canReopen => status == 'CLOSED';
+
+  String get statusLabel => switch (status) {
+    'APPROVED' => 'Đang hoạt động',
+    'CLOSED' => 'Đã tạm dừng',
+    'PENDING' => 'Chờ duyệt',
+    'REJECTED' => 'Đã từ chối',
+    _ => status,
+  };
+
+  factory AdminManagedParkingLot.fromJson(Map<String, dynamic> json) {
+    return AdminManagedParkingLot(
+      id: json['id'] as int,
+      lotOwnerId: json['lot_owner_id'] as int,
+      name: json['name'] as String,
+      address: json['address'] as String,
+      currentAvailable: json['current_available'] as int? ?? 0,
+      status: json['status'] as String,
+      ownerName: json['owner_name'] as String?,
+      ownerPhone: json['owner_phone'] as String?,
+      ownerBusinessLicense: json['owner_business_license'] as String?,
+      description: json['description'] as String?,
+      coverImage: json['cover_image'] as String?,
+    );
+  }
+}
+
 class AdminApprovalsDashboard {
   const AdminApprovalsDashboard({
     required this.lotOwnerApplications,
     required this.operatorApplications,
     required this.parkingLotApplications,
+    required this.managedUsers,
+    required this.managedParkingLots,
   });
 
   final List<AdminApprovalItem> lotOwnerApplications;
   final List<AdminApprovalItem> operatorApplications;
   final List<AdminApprovalItem> parkingLotApplications;
+  final List<AdminManagedUser> managedUsers;
+  final List<AdminManagedParkingLot> managedParkingLots;
 }
 
 abstract class AdminApprovalsService {
@@ -114,6 +216,16 @@ abstract class AdminApprovalsService {
     required ApprovalSubjectType type,
     required int applicationId,
     required String rejectionReason,
+  });
+
+  Future<AdminManagedUser> updateUserActivation({
+    required int userId,
+    required bool isActive,
+  });
+
+  Future<AdminManagedParkingLot> updateParkingLotStatus({
+    required int parkingLotId,
+    required String status,
   });
 }
 
@@ -143,6 +255,10 @@ class BackendAdminApprovalsService implements AdminApprovalsService {
         '/admin/parking-lots',
         options: _authOptions,
       );
+      final userResponse = await _dio.get<dynamic>(
+        '/admin/users',
+        options: _authOptions,
+      );
 
       final lotOwnerItems = _parseList(
         lotOwnerResponse.data,
@@ -156,11 +272,21 @@ class BackendAdminApprovalsService implements AdminApprovalsService {
         parkingLotResponse.data,
         AdminApprovalItem.fromParkingLotJson,
       ).where((item) => item.isPending).toList();
+      final managedUsers = _parseList(
+        userResponse.data,
+        AdminManagedUser.fromJson,
+      );
+      final managedParkingLots = _parseList(
+        parkingLotResponse.data,
+        AdminManagedParkingLot.fromJson,
+      );
 
       return AdminApprovalsDashboard(
         lotOwnerApplications: lotOwnerItems,
         operatorApplications: operatorItems,
         parkingLotApplications: parkingLotItems,
+        managedUsers: managedUsers,
+        managedParkingLots: managedParkingLots,
       );
     } on DioException catch (error) {
       throw AdminApprovalsException(_extractMessage(error));
@@ -193,6 +319,52 @@ class BackendAdminApprovalsService implements AdminApprovalsService {
     );
   }
 
+  @override
+  Future<AdminManagedUser> updateUserActivation({
+    required int userId,
+    required bool isActive,
+  }) async {
+    try {
+      final response = await _dio.patch<dynamic>(
+        '/admin/users/$userId/activation',
+        data: {'is_active': isActive},
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AdminApprovalsException(
+          'Phản hồi cập nhật tài khoản không hợp lệ.',
+        );
+      }
+      return AdminManagedUser.fromJson(raw);
+    } on DioException catch (error) {
+      throw AdminApprovalsException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AdminManagedParkingLot> updateParkingLotStatus({
+    required int parkingLotId,
+    required String status,
+  }) async {
+    try {
+      final response = await _dio.patch<dynamic>(
+        '/admin/parking-lots/$parkingLotId/status',
+        data: {'status': status},
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AdminApprovalsException(
+          'Phản hồi cập nhật trạng thái bãi xe không hợp lệ.',
+        );
+      }
+      return AdminManagedParkingLot.fromJson(raw);
+    } on DioException catch (error) {
+      throw AdminApprovalsException(_extractMessage(error));
+    }
+  }
+
   Future<AdminApprovalItem> _review({
     required ApprovalSubjectType type,
     required int applicationId,
@@ -201,7 +373,7 @@ class BackendAdminApprovalsService implements AdminApprovalsService {
   }) async {
     try {
       final response = await _dio.post<dynamic>(
-        '${_reviewPath(type, applicationId)}',
+        _reviewPath(type, applicationId),
         data: {'decision': decision, 'rejection_reason': rejectionReason},
         options: _authOptions,
       );
@@ -218,10 +390,7 @@ class BackendAdminApprovalsService implements AdminApprovalsService {
     }
   }
 
-  List<AdminApprovalItem> _parseList(
-    dynamic raw,
-    AdminApprovalItem Function(Map<String, dynamic>) parser,
-  ) {
+  List<T> _parseList<T>(dynamic raw, T Function(Map<String, dynamic>) parser) {
     if (raw is! List) {
       throw const AdminApprovalsException(
         'Phản hồi danh sách phê duyệt không hợp lệ.',

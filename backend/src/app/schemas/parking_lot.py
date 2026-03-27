@@ -78,3 +78,16 @@ class ParkingLotReview(BaseModel):
         if value not in {ParkingLotStatus.APPROVED, ParkingLotStatus.REJECTED}:
             raise ValueError("Decision must be APPROVED or REJECTED")
         return value
+
+
+class ParkingLotStatusUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: ParkingLotStatus
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: ParkingLotStatus) -> ParkingLotStatus:
+        if value not in {ParkingLotStatus.APPROVED, ParkingLotStatus.CLOSED}:
+            raise ValueError("Status must be APPROVED or CLOSED")
+        return value
