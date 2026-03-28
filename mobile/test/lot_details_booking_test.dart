@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:parking_app/src/features/driver_booking/data/driver_booking_service.dart';
 import 'package:parking_app/src/features/lot_details/data/lot_details_service.dart';
@@ -266,5 +267,50 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Lot is full - no available spots.'), findsOneWidget);
+  });
+
+  testWidgets('surfaces expired booking state and still allows rebooking', (
+    tester,
+  ) async {
+    final bookingService = FakeDriverBookingService(
+      activeBooking: DriverBooking(
+        bookingId: 61,
+        parkingLotId: 1,
+        parkingLotName: 'Bãi xe Lê Lợi',
+        status: 'EXPIRED',
+        bookingTime: DateTime(2026, 3, 28, 9, 0),
+        expectedArrival: DateTime(2026, 3, 28, 9, 30),
+        expirationTime: DateTime(2026, 3, 28, 9, 30),
+        expiresInSeconds: 0,
+        currentAvailable: 5,
+        token: '',
+        vehicle: const Vehicle(
+          id: 7,
+          licensePlate: '59A-12345',
+          vehicleType: 'MOTORBIKE',
+        ),
+        payment: const DriverBookingPayment(
+          paymentId: 88,
+          amount: 8000,
+          finalAmount: 8000,
+          paymentMethod: 'ONLINE',
+          paymentStatus: 'COMPLETED',
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildSubject(
+        bookingService: bookingService,
+        vehicleService: FakeVehicleService(const [
+          Vehicle(id: 7, licensePlate: '59A-12345', vehicleType: 'MOTORBIKE'),
+        ]),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Booking đã hết hạn'), findsOneWidget);
+    expect(find.byKey(const ValueKey('bookLot:1')), findsOneWidget);
+    expect(find.byType(QrImageView), findsNothing);
   });
 }

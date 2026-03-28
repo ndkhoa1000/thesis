@@ -76,7 +76,7 @@ development_status:
   epic-7: in-progress
   7-1-driver-pre-books-parking-spot: review
   7-2-attendant-scans-pre-booked-check-in: review
-  7-3-auto-expire-no-show-bookings: ready-for-dev
+  7-3-auto-expire-no-show-bookings: review
   epic-7-retrospective: optional
   epic-8: backlog
   8-1-create-lease-contract: backlog

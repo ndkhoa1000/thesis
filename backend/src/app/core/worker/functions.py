@@ -6,6 +6,9 @@ import structlog
 import uvloop
 from arq.worker import Worker
 
+from ...services.booking_service import expire_stale_bookings
+from ..db.database import local_session
+
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 
@@ -13,6 +16,14 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 async def sample_background_task(ctx: Worker, name: str) -> str:
     await asyncio.sleep(5)
     return f"Task {name} is complete!"
+
+
+async def expire_no_show_bookings(ctx: Worker) -> int:
+    async with local_session() as db:
+        expired_count = await expire_stale_bookings(db)
+
+    logging.info("Expired %s stale bookings", expired_count)
+    return expired_count
 
 
 # -------- base functions --------

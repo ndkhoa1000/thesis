@@ -226,6 +226,7 @@ class _LotDetailsSheetState extends State<LotDetailsSheet> {
 
   Widget _buildBookingSection(ThemeData theme) {
     final detail = _detail!;
+    final booking = _activeBooking;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -251,14 +252,43 @@ class _LotDetailsSheetState extends State<LotDetailsSheet> {
           ),
         ],
         const SizedBox(height: 12),
-        if (_activeBooking != null)
+        if (booking != null && booking.status != 'EXPIRED')
           _ActiveBookingCard(
-            booking: _activeBooking!,
+            booking: booking,
             isBusy: _isBookingBusy,
             onCancel: _cancelBooking,
             formatDateTime: _formatDateTime,
             formatMoney: _formatMoney,
             vehicleTypeLabel: _vehicleTypeLabel,
+          )
+        else if (booking != null && booking.status == 'EXPIRED')
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ExpiredBookingCard(
+                booking: booking,
+                formatDateTime: _formatDateTime,
+                formatMoney: _formatMoney,
+                vehicleTypeLabel: _vehicleTypeLabel,
+              ),
+              const SizedBox(height: 12),
+              if (_vehicles.isEmpty)
+                _NoVehicleBookingCard(onManageVehicles: _openVehicleManagement)
+              else
+                _CreateBookingCard(
+                  detail: detail,
+                  vehicles: _vehicles,
+                  selectedVehicleId: _selectedVehicleId,
+                  onVehicleChanged: (value) {
+                    setState(() {
+                      _selectedVehicleId = value;
+                    });
+                  },
+                  onCreateBooking: _createBooking,
+                  isBusy: _isBookingBusy,
+                  vehicleTypeLabel: _vehicleTypeLabel,
+                ),
+            ],
           )
         else if (_vehicles.isEmpty)
           _NoVehicleBookingCard(onManageVehicles: _openVehicleManagement)
@@ -596,6 +626,51 @@ class _ActiveBookingCard extends StatelessWidget {
             icon: const Icon(Icons.cancel_outlined),
             label: Text(isBusy ? 'Đang hủy...' : 'Hủy booking'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExpiredBookingCard extends StatelessWidget {
+  const _ExpiredBookingCard({
+    required this.booking,
+    required this.formatDateTime,
+    required this.formatMoney,
+    required this.vehicleTypeLabel,
+  });
+
+  final DriverBooking booking;
+  final String Function(DateTime? value) formatDateTime;
+  final String Function(double amount) formatMoney;
+  final String Function(String vehicleType) vehicleTypeLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Booking đã hết hạn', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            'Giữ chỗ cho ${booking.vehicle.licensePlate} (${vehicleTypeLabel(booking.vehicle.vehicleType)}) đã được trả lại cho bãi.',
+          ),
+          const SizedBox(height: 8),
+          Text('Hết hạn lúc: ${formatDateTime(booking.expirationTime)}'),
+          const SizedBox(height: 4),
+          Text(
+            'Phí giữ chỗ trước đó: ${formatMoney(booking.payment.finalAmount)} VNĐ • ${booking.payment.paymentMethod}',
+          ),
+          const SizedBox(height: 4),
+          const Text('Bạn có thể tạo booking mới ngay nếu bãi vẫn còn chỗ.'),
         ],
       ),
     );

@@ -246,6 +246,45 @@ class TestDriverBookings:
         assert response.vehicle.license_plate == "59A-12345"
 
     @pytest.mark.asyncio
+    async def test_reads_expired_booking_state_and_releases_capacity_when_latest_booking_times_out(self, mock_db):
+        driver_result = MagicMock()
+        driver_result.scalar_one_or_none.return_value = _make_driver()
+
+        lot = _make_lot(current_available=1)
+        vehicle = _make_vehicle()
+        booking = _make_booking(expires_in_minutes=-1)
+
+        booking_result = MagicMock()
+        booking_result.first.return_value = (booking, lot, vehicle)
+
+        latest_config_result = MagicMock()
+        latest_config_result.scalar_one_or_none.return_value = None
+
+        payment_result = MagicMock()
+        payment_result.scalar_one_or_none.return_value = _make_payment()
+
+        mock_db.execute = AsyncMock(
+            side_effect=[driver_result, booking_result, latest_config_result, payment_result]
+        )
+        mock_db.commit = AsyncMock()
+        mock_db.rollback = AsyncMock()
+
+        with patch("src.app.api.v1.bookings.publish_lot_availability_update") as publish_mock:
+            response = await get_driver_active_booking(Mock(), _driver_user(), mock_db, 14)
+
+        assert response.status == "EXPIRED"
+        assert response.expires_in_seconds == 0
+        assert response.token == ""
+        assert response.current_available == 2
+        assert booking.status == "EXPIRED"
+        assert lot.current_available == 2
+        publish_mock.assert_called_once_with(
+            lot,
+            previous_current_available=1,
+            source="driver_booking_expired_on_read",
+        )
+
+    @pytest.mark.asyncio
     async def test_cancel_booking_restores_capacity_exactly_once(self, mock_db):
         driver_result = MagicMock()
         driver_result.scalar_one_or_none.return_value = _make_driver()

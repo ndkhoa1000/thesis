@@ -1,6 +1,6 @@
 """Driver booking lifecycle endpoints."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from secrets import token_urlsafe
 from typing import Annotated, Any
 
@@ -24,12 +24,13 @@ from ...models.enums import (
     VehicleTypeAll,
 )
 from ...models.financials import Payment
-from ...models.parking import ParkingLot, ParkingLotConfig, Pricing
+from ...models.parking import ParkingLot, Pricing
 from ...models.sessions import Booking
 from ...models.users import Driver
 from ...models.vehicles import Vehicle
 from ...schemas.booking import BookingPaymentRead, DriverBookingCancelRead, DriverBookingCreate, DriverBookingRead
 from ...schemas.vehicle import VehicleRead
+from ...services.booking_service import get_latest_lot_capacity_config, mark_booking_expired
 
 router = APIRouter(tags=["bookings"])
 BOOKING_HOLD_TTL = timedelta(minutes=30)
@@ -79,24 +80,6 @@ async def _get_latest_pricing(
         if pricing.vehicle_type == VehicleTypeAll.ALL.value:
             return pricing
     return None
-
-
-async def _get_latest_lot_capacity_config(
-    db: AsyncSession,
-    parking_lot_id: int,
-) -> ParkingLotConfig | None:
-    config_result = await db.execute(
-        select(ParkingLotConfig)
-        .where(
-            ParkingLotConfig.parking_lot_id == parking_lot_id,
-            ParkingLotConfig.vehicle_type == VehicleTypeAll.ALL.value,
-            or_(ParkingLotConfig.effective_from.is_(None), ParkingLotConfig.effective_from <= date.today()),
-            or_(ParkingLotConfig.effective_to.is_(None), ParkingLotConfig.effective_to >= date.today()),
-        )
-        .order_by(ParkingLotConfig.created_at.desc(), ParkingLotConfig.id.desc())
-        .limit(1)
-    )
-    return config_result.scalar_one_or_none()
 
 
 def _calculate_booking_fee(pricing: Pricing) -> float:
@@ -172,6 +155,7 @@ def _serialize_driver_booking(
     payment: Payment,
 ) -> DriverBookingRead:
     expires_at = booking.expiration_time or booking.expected_arrival or booking.booking_time
+    can_present_qr = booking.status == BookingStatus.CONFIRMED.value and expires_at > _utcnow()
     expires_in_seconds = max(int((expires_at - _utcnow()).total_seconds()), 0)
     return DriverBookingRead(
         booking_id=booking.id,
@@ -183,7 +167,7 @@ def _serialize_driver_booking(
         expiration_time=booking.expiration_time,
         expires_in_seconds=expires_in_seconds,
         current_available=max(int(parking_lot.current_available), 0),
-        token=_build_booking_token(booking, parking_lot, vehicle, expires_at),
+        token=_build_booking_token(booking, parking_lot, vehicle, expires_at) if can_present_qr else "",
         vehicle=VehicleRead.model_validate(vehicle),
         payment=BookingPaymentRead(
             payment_id=payment.id,
@@ -215,24 +199,6 @@ async def _commit_and_publish_if_changed(
     )
 
 
-async def _expire_booking(
-    db: AsyncSession,
-    booking: Booking,
-    parking_lot: ParkingLot,
-) -> int:
-    latest_config = await _get_latest_lot_capacity_config(db, parking_lot.id)
-    previous_current_available = parking_lot.current_available
-    booking.status = BookingStatus.EXPIRED.value
-    if latest_config is None:
-        parking_lot.current_available += 1
-    else:
-        parking_lot.current_available = min(
-            parking_lot.current_available + 1,
-            max(latest_config.total_capacity, 0),
-        )
-    return previous_current_available
-
-
 @router.get("/bookings/driver-active", response_model=DriverBookingRead, status_code=200)
 async def get_driver_active_booking(
     request: Request,
@@ -248,18 +214,29 @@ async def get_driver_active_booking(
         .where(
             Booking.driver_id == driver.id,
             Booking.parking_lot_id == parking_lot_id,
-            Booking.status == BookingStatus.CONFIRMED.value,
+            Booking.status.in_([BookingStatus.CONFIRMED.value, BookingStatus.EXPIRED.value]),
         )
         .order_by(Booking.id.desc())
         .limit(1)
+        .with_for_update()
     )
     row = booking_result.first()
     if row is None:
         raise NotFoundException("No active booking found")
 
     booking, parking_lot, vehicle = row
-    if booking.expiration_time is not None and booking.expiration_time <= _utcnow():
-        raise NotFoundException("No active booking found")
+    if (
+        booking.status == BookingStatus.CONFIRMED.value
+        and booking.expiration_time is not None
+        and booking.expiration_time <= _utcnow()
+    ):
+        previous_current_available = await mark_booking_expired(db, booking, parking_lot)
+        await _commit_and_publish_if_changed(
+            db,
+            parking_lot,
+            previous_current_available=previous_current_available,
+            source="driver_booking_expired_on_read",
+        )
 
     payment = await _get_booking_payment(db, booking.id)
     if payment is None:
@@ -305,7 +282,7 @@ async def create_driver_booking(
     previous_current_available = parking_lot.current_available
     if existing_booking is not None:
         if existing_booking.expiration_time is not None and existing_booking.expiration_time <= _utcnow():
-            previous_current_available = await _expire_booking(db, existing_booking, parking_lot)
+            previous_current_available = await mark_booking_expired(db, existing_booking, parking_lot)
         else:
             raise BadRequestException("Driver already has an active booking at this lot")
 
@@ -401,7 +378,7 @@ async def cancel_driver_booking(
     now = _utcnow()
     previous_current_available = parking_lot.current_available
     if booking.expiration_time is not None and booking.expiration_time <= now:
-        previous_current_available = await _expire_booking(db, booking, parking_lot)
+        previous_current_available = await mark_booking_expired(db, booking, parking_lot)
         await _commit_and_publish_if_changed(
             db,
             parking_lot,
@@ -410,7 +387,7 @@ async def cancel_driver_booking(
         )
         raise BadRequestException("Booking already expired")
 
-    latest_config = await _get_latest_lot_capacity_config(db, parking_lot.id)
+    latest_config = await get_latest_lot_capacity_config(db, parking_lot.id)
     booking.status = BookingStatus.CANCELLED.value
     if latest_config is None:
         parking_lot.current_available += 1

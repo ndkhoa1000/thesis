@@ -1,6 +1,6 @@
 # Story 7.3: Auto-Expire No-Show Bookings
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that held spots are returned when drivers do not arrive.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement backend expiration job and booking expiry rules (AC: 1, 2, 4, 5)
-  - [ ] Add focused expiration logic that finds eligible stale bookings using backend UTC timestamps and updates them to `EXPIRED` safely.
-  - [ ] Ensure already cancelled, already consumed, or already expired bookings are ignored without restoring capacity again.
-  - [ ] Expose expired booking state cleanly through booking read contracts established in Story 7.1.
+- [x] Task 1: Implement backend expiration job and booking expiry rules (AC: 1, 2, 4, 5)
+  - [x] Add focused expiration logic that finds eligible stale bookings using backend UTC timestamps and updates them to `EXPIRED` safely.
+  - [x] Ensure already cancelled, already consumed, or already expired bookings are ignored without restoring capacity again.
+  - [x] Expose expired booking state cleanly through booking read contracts established in Story 7.1.
 
-- [ ] Task 2: Reuse the existing worker/scheduler scaffolding (AC: 1, 4)
-  - [ ] Extend the current ARQ worker functions/settings with a real booking-expiration job and an appropriate cron schedule.
-  - [ ] Keep the implementation aligned with the repo's existing worker startup/shutdown hooks and Redis-backed queue settings.
-  - [ ] If local demo execution needs an in-process fallback, keep it inside the backend architecture rather than offloading responsibility to mobile or manual operator actions.
+- [x] Task 2: Reuse the existing worker/scheduler scaffolding (AC: 1, 4)
+  - [x] Extend the current ARQ worker functions/settings with a real booking-expiration job and an appropriate cron schedule.
+  - [x] Keep the implementation aligned with the repo's existing worker startup/shutdown hooks and Redis-backed queue settings.
+  - [x] If local demo execution needs an in-process fallback, keep it inside the backend architecture rather than offloading responsibility to mobile or manual operator actions.
 
-- [ ] Task 3: Preserve availability truth and publication semantics (AC: 1, 2, 3)
-  - [ ] Restore `current_available` within the same transaction as the booking expiration state change.
-  - [ ] Publish lot updates through the same canonical availability channel used by the rest of the system after successful commit.
-  - [ ] Prevent any double-release path when a booking was already cancelled or already converted into a session.
+- [x] Task 3: Preserve availability truth and publication semantics (AC: 1, 2, 3)
+  - [x] Restore `current_available` within the same transaction as the booking expiration state change.
+  - [x] Publish lot updates through the same canonical availability channel used by the rest of the system after successful commit.
+  - [x] Prevent any double-release path when a booking was already cancelled or already converted into a session.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for successful expiration, non-eligible booking skip behavior, exact-once capacity restoration, and post-commit availability publication.
-  - [ ] Add tests for worker/scheduler registration or equivalent proof that the expiration job is wired into the backend execution path.
-  - [ ] Verify with backend Docker tests; Flutter verification is only required if Driver-visible expired-state UI contracts change in Story 7.1 surfaces.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for successful expiration, non-eligible booking skip behavior, exact-once capacity restoration, and post-commit availability publication.
+  - [x] Add tests for worker/scheduler registration or equivalent proof that the expiration job is wired into the backend execution path.
+  - [x] Verify with backend Docker tests; Flutter verification is only required if Driver-visible expired-state UI contracts change in Story 7.1 surfaces.
 
 ## Dev Notes
 
@@ -142,13 +142,26 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story creation anchored on Epic 7 planning, PRD booking expiry requirements, architecture scheduling rules, tech-design background-work guidance, existing ARQ scaffolding, and canonical availability publication patterns from Epic 5.
+- Added a shared booking expiration service that expires stale confirmed bookings in batches, restores held capacity exactly once, and publishes canonical lot-availability updates only after commit.
+- Wired the expiration path into the existing ARQ worker scaffold with a cron job so no-show expiry is backend-managed instead of client-managed.
+- Extended booking reads so expired reservations surface explicit `EXPIRED` status and no longer look active forever.
+- Updated the lot-details booking UI to show expired booking state cleanly and still allow immediate rebooking from the same scanner-free driver surface.
+- Verified the story with focused backend Docker suites plus related availability regression and focused Flutter widget regressions.
 
 ### File List
 
+- `backend/src/app/services/booking_service.py`
+- `backend/src/app/api/v1/bookings.py`
+- `backend/src/app/core/worker/functions.py`
+- `backend/src/app/core/worker/settings.py`
+- `backend/tests/test_bookings.py`
+- `backend/tests/test_booking_expiration.py`
+- `backend/tests/test_worker_settings.py`
+- `mobile/lib/src/features/lot_details/presentation/lot_details_sheet.dart`
+- `mobile/test/lot_details_booking_test.dart`
 - `_bmad-output/implementation-artifacts/7-3-auto-expire-no-show-bookings.md`
 
 ### Change Log
 
+- 2026-03-28: Implemented Story 7.3 with ARQ-backed booking expiration, exact-once capacity restoration, expired-state booking reads, and driver lot-details expired-booking UI coverage.
 - 2026-03-28: Created Story 7.3 implementation artifact for backend-managed automatic expiration of no-show bookings.

@@ -3,19 +3,29 @@ from typing import cast
 
 from arq.cli import watch_reload
 from arq.connections import RedisSettings
+from arq.cron import cron
 from arq.typing import WorkerSettingsType
 from arq.worker import check_health, run_worker
 
 from ...core.config import settings
 from ...core.logger import logging  # noqa: F401
-from .functions import on_job_end, on_job_start, sample_background_task, shutdown, startup
+from .functions import expire_no_show_bookings, on_job_end, on_job_start, sample_background_task, shutdown, startup
 
 REDIS_QUEUE_HOST = settings.REDIS_QUEUE_HOST
 REDIS_QUEUE_PORT = settings.REDIS_QUEUE_PORT
 
 
 class WorkerSettings:
-    functions = [sample_background_task]
+    functions = [sample_background_task, expire_no_show_bookings]
+    cron_jobs = [
+        cron(
+            expire_no_show_bookings,
+            second=0,
+            microsecond=0,
+            keep_result=0,
+            max_tries=1,
+        )
+    ]
     redis_settings = RedisSettings(host=REDIS_QUEUE_HOST, port=REDIS_QUEUE_PORT)
     on_startup = startup
     on_shutdown = shutdown
