@@ -72,7 +72,7 @@ development_status:
   6-3-force-close-timeout-session: done
   6-4-zero-trust-shift-handover: done
   6-5-close-final-shift-of-day: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
   epic-7: backlog
   7-1-driver-pre-books-parking-spot: backlog
   7-2-attendant-scans-pre-booked-check-in: backlog
