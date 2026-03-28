@@ -78,8 +78,8 @@ development_status:
   7-2-attendant-scans-pre-booked-check-in: review
   7-3-auto-expire-no-show-bookings: review
   epic-7-retrospective: optional
-  epic-8: backlog
-  8-1-create-lease-contract: backlog
+  epic-8: in-progress
+  8-1-create-lease-contract: ready-for-dev
   8-2-owner-revenue-dashboard: backlog
   8-3-operator-revenue-dashboard: backlog
   epic-8-retrospective: optional
