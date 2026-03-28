@@ -1,6 +1,6 @@
 # Story 6.3: Force Close/Timeout Session
 
-Status: review
+Status: done
 
 ## Story
 
@@ -43,6 +43,11 @@ so that lot occupancy remains accurate.
   - [x] Add backend tests for attendant authorization, timeout transition rules, atomic capacity release, and audit-record persistence.
   - [x] Add Flutter tests for the active-session administrative list, required-reason validation, and successful state refresh.
   - [x] Verify with backend Docker tests and local `flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Timeout endpoint leaks cross-lot session existence before rejecting unauthorized attendants [backend/src/app/api/v1/sessions.py:521]
+- [x] [Review][Patch] TIMEOUT sessions never appear in driver history because the query still filters only CHECKED_OUT [backend/src/app/api/v1/sessions.py:316]
 
 ## Dev Notes
 
@@ -128,6 +133,7 @@ GPT-5.4
 - Added a separate attendant administrative flow for stale-session handling from the app bar, keeping timeout correction out of the fast scanner workflow while refreshing Story 6.1 occupancy stats after success.
 - Added focused backend and Flutter coverage for active-session visibility, required-reason validation, timeout success, and state refresh.
 - Validation passed with `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/attendant_timeout_session_test.dart test/attendant_check_in_screen_test.dart test/attendant_check_out_screen_test.dart test/attendant_check_out_finalize_test.dart test/attendant_walk_in_check_in_test.dart test/widget_test.dart`, and `cd mobile && flutter test`.
+- Epic 6 review follow-up removed cross-lot session enumeration from the timeout endpoint and restored `TIMEOUT` sessions to the driver history read path with regression coverage.
 
 ### File List
 
@@ -150,3 +156,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 6.3 implementation artifact for attendant timeout handling of stale parking sessions.
 - 2026-03-28: Implemented Story 6.3 with attendant active-session visibility, timeout mutation and audit logging, administrative mobile timeout flow, and full backend/mobile regression validation.
+- 2026-03-28: Resolved Epic 6 review findings for timeout authorization leakage and missing `TIMEOUT` visibility in driver history.

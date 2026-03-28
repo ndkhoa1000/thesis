@@ -378,6 +378,11 @@ class TestPublicParkingLots:
         assert len(result.announcements) == 1
         assert result.announcements[0].title == "Thong bao dang hien thi"
 
+        announcements_query = mock_db.execute.await_args_list[5].args[0]
+        query_text = str(announcements_query)
+        assert "visible_from" in query_text
+        assert "visible_until" in query_text
+
     @pytest.mark.asyncio
     async def test_read_public_lot_detail_rejects_missing_or_inaccessible_lot(self, mock_db):
         lot_result = MagicMock()

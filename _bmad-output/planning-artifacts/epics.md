@@ -421,6 +421,17 @@ N/A
 * **Then** the shift is locked and transferred if the physical cash matches.
 * **And (UX)** if there is a mismatch, the incoming attendant must submit a Mandatory Discrepancy Report via a Full-Screen hard-blocking modal (Red warning UI) that requires a text rationale before proceeding.
 
+#### Story 6.5: Close Final Shift of Day
+**As an** Attendant,
+**I want** to submit the lot's final shift of the day for operator close-out after the lot is empty,
+**So that** day-end financial accountability is completed without abusing the QR handover flow.
+
+**Acceptance Criteria:**
+* **Given** I am on the final active shift of the day for my lot
+* **When** I start day-end close-out
+* **Then** the system uses a dedicated final-shift flow instead of QR handover, verifies the lot is empty, auto-settles the shift's cash total, and creates an operator-facing close-out alert.
+* **And** the responsible Operator can explicitly complete the final shift close-out from the management workspace.
+
 ### Epic 7: Advance Booking System
 **Goal:** Drivers can pre-book a spot with automatic expiration.
 **FRs covered:** FR4, FR5, FR6, FR7

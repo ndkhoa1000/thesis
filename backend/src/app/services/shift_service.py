@@ -42,6 +42,27 @@ async def get_open_shift(
         select(Shift)
         .where(
             Shift.attendant_id == attendant_id,
+            Shift.status == ShiftStatus.OPEN.value,
+        )
+        .order_by(Shift.started_at.desc(), Shift.id.desc())
+        .limit(1)
+    )
+    if for_update:
+        query = query.with_for_update()
+    result = await db.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def get_current_shift(
+    db: AsyncSession,
+    attendant_id: int,
+    *,
+    for_update: bool = False,
+) -> Shift | None:
+    query = (
+        select(Shift)
+        .where(
+            Shift.attendant_id == attendant_id,
             Shift.status.in_([ShiftStatus.OPEN.value, ShiftStatus.HANDOVER_PENDING.value]),
         )
         .order_by(Shift.started_at.desc(), Shift.id.desc())
@@ -59,7 +80,7 @@ async def get_or_create_open_shift(
     *,
     started_at: datetime | None = None,
 ) -> Shift:
-    shift = await get_open_shift(db, attendant.id, for_update=True)
+    shift = await get_current_shift(db, attendant.id, for_update=True)
     if shift is not None:
         if shift.status == ShiftStatus.HANDOVER_PENDING.value:
             raise BadRequestException("Current shift is already pending handover.")
@@ -102,6 +123,7 @@ async def calculate_expected_cash(
 def build_shift_handover_token(
     *,
     shift: Shift,
+    outgoing_attendant_user_id: int,
     expected_cash: float,
     expires_at: datetime,
 ) -> str:
@@ -110,6 +132,7 @@ def build_shift_handover_token(
         "shift_id": shift.id,
         "parking_lot_id": shift.parking_lot_id,
         "outgoing_attendant_id": shift.attendant_id,
+        "outgoing_attendant_user_id": outgoing_attendant_user_id,
         "expected_cash": expected_cash,
         "exp": expires_at.replace(tzinfo=None),
     }
@@ -134,11 +157,13 @@ def decode_shift_handover_token(token: str) -> dict[str, int | float]:
     shift_id = payload.get("shift_id")
     parking_lot_id = payload.get("parking_lot_id")
     outgoing_attendant_id = payload.get("outgoing_attendant_id")
+    outgoing_attendant_user_id = payload.get("outgoing_attendant_user_id")
     expected_cash = payload.get("expected_cash")
     if (
         not isinstance(shift_id, int)
         or not isinstance(parking_lot_id, int)
         or not isinstance(outgoing_attendant_id, int)
+        or not isinstance(outgoing_attendant_user_id, int)
     ):
         raise BadRequestException("Invalid shift handover QR. Please generate a new one.")
     if not isinstance(expected_cash, (int, float)):
@@ -148,6 +173,7 @@ def decode_shift_handover_token(token: str) -> dict[str, int | float]:
         "shift_id": shift_id,
         "parking_lot_id": parking_lot_id,
         "outgoing_attendant_id": outgoing_attendant_id,
+        "outgoing_attendant_user_id": outgoing_attendant_user_id,
         "expected_cash": float(expected_cash),
     }
 

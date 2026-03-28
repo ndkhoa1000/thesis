@@ -153,13 +153,16 @@ class TestAttendantShiftHandoverStart:
         mock_db.add.assert_not_called()
         mock_db.commit.assert_awaited_once()
 
+        token_payload = jwt.get_unverified_claims(result.token)
+        assert token_payload['outgoing_attendant_user_id'] == 51
+
         aggregation_query = mock_db.execute.await_args_list[3].args[0]
         compiled = aggregation_query.compile()
         assert compiled.params['payment_method_1'] == 'CASH'
         assert compiled.params['payment_status_1'] == 'COMPLETED'
 
     @pytest.mark.asyncio
-    async def test_flushes_new_shift_before_building_qr_token(self, mock_db, monkeypatch):
+    async def test_rejects_handover_without_active_shift(self, mock_db, monkeypatch):
         monkeypatch.setattr('src.app.api.v1.shifts._utcnow', lambda: NOW)
 
         attendant_result = MagicMock()
@@ -168,31 +171,16 @@ class TestAttendantShiftHandoverStart:
         lot_result.scalar_one_or_none.return_value = _make_lot()
         shift_result = MagicMock()
         shift_result.scalar_one_or_none.return_value = None
-        expected_cash_result = MagicMock()
-        expected_cash_result.scalar_one.return_value = 0
 
-        created_records: list[object] = []
-
-        def track_add(record):
-            created_records.append(record)
-
-        async def assign_shift_id():
-            created_shift = next(item for item in created_records if isinstance(item, Shift))
-            created_shift.id = 23
-
-        mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, shift_result, expected_cash_result]
-        )
-        mock_db.add = Mock(side_effect=track_add)
-        mock_db.flush = AsyncMock(side_effect=assign_shift_id)
+        mock_db.execute = AsyncMock(side_effect=[attendant_result, lot_result, shift_result])
+        mock_db.add = Mock()
         mock_db.commit = AsyncMock()
 
-        result = await create_attendant_shift_handover(Mock(), _attendant_user(), mock_db)
+        with pytest.raises(BadRequestException, match='No active shift found to hand over'):
+            await create_attendant_shift_handover(Mock(), _attendant_user(), mock_db)
 
-        token_payload = jwt.get_unverified_claims(result.token)
-        assert result.shift_id == 23
-        assert token_payload['shift_id'] == 23
-        mock_db.flush.assert_awaited_once()
+        mock_db.add.assert_not_called()
+        mock_db.commit.assert_not_awaited()
 
 
 class TestAttendantShiftHandoverFinalize:
@@ -218,6 +206,7 @@ class TestAttendantShiftHandoverFinalize:
 
         token = build_shift_handover_token(
             shift=outgoing_shift,
+            outgoing_attendant_user_id=51,
             expected_cash=85000,
             expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
@@ -265,6 +254,7 @@ class TestAttendantShiftHandoverFinalize:
 
         token = build_shift_handover_token(
             shift=outgoing_shift,
+            outgoing_attendant_user_id=51,
             expected_cash=85000,
             expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
@@ -330,6 +320,66 @@ class TestAttendantShiftHandoverFinalize:
         assert result.expected_cash == 85000
         assert result.actual_cash == 80000
 
+    @pytest.mark.asyncio
+    async def test_rejects_incoming_attendant_with_pending_shift(self, mock_db, monkeypatch):
+        monkeypatch.setattr('src.app.api.v1.shifts._utcnow', lambda: NOW)
+
+        incoming_attendant_result = MagicMock()
+        incoming_attendant_result.scalar_one_or_none.return_value = _make_attendant(attendant_id=9, user_id=61)
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = _make_lot()
+        outgoing_shift = _make_shift(
+            shift_id=17,
+            attendant_id=7,
+            started_at=datetime(2026, 3, 28, 6, 0, tzinfo=UTC),
+            ended_at=datetime(2026, 3, 28, 8, 45, tzinfo=UTC),
+            status=ShiftStatus.HANDOVER_PENDING.value,
+        )
+        outgoing_shift_result = MagicMock()
+        outgoing_shift_result.scalar_one_or_none.return_value = outgoing_shift
+        expected_cash_result = MagicMock()
+        expected_cash_result.scalar_one.return_value = 85000
+        incoming_shift_result = MagicMock()
+        incoming_shift_result.scalar_one_or_none.return_value = _make_shift(
+            shift_id=29,
+            parking_lot_id=13,
+            attendant_id=9,
+            status=ShiftStatus.HANDOVER_PENDING.value,
+        )
+
+        token = build_shift_handover_token(
+            shift=outgoing_shift,
+            outgoing_attendant_user_id=51,
+            expected_cash=85000,
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
+        )
+
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                incoming_attendant_result,
+                lot_result,
+                outgoing_shift_result,
+                expected_cash_result,
+                incoming_shift_result,
+            ]
+        )
+        mock_db.add = Mock()
+        mock_db.commit = AsyncMock()
+
+        with pytest.raises(BadRequestException, match='already has a shift pending handover'):
+            await finalize_attendant_shift_handover(
+                Mock(),
+                AttendantShiftHandoverFinalizeCreate(
+                    token=token,
+                    actual_cash=85000,
+                ),
+                _attendant_user(user_id=61),
+                mock_db,
+            )
+
+        mock_db.add.assert_not_called()
+        mock_db.commit.assert_not_awaited()
+
 
 class TestShiftHandoverTokenValidation:
     def test_rejects_expired_shift_handover_token(self):
@@ -342,6 +392,7 @@ class TestShiftHandoverTokenValidation:
         )
         expired_token = build_shift_handover_token(
             shift=outgoing_shift,
+            outgoing_attendant_user_id=51,
             expected_cash=85000,
             expires_at=datetime.now(UTC) - timedelta(minutes=5),
         )

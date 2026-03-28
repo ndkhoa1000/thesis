@@ -32,7 +32,15 @@ DateTime? _parseAnnouncementDateTime(String value) {
       minute == null) {
     return null;
   }
-  return DateTime(year, month, day, hour, minute);
+  final parsed = DateTime(year, month, day, hour, minute);
+  if (parsed.year != year ||
+      parsed.month != month ||
+      parsed.day != day ||
+      parsed.hour != hour ||
+      parsed.minute != minute) {
+    return null;
+  }
+  return parsed;
 }
 
 String _announcementTypeLabel(String type) => switch (type) {

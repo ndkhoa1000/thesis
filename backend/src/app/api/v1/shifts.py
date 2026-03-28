@@ -27,7 +27,7 @@ from ...services.shift_service import (
     build_shift_handover_token,
     calculate_expected_cash,
     decode_shift_handover_token,
-    get_open_shift,
+    get_current_shift,
     get_operator_recipients_for_lot,
 )
 
@@ -89,16 +89,11 @@ async def create_attendant_shift_handover(
     attendant = await _get_attendant_for_user(db, current_user)
     await _get_attendant_lot(db, attendant, for_update=True)
 
-    shift = await get_open_shift(db, attendant.id, for_update=True)
+    shift = await get_current_shift(db, attendant.id, for_update=True)
     if shift is None:
-        shift = Shift(
-            parking_lot_id=attendant.parking_lot_id,
-            attendant_id=attendant.id,
-            started_at=_utcnow(),
-            status=ShiftStatus.OPEN.value,
+        raise BadRequestException(
+            "No active shift found to hand over. Use the daily close-out flow if this is the last shift of the day."
         )
-        db.add(shift)
-        await db.flush()
 
     if shift.status == ShiftStatus.LOCKED.value:
         raise BadRequestException("Current shift is already locked")
@@ -113,6 +108,7 @@ async def create_attendant_shift_handover(
     expires_at = _utcnow() + SHIFT_HANDOVER_TOKEN_TTL
     token = build_shift_handover_token(
         shift=shift,
+        outgoing_attendant_user_id=attendant.user_id,
         expected_cash=expected_cash,
         expires_at=expires_at,
     )
@@ -157,13 +153,17 @@ async def finalize_attendant_shift_handover(
     if outgoing_shift.status != ShiftStatus.HANDOVER_PENDING.value:
         raise BadRequestException("Outgoing shift is not pending handover")
 
-    expected_cash = await calculate_expected_cash(db, outgoing_shift, int(token_payload["outgoing_attendant_id"]))
+    expected_cash = await calculate_expected_cash(
+        db,
+        outgoing_shift,
+        int(token_payload["outgoing_attendant_user_id"]),
+    )
     discrepancy_flagged = abs(payload.actual_cash - expected_cash) > 0.009
     discrepancy_reason = (payload.discrepancy_reason or "").strip() or None
     if discrepancy_flagged and not discrepancy_reason:
         raise BadRequestException("Discrepancy reason is required before completing handover.")
 
-    incoming_shift = await get_open_shift(db, incoming_attendant.id, for_update=True)
+    incoming_shift = await get_current_shift(db, incoming_attendant.id, for_update=True)
     if incoming_shift is None:
         incoming_shift = Shift(
             parking_lot_id=lot.id,
@@ -173,6 +173,10 @@ async def finalize_attendant_shift_handover(
         )
         db.add(incoming_shift)
         await db.flush()
+    elif incoming_shift.status != ShiftStatus.OPEN.value:
+        raise BadRequestException(
+            "Incoming attendant already has a shift pending handover and must close it before receiving a new shift."
+        )
 
     outgoing_shift.status = ShiftStatus.LOCKED.value
     if outgoing_shift.ended_at is None:

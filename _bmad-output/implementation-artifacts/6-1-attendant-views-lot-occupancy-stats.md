@@ -1,6 +1,6 @@
 # Story 6.1: Attendant Views Lot Occupancy Stats
 
-Status: review
+Status: done
 
 ## Story
 
@@ -144,3 +144,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 6.1 implementation artifact for backend-owned attendant occupancy stats.
 - 2026-03-28: Implemented Story 6.1 with an attendant occupancy summary endpoint, mobile occupancy panel, scroll-safe attendant layout updates, and full backend/mobile regression validation.
+- 2026-03-28: Epic 6 code review completed with no remaining action items for Story 6.1.

@@ -344,7 +344,12 @@ async def list_driver_parking_history(
         .outerjoin(Payment, Payment.id == latest_payment_subquery.c.payment_id)
         .where(
             ParkingSession.driver_id == driver.id,
-            ParkingSession.status == SessionStatus.CHECKED_OUT.value,
+            ParkingSession.status.in_(
+                [
+                    SessionStatus.CHECKED_OUT.value,
+                    SessionStatus.TIMEOUT.value,
+                ]
+            ),
         )
         .order_by(ParkingSession.checkout_time.desc(), ParkingSession.id.desc())
     )
@@ -517,15 +522,13 @@ async def attendant_force_close_timeout(
     session_result = await db.execute(
         select(ParkingSession)
         .where(ParkingSession.id == payload.session_id)
+        .where(ParkingSession.parking_lot_id == parking_lot.id)
         .limit(1)
         .with_for_update()
     )
     session = session_result.scalar_one_or_none()
     if session is None:
         raise NotFoundException("Parking session not found")
-
-    if session.parking_lot_id != parking_lot.id:
-        raise BadRequestException("This session belongs to a different parking lot")
 
     if session.status == SessionStatus.TIMEOUT.value:
         raise BadRequestException("This parking session has already been force-closed.")

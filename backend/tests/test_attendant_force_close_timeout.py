@@ -9,7 +9,7 @@ from src.app.api.v1.sessions import (
     attendant_force_close_timeout,
     get_attendant_active_sessions,
 )
-from src.app.core.exceptions.http_exceptions import BadRequestException, ForbiddenException
+from src.app.core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
 from src.app.models.enums import SessionStatus
 from src.app.models.parking import ParkingLot, ParkingLotConfig
 from src.app.models.sessions import ParkingSession, SessionEdit
@@ -224,3 +224,37 @@ class TestAttendantForceCloseTimeout:
 
         assert lot.current_available == 12
         assert result.current_available == 12
+
+    @pytest.mark.asyncio
+    async def test_hides_cross_lot_session_existence_from_attendants(self, mock_db):
+        attendant_result = MagicMock()
+        attendant_result.scalar_one_or_none.return_value = _make_attendant()
+
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = _make_lot()
+
+        config_result = MagicMock()
+        config_result.scalar_one_or_none.return_value = _make_config(total_capacity=12)
+
+        session_result = MagicMock()
+        session_result.scalar_one_or_none.return_value = None
+
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, config_result, session_result]
+        )
+        mock_db.add = Mock()
+        mock_db.commit = AsyncMock()
+
+        with pytest.raises(NotFoundException, match='Parking session not found'):
+            await attendant_force_close_timeout(
+                Mock(),
+                AttendantForceCloseTimeoutCreate(
+                    session_id=999,
+                    reason='Session nay khong thuoc bai dang truc.',
+                ),
+                _attendant_user(),
+                mock_db,
+            )
+
+        mock_db.add.assert_not_called()
+        mock_db.commit.assert_not_awaited()

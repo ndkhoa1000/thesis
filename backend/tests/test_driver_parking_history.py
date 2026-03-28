@@ -8,6 +8,7 @@ import pytest
 from src.app.api.v1.sessions import list_driver_parking_history
 from src.app.core.exceptions.http_exceptions import ForbiddenException
 from src.app.models.financials import Payment
+from src.app.models.enums import SessionStatus
 from src.app.models.parking import ParkingLot
 from src.app.models.sessions import ParkingSession
 from src.app.models.users import Driver
@@ -45,6 +46,7 @@ def _make_session(
     license_plate: str = '59A-88888',
     vehicle_type: str = 'CAR',
     duration_minutes: int = 90,
+    status: str = SessionStatus.CHECKED_OUT.value,
 ) -> ParkingSession:
     session = MagicMock(spec=ParkingSession)
     session.id = session_id
@@ -54,7 +56,7 @@ def _make_session(
     session.vehicle_type = vehicle_type
     session.checkin_time = checked_out_at - timedelta(minutes=duration_minutes)
     session.checkout_time = checked_out_at
-    session.status = 'CHECKED_OUT'
+    session.status = status
     return session
 
 
@@ -124,6 +126,36 @@ class TestDriverParkingHistory:
         result = await list_driver_parking_history(Mock(), _driver_user(), mock_db)
 
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_includes_timeout_sessions_in_driver_history(self, mock_db):
+        driver_result = MagicMock()
+        driver_result.scalar_one_or_none.return_value = _make_driver(driver_id=9)
+        timeout_at = datetime.now(UTC) - timedelta(hours=3)
+        history_result = MagicMock()
+        history_result.all.return_value = [
+            (
+                _make_session(
+                    session_id=111,
+                    parking_lot_id=15,
+                    driver_id=9,
+                    checked_out_at=timeout_at,
+                    duration_minutes=45,
+                    status=SessionStatus.TIMEOUT.value,
+                ),
+                _make_lot(15, 'Bai xe Le Thanh Ton'),
+                None,
+            ),
+        ]
+
+        mock_db.execute = AsyncMock(side_effect=[driver_result, history_result])
+
+        result = await list_driver_parking_history(Mock(), _driver_user(), mock_db)
+
+        assert len(result) == 1
+        assert result[0].session_id == 111
+        assert result[0].amount_paid is None
+        assert result[0].payment_method is None
 
     @pytest.mark.asyncio
     async def test_rejects_non_driver_account(self, mock_db):

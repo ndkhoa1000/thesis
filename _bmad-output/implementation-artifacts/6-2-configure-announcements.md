@@ -1,6 +1,6 @@
 # Story 6.2: Configure Announcements
 
-Status: review
+Status: done
 
 ## Story
 
@@ -41,6 +41,12 @@ so that drivers see important notices.
   - [x] Add backend tests for operator authorization, visibility-window filtering, and lot-detail announcement projection.
   - [x] Add Flutter tests for operator announcement configuration UI and driver lot-detail rendering.
   - [x] Verify with backend Docker tests and local `flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Invalid calendar inputs are silently normalized instead of rejected [mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart:15]
+- [x] [Review][Patch] Visibility-window behavior is under-tested end-to-end for future and expired announcements [backend/tests/test_parking_lots.py:343]
+- [x] [Review][Patch] Driver announcement rendering is only covered for the visible happy path, not hidden-window regressions [mobile/test/map_discovery_screen_test.dart:246]
 
 ## Dev Notes
 
@@ -125,6 +131,7 @@ GPT-5.4
 - Added a management sheet in the operator workspace for creating and updating lot-scoped announcements with title, content, type, and visibility window fields, while preserving the existing bright management UI.
 - Added an announcement section to the driver lot-details sheet and kept ordering deterministic by sorting the backend response by `visible_from` descending and `id` descending.
 - Validation passed with `cd backend && docker compose run --rm pytest`, `cd mobile && flutter test test/map_discovery_screen_test.dart test/widget_test.dart`, and `cd mobile && flutter test`.
+- Epic 6 review follow-up hardened announcement scheduling by rejecting impossible calendar dates and expanded backend/mobile regression coverage around announcement visibility windows and hidden states.
 
 ### File List
 
@@ -145,3 +152,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 6.2 implementation artifact for operator-managed lot announcements shown in driver lot details.
 - 2026-03-28: Implemented Story 6.2 with operator announcement management endpoints, mobile operator announcement configuration UI, driver lot-detail announcement rendering, and full backend/mobile regression validation.
+- 2026-03-28: Resolved Epic 6 review findings for invalid announcement date input handling and announcement visibility coverage gaps.

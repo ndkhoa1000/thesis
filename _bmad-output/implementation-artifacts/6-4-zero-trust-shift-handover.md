@@ -1,6 +1,6 @@
 # Story 6.4: Zero-Trust Shift Handover
 
-Status: review
+Status: done
 
 ## Story
 
@@ -46,6 +46,12 @@ so that financial accountability is strictly enforced.
   - [x] Add backend tests for expected-cash calculation, shift locking, discrepancy persistence, and operator alert creation.
   - [x] Add Flutter tests for QR handover happy path and hard-blocking discrepancy UX behavior.
   - [x] Verify with backend Docker tests and local `flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Shift lifecycle must distinguish attendant-to-attendant handover from last-shift-of-day close-out — do not fabricate a zero-duration shift for handover; if this is the final shift of the day, the flow should settle cash, verify the lot is empty, and notify the operator that the last daily shift can be closed.
+- [x] [Review][Patch] Handover finalize recomputes expected cash with the attendant profile id instead of the payment processor user id [backend/src/app/api/v1/shifts.py:160]
+- [x] [Review][Patch] Incoming attendants can finalize onto an existing HANDOVER_PENDING shift instead of receiving a fresh OPEN shift [backend/src/app/api/v1/shifts.py:166]
 
 ## Dev Notes
 
@@ -134,6 +140,7 @@ GPT-5.4
 - Extended the attendant mobile workspace with an app-bar driven shift handover sheet that generates Shift QR payloads, scans incoming handover QR tokens, captures actual cash, and forces a non-dismissible discrepancy rationale flow before completion.
 - Added an operator-facing in-app discrepancy alert surface to the existing lot-management screen instead of introducing a new push-notification channel.
 - Validation passed with `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/shift_handover_test.dart test/attendant_check_in_screen_test.dart test/attendant_check_out_screen_test.dart test/attendant_check_out_finalize_test.dart test/attendant_walk_in_check_in_test.dart test/attendant_timeout_session_test.dart test/widget_test.dart`, and `cd mobile && flutter test`.
+- Epic 6 review follow-up prevented synthetic zero-duration handover shifts, aligned handover cash reconciliation with the checkout payment processor identity, and blocked incoming attendants from reusing a shift that is already pending handover.
 
 ### File List
 
@@ -167,3 +174,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 6.4 implementation artifact for zero-trust attendant shift handover.
 - 2026-03-28: Implemented Story 6.4 with backend shift/handover domain support, signed QR handover APIs, hard-blocking discrepancy UX, operator alert visibility, and full backend/mobile regression validation.
+- 2026-03-28: Resolved Epic 6 review findings for shift handover lifecycle, expected-cash reconciliation identity, and incoming-shift state validation.

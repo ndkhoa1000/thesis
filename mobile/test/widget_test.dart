@@ -2262,6 +2262,69 @@ void main() {
     expect(find.text('Bao tri cong 2'), findsNothing);
   });
 
+  testWidgets('Operator workspace rejects impossible announcement dates', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 24,
+          leaseId: 12,
+          lotOwnerId: 5,
+          name: 'Bai xe Hai Ba Trung',
+          address: '88 Hai Ba Trung, Quan 1',
+          latitude: 10.779,
+          longitude: 106.703,
+          currentAvailable: 7,
+          status: 'APPROVED',
+          occupiedCount: 5,
+          totalCapacity: 12,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 15000,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Thông báo'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Tạo thông báo'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tiêu đề'),
+      'Thong bao ngay sai',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Bắt đầu hiển thị (YYYY-MM-DD HH:mm)'),
+      '2026-02-31 07:30',
+    );
+
+    final saveAnnouncementButton = find.widgetWithText(
+      FilledButton,
+      'Lưu thông báo',
+    );
+    await tester.ensureVisible(saveAnnouncementButton);
+    await tester.tap(saveAnnouncementButton);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nhập theo định dạng YYYY-MM-DD HH:mm'), findsOneWidget);
+    expect(find.text('Thong bao ngay sai'), findsOneWidget);
+  });
+
   testWidgets('Operator workspace floors available slots at zero', (
     WidgetTester tester,
   ) async {
