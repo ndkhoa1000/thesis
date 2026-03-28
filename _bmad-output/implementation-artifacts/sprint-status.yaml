@@ -60,11 +60,11 @@ development_status:
   4-5-attendant-scans-qr-for-check-out-calculates-fee: done
   4-6-record-payment-finalize-session: done
   epic-4-retrospective: done
-  epic-5: backlog
-  5-1-view-interactive-map-lots: backlog
-  5-2-view-lot-details-availability: backlog
-  5-3-driver-parking-history: backlog
-  5-4-en-route-lot-capacity-alert: backlog
+  epic-5: in-progress
+  5-1-view-interactive-map-lots: ready-for-dev
+  5-2-view-lot-details-availability: ready-for-dev
+  5-3-driver-parking-history: ready-for-dev
+  5-4-en-route-lot-capacity-alert: ready-for-dev
   epic-5-retrospective: optional
   epic-6: backlog
   6-1-attendant-views-lot-occupancy-stats: backlog
