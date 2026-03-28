@@ -91,6 +91,7 @@ class BookingStatus(str, enum.Enum):
 class SessionStatus(str, enum.Enum):
     CHECKED_IN = "CHECKED_IN"
     CHECKED_OUT = "CHECKED_OUT"
+    TIMEOUT = "TIMEOUT"
 
 
 class PayableType(str, enum.Enum):

@@ -45,6 +45,11 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }
 
   @override
+  Future<List<AttendantActiveSession>> getActiveSessions() async {
+    return const [];
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     lastScannedToken = token;
     if (errorMessage != null) {
@@ -82,6 +87,14 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
     required int sessionId,
     required String paymentMethod,
     required double quotedFinalFee,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
+    required int sessionId,
+    required String reason,
   }) async {
     throw UnimplementedError();
   }

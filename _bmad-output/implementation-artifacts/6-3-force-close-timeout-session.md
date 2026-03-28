@@ -1,6 +1,6 @@
 # Story 6.3: Force Close/Timeout Session
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -23,26 +23,26 @@ so that lot occupancy remains accurate.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add attendant-scoped active-session visibility for stale-session resolution (AC: 1)
-  - [ ] Expose a lot-scoped active session list for the current attendant, limited to their assigned lot.
-  - [ ] Include enough metadata to safely identify stale sessions without overexposing unrelated data.
-  - [ ] Keep this list aligned with Story 6.1 occupancy data so both views reflect the same backend source of truth.
+- [x] Task 1: Add attendant-scoped active-session visibility for stale-session resolution (AC: 1)
+  - [x] Expose a lot-scoped active session list for the current attendant, limited to their assigned lot.
+  - [x] Include enough metadata to safely identify stale sessions without overexposing unrelated data.
+  - [x] Keep this list aligned with Story 6.1 occupancy data so both views reflect the same backend source of truth.
 
-- [ ] Task 2: Implement the backend force-close timeout mutation with audit logging (AC: 2, 3)
-  - [ ] Before implementing the mutation, extend `SessionStatus` and all dependent schemas/clients to support `TIMEOUT` consistently.
-  - [ ] Add a dedicated attendant force-close endpoint for stale sessions.
-  - [ ] Require a human-entered reason and persist an audit trail capturing old/new values and actor identity.
-  - [ ] Release lot availability atomically and protect against double-release or duplicate timeout transitions.
+- [x] Task 2: Implement the backend force-close timeout mutation with audit logging (AC: 2, 3)
+  - [x] Before implementing the mutation, extend `SessionStatus` and all dependent schemas/clients to support `TIMEOUT` consistently.
+  - [x] Add a dedicated attendant force-close endpoint for stale sessions.
+  - [x] Require a human-entered reason and persist an audit trail capturing old/new values and actor identity.
+  - [x] Release lot availability atomically and protect against double-release or duplicate timeout transitions.
 
-- [ ] Task 3: Extend the mobile attendant experience for administrative timeout resolution (AC: 1, 2, 3)
-  - [ ] Add an off-peak administrative surface for viewing active sessions and force-closing a stale one.
-  - [ ] Collect the mandatory reason in a deliberate, explicit form flow rather than the high-speed gate scanner interaction zone.
-  - [ ] Refresh the attendant stats/session state after success so the lot no longer appears over-occupied.
+- [x] Task 3: Extend the mobile attendant experience for administrative timeout resolution (AC: 1, 2, 3)
+  - [x] Add an off-peak administrative surface for viewing active sessions and force-closing a stale one.
+  - [x] Collect the mandatory reason in a deliberate, explicit form flow rather than the high-speed gate scanner interaction zone.
+  - [x] Refresh the attendant stats/session state after success so the lot no longer appears over-occupied.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3)
-  - [ ] Add backend tests for attendant authorization, timeout transition rules, atomic capacity release, and audit-record persistence.
-  - [ ] Add Flutter tests for the active-session administrative list, required-reason validation, and successful state refresh.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3)
+  - [x] Add backend tests for attendant authorization, timeout transition rules, atomic capacity release, and audit-record persistence.
+  - [x] Add Flutter tests for the active-session administrative list, required-reason validation, and successful state refresh.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -123,10 +123,30 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Story context prepared for Epic 6 implementation.
-- Key guardrail: `TIMEOUT` requires explicit enum/schema support because the current codebase does not define it yet.
-- No `project-context.md` file was present in the repository at story creation time.
+- Extended the session domain with `SessionStatus.TIMEOUT` and added attendant-scoped backend contracts for listing active sessions and force-closing a stuck session with a required reason.
+- Implemented the timeout mutation in `sessions.py` with lot-scoped attendant authorization, duplicate-transition protection, `SessionEdit` audit logging, atomic availability release, and downstream availability event publication.
+- Added a separate attendant administrative flow for stale-session handling from the app bar, keeping timeout correction out of the fast scanner workflow while refreshing Story 6.1 occupancy stats after success.
+- Added focused backend and Flutter coverage for active-session visibility, required-reason validation, timeout success, and state refresh.
+- Validation passed with `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/attendant_timeout_session_test.dart test/attendant_check_in_screen_test.dart test/attendant_check_out_screen_test.dart test/attendant_check_out_finalize_test.dart test/attendant_walk_in_check_in_test.dart test/widget_test.dart`, and `cd mobile && flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/6-3-force-close-timeout-session.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/models/enums.py`
+- `backend/src/app/schemas/session.py`
+- `backend/tests/test_attendant_force_close_timeout.py`
+- `mobile/lib/src/features/attendant_check_in/data/attendant_check_in_service.dart`
+- `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
+- `mobile/test/attendant_check_in_screen_test.dart`
+- `mobile/test/attendant_check_out_finalize_test.dart`
+- `mobile/test/attendant_check_out_screen_test.dart`
+- `mobile/test/attendant_timeout_session_test.dart`
+- `mobile/test/attendant_walk_in_check_in_test.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-28: Created Story 6.3 implementation artifact for attendant timeout handling of stale parking sessions.
+- 2026-03-28: Implemented Story 6.3 with attendant active-session visibility, timeout mutation and audit logging, administrative mobile timeout flow, and full backend/mobile regression validation.

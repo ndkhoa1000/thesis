@@ -40,6 +40,11 @@ class FakeAttendantCheckOutFinalizeService implements AttendantCheckInService {
   }
 
   @override
+  Future<List<AttendantActiveSession>> getActiveSessions() async {
+    return const [];
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     throw UnimplementedError();
   }
@@ -90,6 +95,14 @@ class FakeAttendantCheckOutFinalizeService implements AttendantCheckInService {
           checkedOutAt: DateTime(2026, 3, 28, 10, 20),
           currentAvailable: 8,
         );
+  }
+
+  @override
+  Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
+    required int sessionId,
+    required String reason,
+  }) async {
+    throw UnimplementedError();
   }
 
   @override

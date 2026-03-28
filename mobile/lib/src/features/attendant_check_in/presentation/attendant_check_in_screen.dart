@@ -375,6 +375,20 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
     });
   }
 
+  Future<void> _openActiveSessionManagement() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ActiveSessionManagementSheet(
+        attendantCheckInService: widget.attendantCheckInService,
+        vehicleTypeLabel: _vehicleTypeLabel,
+        onTimeoutCompleted: () async {
+          await _reloadOccupancySummary(showLoading: false);
+        },
+      ),
+    );
+  }
+
   void _selectScannerFlow(_AttendantScannerFlow flow) {
     if (_isBusy) return;
     setState(() {
@@ -442,15 +456,20 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                 ? 'Quet ma check-out'
                 : 'Quét mã check-in',
           ),
-          actions: widget.onSignOut == null
-              ? null
-              : [
-                  IconButton(
-                    icon: const Icon(Icons.logout),
-                    tooltip: 'Đăng xuất',
-                    onPressed: widget.onSignOut,
-                  ),
-                ],
+          actions: [
+            IconButton(
+              key: const ValueKey('active-session-management-button'),
+              icon: const Icon(Icons.fact_check_outlined),
+              tooltip: 'Phien ton',
+              onPressed: _openActiveSessionManagement,
+            ),
+            if (widget.onSignOut != null)
+              IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Đăng xuất',
+                onPressed: widget.onSignOut,
+              ),
+          ],
         ),
         body: SafeArea(
           child: LayoutBuilder(
@@ -836,6 +855,331 @@ class _OccupancyFact extends StatelessWidget {
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActiveSessionManagementSheet extends StatefulWidget {
+  const _ActiveSessionManagementSheet({
+    required this.attendantCheckInService,
+    required this.vehicleTypeLabel,
+    required this.onTimeoutCompleted,
+  });
+
+  final AttendantCheckInService attendantCheckInService;
+  final String Function(String vehicleType) vehicleTypeLabel;
+  final Future<void> Function() onTimeoutCompleted;
+
+  @override
+  State<_ActiveSessionManagementSheet> createState() =>
+      _ActiveSessionManagementSheetState();
+}
+
+class _ActiveSessionManagementSheetState
+    extends State<_ActiveSessionManagementSheet> {
+  late Future<List<AttendantActiveSession>> _activeSessionsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    setState(() {
+      _activeSessionsFuture = widget.attendantCheckInService
+          .getActiveSessions();
+    });
+  }
+
+  String _elapsedLabel(int elapsedMinutes) {
+    if (elapsedMinutes < 60) {
+      return '$elapsedMinutes phut';
+    }
+    final hours = elapsedMinutes ~/ 60;
+    final minutes = elapsedMinutes % 60;
+    if (minutes == 0) {
+      return '$hours gio';
+    }
+    return '$hours gio $minutes phut';
+  }
+
+  Future<void> _openForceCloseForm(AttendantActiveSession session) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => _ForceCloseTimeoutFormSheet(
+        licensePlate: session.licensePlate,
+        onSubmit: (reason) async {
+          try {
+            final result = await widget.attendantCheckInService
+                .forceCloseTimeout(
+                  sessionId: session.sessionId,
+                  reason: reason,
+                );
+            if (!mounted || !sheetContext.mounted) {
+              return;
+            }
+            Navigator.of(sheetContext).pop();
+            await widget.onTimeoutCompleted();
+            _reload();
+            if (!mounted) {
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Da timeout phien ${result.licensePlate}. Con ${result.currentAvailable} cho trong bai.',
+                ),
+              ),
+            );
+          } on AttendantCheckInException catch (error) {
+            if (!sheetContext.mounted) {
+              return;
+            }
+            ScaffoldMessenger.of(sheetContext).showSnackBar(
+              SnackBar(
+                content: Text(error.message),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.9,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Phien dang gui',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Khu vuc xu ly phien ton va timeout thu cong cho bai xe hien tai.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Lam moi danh sach'),
+                ),
+              ),
+              Expanded(
+                child: FutureBuilder<List<AttendantActiveSession>>(
+                  future: _activeSessionsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              snapshot.error.toString(),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: _reload,
+                              child: const Text('Thu lai'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final sessions =
+                        snapshot.data ?? const <AttendantActiveSession>[];
+                    if (sessions.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Khong con phien dang gui nao can xu ly.',
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.only(top: 8),
+                      itemCount: sessions.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final session = sessions[index];
+                        return Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  session.licensePlate,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  widget.vehicleTypeLabel(session.vehicleType),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Dang gui: ${_elapsedLabel(session.elapsedMinutes)}',
+                                ),
+                                const SizedBox(height: 12),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: FilledButton.tonalIcon(
+                                    onPressed: () =>
+                                        _openForceCloseForm(session),
+                                    icon: const Icon(Icons.gpp_bad_outlined),
+                                    label: const Text('Timeout phien'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ForceCloseTimeoutFormSheet extends StatefulWidget {
+  const _ForceCloseTimeoutFormSheet({
+    required this.licensePlate,
+    required this.onSubmit,
+  });
+
+  final String licensePlate;
+  final Future<void> Function(String reason) onSubmit;
+
+  @override
+  State<_ForceCloseTimeoutFormSheet> createState() =>
+      _ForceCloseTimeoutFormSheetState();
+}
+
+class _ForceCloseTimeoutFormSheetState
+    extends State<_ForceCloseTimeoutFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.onSubmit(_reasonController.text.trim());
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Timeout phien ${widget.licensePlate}',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Nhap ly do bat buoc truoc khi giai phong suc chua cho phien bi ket.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _reasonController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Ly do timeout bat buoc',
+                  ),
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    if (trimmed.isEmpty) {
+                      return 'Ly do timeout la bat buoc';
+                    }
+                    if (trimmed.length < 5) {
+                      return 'Ly do timeout phai co it nhat 5 ky tu';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isSubmitting ? null : _submit,
+                    icon: const Icon(Icons.warning_amber_outlined),
+                    label: Text(
+                      _isSubmitting ? 'Dang xu ly...' : 'Xac nhan timeout',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -186,8 +186,74 @@ class AttendantCheckOutUndoResult {
   }
 }
 
+class AttendantActiveSession {
+  const AttendantActiveSession({
+    required this.sessionId,
+    required this.parkingLotId,
+    required this.licensePlate,
+    required this.vehicleType,
+    required this.checkedInAt,
+    required this.elapsedMinutes,
+  });
+
+  final int sessionId;
+  final int parkingLotId;
+  final String licensePlate;
+  final String vehicleType;
+  final DateTime checkedInAt;
+  final int elapsedMinutes;
+
+  factory AttendantActiveSession.fromJson(Map<String, dynamic> json) {
+    return AttendantActiveSession(
+      sessionId: json['session_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      licensePlate: json['license_plate'] as String,
+      vehicleType: json['vehicle_type'] as String,
+      checkedInAt: DateTime.parse(json['checked_in_at'] as String),
+      elapsedMinutes: json['elapsed_minutes'] as int? ?? 0,
+    );
+  }
+}
+
+class AttendantForceCloseTimeoutResult {
+  const AttendantForceCloseTimeoutResult({
+    required this.sessionId,
+    required this.parkingLotId,
+    required this.licensePlate,
+    required this.vehicleType,
+    required this.timeoutAt,
+    required this.currentAvailable,
+    required this.status,
+    required this.reason,
+  });
+
+  final int sessionId;
+  final int parkingLotId;
+  final String licensePlate;
+  final String vehicleType;
+  final DateTime timeoutAt;
+  final int currentAvailable;
+  final String status;
+  final String reason;
+
+  factory AttendantForceCloseTimeoutResult.fromJson(Map<String, dynamic> json) {
+    return AttendantForceCloseTimeoutResult(
+      sessionId: json['session_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      licensePlate: json['license_plate'] as String,
+      vehicleType: json['vehicle_type'] as String,
+      timeoutAt: DateTime.parse(json['timeout_at'] as String),
+      currentAvailable: json['current_available'] as int,
+      status: json['status'] as String,
+      reason: json['reason'] as String,
+    );
+  }
+}
+
 abstract class AttendantCheckInService {
   Future<AttendantOccupancySummary> getOccupancySummary();
+
+  Future<List<AttendantActiveSession>> getActiveSessions();
 
   Future<AttendantCheckInResult> checkInDriver({required String token});
 
@@ -205,6 +271,11 @@ abstract class AttendantCheckInService {
     required int sessionId,
     required String paymentMethod,
     required double quotedFinalFee,
+  });
+
+  Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
+    required int sessionId,
+    required String reason,
   });
 
   Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId});
@@ -253,6 +324,28 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         AttendantOccupancySummary.fromJson,
         'Phan hoi thong ke bai xe tu may chu khong hop le.',
       );
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<List<AttendantActiveSession>> getActiveSessions() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/sessions/attendant-active-sessions',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! List) {
+        throw const AttendantCheckInException(
+          'Phan hoi danh sach phien dang gui khong hop le.',
+        );
+      }
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(AttendantActiveSession.fromJson)
+          .toList(growable: false);
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }
@@ -351,6 +444,27 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         response.data,
         AttendantCheckOutFinalizeResult.fromJson,
         'Phan hoi finalize checkout tu may chu khong hop le.',
+      );
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
+    required int sessionId,
+    required String reason,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/sessions/attendant-force-close-timeout',
+        data: {'session_id': sessionId, 'reason': reason},
+        options: _authOptions,
+      );
+      return _parseResponse(
+        response.data,
+        AttendantForceCloseTimeoutResult.fromJson,
+        'Phan hoi timeout phien tu may chu khong hop le.',
       );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));

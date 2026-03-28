@@ -28,14 +28,17 @@ from ...models.enums import (
     VehicleType,
     VehicleTypeAll,
 )
-from ...models.sessions import ParkingSession
+from ...models.sessions import ParkingSession, SessionEdit
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
 from ...schemas.session import (
+    AttendantActiveSessionRead,
     AttendantOccupancySummaryRead,
     AttendantOccupancyVehicleBreakdownRead,
     AttendantCheckInCreate,
     AttendantCheckInRead,
+    AttendantForceCloseTimeoutCreate,
+    AttendantForceCloseTimeoutRead,
     AttendantCheckOutFinalizeCreate,
     AttendantCheckOutFinalizeRead,
     AttendantCheckOutUndoCreate,
@@ -59,6 +62,13 @@ WALK_IN_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "walk_in_c
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _normalize_timeout_reason(reason: str) -> str:
+    normalized = reason.strip()
+    if not normalized:
+        raise BadRequestException("Timeout reason is required")
+    return normalized
 
 
 async def _get_latest_attendant_lot_capacity_config(
@@ -446,6 +456,135 @@ async def get_attendant_occupancy_summary(
         free_count=free_count,
         occupied_count=occupied_count,
         vehicle_type_breakdown=vehicle_type_breakdown,
+    )
+
+
+@router.get(
+    "/sessions/attendant-active-sessions",
+    response_model=list[AttendantActiveSessionRead],
+    status_code=200,
+)
+async def get_attendant_active_sessions(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> list[AttendantActiveSessionRead]:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant)
+
+    active_sessions_result = await db.execute(
+        select(ParkingSession)
+        .where(
+            ParkingSession.parking_lot_id == parking_lot.id,
+            ParkingSession.status == SessionStatus.CHECKED_IN.value,
+        )
+        .order_by(ParkingSession.checkin_time.asc(), ParkingSession.id.asc())
+    )
+    active_sessions = list(active_sessions_result.scalars().all())
+
+    return [
+        AttendantActiveSessionRead(
+            session_id=session.id,
+            parking_lot_id=session.parking_lot_id,
+            license_plate=session.license_plate,
+            vehicle_type=session.vehicle_type,
+            checked_in_at=session.checkin_time,
+            elapsed_minutes=max(
+                int((_utcnow() - session.checkin_time).total_seconds() // 60),
+                0,
+            ),
+        )
+        for session in active_sessions
+    ]
+
+
+@router.post(
+    "/sessions/attendant-force-close-timeout",
+    response_model=AttendantForceCloseTimeoutRead,
+    status_code=200,
+)
+async def attendant_force_close_timeout(
+    request: Request,
+    payload: AttendantForceCloseTimeoutCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> AttendantForceCloseTimeoutRead:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
+    latest_config = await _get_latest_attendant_lot_capacity_config(db, parking_lot.id)
+
+    session_result = await db.execute(
+        select(ParkingSession)
+        .where(ParkingSession.id == payload.session_id)
+        .limit(1)
+        .with_for_update()
+    )
+    session = session_result.scalar_one_or_none()
+    if session is None:
+        raise NotFoundException("Parking session not found")
+
+    if session.parking_lot_id != parking_lot.id:
+        raise BadRequestException("This session belongs to a different parking lot")
+
+    if session.status == SessionStatus.TIMEOUT.value:
+        raise BadRequestException("This parking session has already been force-closed.")
+
+    if session.status != SessionStatus.CHECKED_IN.value:
+        raise BadRequestException("Only active parking sessions can be force-closed.")
+
+    timeout_reason = _normalize_timeout_reason(payload.reason)
+    timeout_at = _utcnow()
+    previous_status = session.status
+    previous_checkout_time = session.checkout_time
+    previous_attendant_checkout_id = session.attendant_checkout_id
+    previous_current_available = parking_lot.current_available
+
+    session.attendant_checkout_id = attendant.id
+    session.checkout_time = timeout_at
+    session.status = SessionStatus.TIMEOUT.value
+    if latest_config is None:
+        parking_lot.current_available += 1
+    else:
+        parking_lot.current_available = min(
+            parking_lot.current_available + 1,
+            max(latest_config.total_capacity, 0),
+        )
+
+    audit_record = SessionEdit(
+        session_id=session.id,
+        edited_by=attendant.id,
+        field_changed="status",
+        old_value=previous_status,
+        new_value=SessionStatus.TIMEOUT.value,
+        reason=timeout_reason,
+    )
+    db.add(audit_record)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        session.status = previous_status
+        session.checkout_time = previous_checkout_time
+        session.attendant_checkout_id = previous_attendant_checkout_id
+        parking_lot.current_available = previous_current_available
+        raise
+
+    publish_lot_availability_update(
+        parking_lot,
+        previous_current_available=previous_current_available,
+        source="attendant_force_close_timeout",
+    )
+
+    return AttendantForceCloseTimeoutRead(
+        session_id=session.id,
+        parking_lot_id=parking_lot.id,
+        license_plate=session.license_plate,
+        vehicle_type=session.vehicle_type,
+        timeout_at=timeout_at,
+        current_available=parking_lot.current_available,
+        status=session.status,
+        reason=timeout_reason,
     )
 
 

@@ -78,6 +78,37 @@ class AttendantOccupancySummaryRead(BaseModel):
     vehicle_type_breakdown: list[AttendantOccupancyVehicleBreakdownRead] = []
 
 
+class AttendantActiveSessionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    license_plate: str
+    vehicle_type: str
+    checked_in_at: datetime
+    elapsed_minutes: int = Field(ge=0)
+
+
+class AttendantForceCloseTimeoutCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: int = Field(gt=0)
+    reason: str = Field(min_length=5, max_length=255)
+
+
+class AttendantForceCloseTimeoutRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    license_plate: str
+    vehicle_type: str
+    timeout_at: datetime
+    current_available: int
+    status: str
+    reason: str
+
+
 class AttendantCheckOutPreviewCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
