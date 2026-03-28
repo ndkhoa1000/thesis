@@ -1,6 +1,6 @@
 # Story 6.5: Close Final Shift of Day
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -27,30 +27,30 @@ so that day-end financial accountability is completed without abusing the QR han
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add a dedicated backend final-shift close-out domain (AC: 1, 2, 3, 5)
-  - [ ] Introduce the minimum persistence needed to track a requested and completed day-end close-out separately from `ShiftHandover`.
-  - [ ] Lock the target shift once close-out is requested so no later checkout/payment mutation can alter the reconciled snapshot.
-  - [ ] Reject duplicate close-out requests and duplicate operator completions for the same shift.
+- [x] Task 1: Add a dedicated backend final-shift close-out domain (AC: 1, 2, 3, 5)
+  - [x] Introduce the minimum persistence needed to track a requested and completed day-end close-out separately from `ShiftHandover`.
+  - [x] Lock the target shift once close-out is requested so no later checkout/payment mutation can alter the reconciled snapshot.
+  - [x] Reject duplicate close-out requests and duplicate operator completions for the same shift.
 
-- [ ] Task 2: Implement attendant-side close-out initiation and lot-empty validation (AC: 1, 2, 3)
-  - [ ] Add an attendant API flow that starts final-shift close-out from the current active shift without creating a QR token.
-  - [ ] Recalculate expected cash server-side from existing payment/session data.
-  - [ ] Block the request if active sessions or occupancy inconsistencies still exist, and return actionable details.
+- [x] Task 2: Implement attendant-side close-out initiation and lot-empty validation (AC: 1, 2, 3)
+  - [x] Add an attendant API flow that starts final-shift close-out from the current active shift without creating a QR token.
+  - [x] Recalculate expected cash server-side from existing payment/session data.
+  - [x] Block the request if active sessions or occupancy inconsistencies still exist, and return actionable details.
 
-- [ ] Task 3: Implement operator review and completion flow (AC: 3, 4, 5)
-  - [ ] Reuse the operator notification/read surface from Story 6.4 for final-shift close-out alerts.
-  - [ ] Add an operator endpoint and management action to explicitly complete the final close-out.
-  - [ ] Keep lot ownership and active lease authorization strict for both attendants and operators.
+- [x] Task 3: Implement operator review and completion flow (AC: 3, 4, 5)
+  - [x] Reuse the operator notification/read surface from Story 6.4 for final-shift close-out alerts.
+  - [x] Add an operator endpoint and management action to explicitly complete the final close-out.
+  - [x] Keep lot ownership and active lease authorization strict for both attendants and operators.
 
-- [ ] Task 4: Extend mobile administrative UX for attendants and operators (AC: 1, 2, 3, 4)
-  - [ ] Add an off-peak attendant action for final-shift close-out that clearly differs from QR handover.
-  - [ ] Surface blocking validation when the lot is not empty, without mixing the flow into the high-speed gate scanner path.
-  - [ ] Add an operator-facing review card or detail sheet that can approve/complete the day-end close-out.
+- [x] Task 4: Extend mobile administrative UX for attendants and operators (AC: 1, 2, 3, 4)
+  - [x] Add an off-peak attendant action for final-shift close-out that clearly differs from QR handover.
+  - [x] Surface blocking validation when the lot is not empty, without mixing the flow into the high-speed gate scanner path.
+  - [x] Add an operator-facing review card or detail sheet that can approve/complete the day-end close-out.
 
-- [ ] Task 5: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for empty-lot validation, cash snapshot creation, duplicate-close-out prevention, and operator completion authorization.
-  - [ ] Add Flutter tests for attendant blocking states, operator close-out review, and successful completion feedback.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 5: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for empty-lot validation, cash snapshot creation, duplicate-close-out prevention, and operator completion authorization.
+  - [x] Add Flutter tests for attendant blocking states, operator close-out review, and successful completion feedback.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -147,10 +147,43 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story created as an Epic 6 follow-up to implement the previously agreed business rule separating day-end close-out from attendant handover.
-- Sprint tracker reopened Epic 6 and set Story 6.5 to `ready-for-dev`.
+- Added a dedicated `ShiftCloseOut` lifecycle with explicit requested/completed states, operator alert references, and close-out snapshot reads that stay separate from QR handover.
+- Implemented attendant and operator `/shifts/*` close-out endpoints, enforced empty-lot validation plus duplicate protection, and locked gate mutations behind a pending-final-close-out guard in session mutation routes.
+- Extended the attendant administrative sheet with a dedicated final-shift close-out action and added an operator review/completion sheet in the management workspace for day-end approval.
+- Added focused backend and Flutter coverage for the new close-out flow, then repaired legacy backend unit mocks to reflect the new guard query instead of weakening the rule.
+- Validation passed with `cd backend && docker compose run --rm pytest python -m pytest` and `cd mobile && flutter test`.
+
+### File List
+
+- `_bmad-output/implementation-artifacts/6-5-close-final-shift-of-day.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/api/v1/shifts.py`
+- `backend/src/app/models/__init__.py`
+- `backend/src/app/models/enums.py`
+- `backend/src/app/models/shifts.py`
+- `backend/src/app/schemas/shift.py`
+- `backend/src/app/services/shift_service.py`
+- `backend/tests/test_attendant_check_in.py`
+- `backend/tests/test_attendant_check_out_finalize.py`
+- `backend/tests/test_attendant_force_close_timeout.py`
+- `backend/tests/test_lot_availability_events.py`
+- `backend/tests/test_shift_close_out.py`
+- `backend/tests/test_walk_in_check_in.py`
+- `mobile/lib/src/features/attendant_check_in/data/attendant_check_in_service.dart`
+- `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
+- `mobile/lib/src/features/operator_lot_management/data/operator_lot_management_service.dart`
+- `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
+- `mobile/test/attendant_check_in_screen_test.dart`
+- `mobile/test/attendant_check_out_finalize_test.dart`
+- `mobile/test/attendant_check_out_screen_test.dart`
+- `mobile/test/attendant_timeout_session_test.dart`
+- `mobile/test/attendant_walk_in_check_in_test.dart`
+- `mobile/test/final_shift_close_out_test.dart`
+- `mobile/test/shift_handover_test.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 6.5 implementation artifact for final-shift-of-day close-out and reopened Epic 6 for follow-up delivery.
+- 2026-03-28: Implemented Story 6.5 with dedicated final-shift close-out backend/mobile flows, operator completion, session-mutation locking, and full backend/mobile regression validation.
