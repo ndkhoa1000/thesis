@@ -77,7 +77,7 @@ development_status:
   7-1-driver-pre-books-parking-spot: done
   7-2-attendant-scans-pre-booked-check-in: done
   7-3-auto-expire-no-show-bookings: done
-  epic-7-retrospective: optional
+  epic-7-retrospective: done
   epic-8: in-progress
   8-1-create-lease-contract: ready-for-dev
   8-2-owner-revenue-dashboard: ready-for-dev
