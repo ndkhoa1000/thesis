@@ -181,6 +181,10 @@ class FakeMapDiscoveryService implements MapDiscoveryService {
 
   @override
   Future<List<MapDiscoveryLotSummary>> fetchActiveLots() async => lots;
+
+  @override
+  Stream<MapDiscoveryAvailabilityUpdate> watchAvailability() =>
+      const Stream.empty();
 }
 
 class FakeLotDetailsService implements LotDetailsService {

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
+from ...core.lot_availability import publish_lot_availability_update
 from ...core.security import ALGORITHM, SECRET_KEY
 from ...models.financials import Payment
 from ...models.parking import ParkingLot, Pricing
@@ -522,6 +523,12 @@ async def attendant_check_out_finalize(
         parking_lot.current_available = previous_current_available
         raise
 
+    publish_lot_availability_update(
+        parking_lot,
+        previous_current_available=previous_current_available,
+        source="attendant_check_out_finalize",
+    )
+
     return AttendantCheckOutFinalizeRead(
         session_id=session.id,
         parking_lot_id=parking_lot.id,
@@ -595,6 +602,12 @@ async def attendant_check_out_undo(
         payment.payment_status = previous_payment_status
         payment.note = previous_payment_note
         raise
+
+    publish_lot_availability_update(
+        parking_lot,
+        previous_current_available=previous_current_available,
+        source="attendant_check_out_undo",
+    )
 
     return AttendantCheckOutUndoRead(
         session_id=session.id,
@@ -673,6 +686,7 @@ async def attendant_check_in_with_driver_qr(
     if parking_lot.current_available <= 0:
         raise BadRequestException("Lot is full - no available spots.")
 
+    previous_current_available = parking_lot.current_available
     created_session = ParkingSession(
         parking_lot_id=parking_lot.id,
         license_plate=vehicle.license_plate,
@@ -684,6 +698,11 @@ async def attendant_check_in_with_driver_qr(
     db.add(created_session)
     await db.commit()
     await db.refresh(created_session)
+    publish_lot_availability_update(
+        parking_lot,
+        previous_current_available=previous_current_available,
+        source="attendant_check_in",
+    )
 
     return AttendantCheckInRead(
         session_id=created_session.id,
@@ -720,6 +739,7 @@ async def attendant_check_in_walk_in_vehicle(
     if parking_lot.current_available <= 0:
         raise BadRequestException("Lot is full - no available spots.")
 
+    previous_current_available = parking_lot.current_available
     created_session = ParkingSession(
         parking_lot_id=parking_lot.id,
         license_plate=_build_walk_in_license_plate(),
@@ -731,6 +751,11 @@ async def attendant_check_in_walk_in_vehicle(
     db.add(created_session)
     await db.commit()
     await db.refresh(created_session)
+    publish_lot_availability_update(
+        parking_lot,
+        previous_current_available=previous_current_available,
+        source="attendant_walk_in_check_in",
+    )
 
     return AttendantCheckInRead(
         session_id=created_session.id,

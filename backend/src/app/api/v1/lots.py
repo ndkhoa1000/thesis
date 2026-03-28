@@ -1,22 +1,24 @@
-"""Parking lot endpoints for registration, admin review, and operator management."""
+"""Parking lot endpoints for registration, admin review, operator management, and availability streaming."""
 
+import asyncio
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
-from ...core.db.database import async_get_db
+from ...core.db.database import async_get_db, local_session
 from ...core.exceptions.http_exceptions import (
     BadRequestException,
     DuplicateValueException,
     ForbiddenException,
     NotFoundException,
 )
-from ...core.security import get_password_hash
+from ...core.lot_availability import lot_availability_hub, publish_lot_availability_update
+from ...core.security import TokenType, get_password_hash, verify_token
 from ...crud.crud_users import crud_users
 from ...models.enums import (
     LeaseStatus,
@@ -65,6 +67,45 @@ def _utcnow() -> datetime:
 def _ensure_public_account(current_user: dict[str, Any]) -> None:
     if current_user.get("role") in {UserRole.ATTENDANT.value, UserRole.ADMIN.value} or current_user.get("is_superuser"):
         raise ForbiddenException("Only public accounts can manage parking lots")
+
+
+def _extract_bearer_token(authorization_header: str | None) -> str | None:
+    if not authorization_header:
+        return None
+
+    token_type, _, token_value = authorization_header.partition(" ")
+    if token_type.lower() != "bearer" or not token_value:
+        return None
+    return token_value
+
+
+async def _authenticate_availability_websocket(websocket: WebSocket) -> dict[str, Any] | None:
+    token = _extract_bearer_token(websocket.headers.get("authorization"))
+    if token is None:
+        return None
+
+    async with local_session() as db:
+        token_data = await verify_token(token, TokenType.ACCESS, db)
+        if token_data is None:
+            return None
+
+        if "@" in token_data.username_or_email:
+            user = await crud_users.get(
+                db=db,
+                email=token_data.username_or_email,
+                is_deleted=False,
+            )
+        else:
+            user = await crud_users.get(
+                db=db,
+                username=token_data.username_or_email,
+                is_deleted=False,
+            )
+
+        if user is None or not user.get("is_active", True):
+            return None
+
+        return user
 
 
 async def _get_lot_owner_profile(db: AsyncSession, user_id: int) -> LotOwner | None:
@@ -508,6 +549,25 @@ async def list_lots(
     return list(lots_result.scalars().all())
 
 
+@router.websocket("/lots/availability/stream")
+async def stream_lot_availability(websocket: WebSocket) -> None:
+    current_user = await _authenticate_availability_websocket(websocket)
+    if current_user is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await websocket.accept()
+    subscription = lot_availability_hub.subscribe()
+    try:
+        while True:
+            event = await asyncio.to_thread(subscription.get)
+            await websocket.send_json(event.model_dump(mode="json"))
+    except WebSocketDisconnect:
+        return
+    finally:
+        lot_availability_hub.unsubscribe(subscription)
+
+
 @router.get("/lots/{parking_lot_id}", response_model=ParkingLotDriverDetailRead)
 async def read_public_lot_detail(
     request: Request,
@@ -687,6 +747,7 @@ async def patch_operator_parking_lot(
         raise BadRequestException("Only approved or suspended parking lots can be configured")
 
     effective_today = _utcnow().date()
+    previous_current_available = parking_lot.current_available
     occupied_count = await _count_active_sessions(db, parking_lot.id)
     parking_lot.name = payload.name
     parking_lot.address = payload.address
@@ -716,6 +777,11 @@ async def patch_operator_parking_lot(
 
     await db.commit()
     await db.refresh(parking_lot)
+    publish_lot_availability_update(
+        parking_lot,
+        previous_current_available=previous_current_available,
+        source="operator_parking_lot_update",
+    )
 
     return _build_operator_read(
         parking_lot,

@@ -1,5 +1,5 @@
 from datetime import date, datetime, time
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -55,6 +55,19 @@ class ParkingLotRead(BaseModel):
     active_operator_name: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
+
+
+class ParkingLotAvailabilityEventRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["lot_availability.updated"] = "lot_availability.updated"
+    lot_id: int
+    current_available: Annotated[int, Field(ge=0)]
+    previous_current_available: Annotated[int, Field(ge=0)]
+    is_full: bool
+    was_full: bool
+    source: str
+    occurred_at: datetime
 
 
 class ParkingLotPeakHourPointRead(BaseModel):

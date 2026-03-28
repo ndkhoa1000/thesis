@@ -1,6 +1,6 @@
 # Story 5.4: En-route Lot Capacity Alert
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,20 +24,20 @@ so that my expectations are managed without forced rerouting.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add realtime availability delivery for driver lot watching (AC: 1, 2)
-  - [ ] Introduce or expose a FastAPI-managed realtime availability channel that emits lot-capacity updates in a driver-consumable event shape.
-  - [ ] Publish updates from the same availability mutation boundary already used by sessions and future bookings rather than duplicating write paths.
-  - [ ] Keep the contract advisory and read-only for drivers.
+- [x] Task 1: Add realtime availability delivery for driver lot watching (AC: 1, 2)
+  - [x] Introduce or expose a FastAPI-managed realtime availability channel that emits lot-capacity updates in a driver-consumable event shape.
+  - [x] Publish updates from the same availability mutation boundary already used by sessions and future bookings rather than duplicating write paths.
+  - [x] Keep the contract advisory and read-only for drivers.
 
-- [ ] Task 2: Wire en-route alert behavior into the driver map/navigation flow (AC: 1, 2)
-  - [ ] Track the currently navigated lot in the map/discovery feature.
-  - [ ] Subscribe to availability updates and surface a temporary alert when that lot transitions to full.
-  - [ ] Ensure the alert does not reroute, dismiss the map, or block continued navigation.
+- [x] Task 2: Wire en-route alert behavior into the driver map/navigation flow (AC: 1, 2)
+  - [x] Track the currently navigated lot in the map/discovery feature.
+  - [x] Subscribe to availability updates and surface a temporary alert when that lot transitions to full.
+  - [x] Ensure the alert does not reroute, dismiss the map, or block continued navigation.
 
-- [ ] Task 3: Add focused regression coverage (AC: 1, 2)
-  - [ ] Add backend tests for availability event publication around lot-capacity changes.
-  - [ ] Add Flutter tests for en-route alert display and non-rerouting behavior when a watched lot becomes full.
-  - [ ] Verify backend in Docker and Flutter locally after wiring the flow.
+- [x] Task 3: Add focused regression coverage (AC: 1, 2)
+  - [x] Add backend tests for availability event publication around lot-capacity changes.
+  - [x] Add Flutter tests for en-route alert display and non-rerouting behavior when a watched lot becomes full.
+  - [x] Verify backend in Docker and Flutter locally after wiring the flow.
 
 ## Dev Notes
 
@@ -104,16 +104,37 @@ so that my expectations are managed without forced rerouting.
 
 GPT-5.4
 
+### Implementation Plan
+
+- Add a backend-owned lot availability event contract and websocket stream that drivers can consume without introducing push notifications.
+- Publish availability changes from the existing parking-session and operator lot-configuration mutation boundaries after successful commits.
+- Extend the driver map discovery flow with a lightweight "Navigate" target, live availability updates, and a temporary advisory alert when the watched lot becomes full.
+- Add focused backend and Flutter regression coverage, then verify through Docker pytest and local flutter test.
+
 ### Completion Notes List
 
 - Story created as an in-app advisory alert layered on top of Epic 5 map discovery, explicitly separated from the later push-notification epic.
 - Current codebase anchor: realtime availability delivery is still a planned gap, so this story documents both the backend event seam and the driver-side alert boundary.
+- Added an authenticated FastAPI websocket stream at `/lots/availability/stream` with a canonical `lot_availability.updated` payload for driver-facing availability updates.
+- Published availability events from the existing attendant check-in, walk-in check-in, checkout finalize/undo, and operator lot configuration flows after successful commits.
+- Extended the driver map quick cards with a `Dẫn đường` action, tracked the active navigation target in the discovery flow, and surfaced a temporary advisory alert when that lot transitions to full without clearing the route target.
+- Validation passed with `cd backend && docker compose run --rm pytest python -m pytest tests/test_lot_availability_events.py`, `cd mobile && flutter test test/map_discovery_screen_test.dart`, and `cd mobile && flutter test test/widget_test.dart`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/5-4-en-route-lot-capacity-alert.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/lots.py`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/core/lot_availability.py`
+- `backend/src/app/schemas/parking_lot.py`
+- `backend/tests/test_lot_availability_events.py`
+- `mobile/lib/src/features/map_discovery/data/map_discovery_service.dart`
+- `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
+- `mobile/test/map_discovery_screen_test.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 5.4 implementation artifact for backend-owned en-route fullness alerts without forced rerouting.
+- 2026-03-28: Implemented Story 5.4 with a backend availability websocket, canonical event publication from lot/session mutation boundaries, driver en-route alerts on the map flow, and focused backend/mobile regression coverage.

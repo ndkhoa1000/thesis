@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -30,6 +31,7 @@ class MapDiscoveryViewData {
     required this.locationDenied,
     required this.defaultViewport,
     required this.onOpenLotDetails,
+    required this.currentNavigationLot,
   });
 
   final List<MapDiscoveryLotSummary> lots;
@@ -37,6 +39,7 @@ class MapDiscoveryViewData {
   final bool locationDenied;
   final MapDiscoveryViewport defaultViewport;
   final Future<void> Function(MapDiscoveryLotSummary lot) onOpenLotDetails;
+  final MapDiscoveryLotSummary? currentNavigationLot;
 }
 
 abstract class MapLocationPermissionService {
@@ -95,14 +98,28 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
   );
 
   List<MapDiscoveryLotSummary> _lots = const [];
+  StreamSubscription<MapDiscoveryAvailabilityUpdate>? _availabilitySubscription;
+  Timer? _enRouteAlertTimer;
   bool _isLoading = true;
   bool _locationDenied = false;
+  int? _navigatingLotId;
   String? _errorMessage;
+  String? _enRouteAlertMessage;
 
   @override
   void initState() {
     super.initState();
+    _availabilitySubscription = widget.mapDiscoveryService
+        .watchAvailability()
+        .listen(_handleAvailabilityUpdate, onError: (_, __) {});
     _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _enRouteAlertTimer?.cancel();
+    _availabilitySubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -147,6 +164,64 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
     );
   }
 
+  MapDiscoveryLotSummary? get _currentNavigationLot {
+    final navigatingLotId = _navigatingLotId;
+    if (navigatingLotId == null) {
+      return null;
+    }
+
+    for (final lot in _lots) {
+      if (lot.id == navigatingLotId) {
+        return lot;
+      }
+    }
+    return null;
+  }
+
+  void _startNavigation(MapDiscoveryLotSummary lot) {
+    setState(() {
+      _navigatingLotId = lot.id;
+    });
+  }
+
+  void _handleAvailabilityUpdate(MapDiscoveryAvailabilityUpdate update) {
+    final lotIndex = _lots.indexWhere((lot) => lot.id == update.lotId);
+    if (lotIndex < 0 || !mounted) {
+      return;
+    }
+
+    final updatedLot = _lots[lotIndex].copyWith(
+      currentAvailable: update.currentAvailable,
+    );
+    final nextLots = List<MapDiscoveryLotSummary>.from(_lots);
+    nextLots[lotIndex] = updatedLot;
+
+    setState(() {
+      _lots = List.unmodifiable(nextLots);
+    });
+
+    if (_navigatingLotId == update.lotId && !update.wasFull && update.isFull) {
+      _showEnRouteAlert(updatedLot.name);
+    }
+  }
+
+  void _showEnRouteAlert(String lotName) {
+    _enRouteAlertTimer?.cancel();
+    setState(() {
+      _enRouteAlertMessage =
+          'Bãi xe $lotName vừa đầy. Bạn vẫn có thể tiếp tục lộ trình hoặc chọn bãi khác.';
+    });
+
+    _enRouteAlertTimer = Timer(const Duration(seconds: 6), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _enRouteAlertMessage = null;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewData = MapDiscoveryViewData(
@@ -155,6 +230,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
       locationDenied: _locationDenied,
       defaultViewport: _defaultViewport,
       onOpenLotDetails: _openLotDetails,
+      currentNavigationLot: _currentNavigationLot,
     );
 
     return Scaffold(
@@ -217,6 +293,23 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
                           message:
                               'Bản đồ đang hiển thị vị trí mặc định của TP.HCM vì ứng dụng chưa được cấp quyền truy cập vị trí.',
                         ),
+                      if (_currentNavigationLot != null) ...[
+                        const SizedBox(height: 8),
+                        _MapDiscoveryNotice(
+                          message:
+                              'Đang theo dõi sức chứa của ${_currentNavigationLot!.name} trong lúc bạn di chuyển.',
+                          backgroundColor: const Color(0xFFE3F2FD),
+                          borderColor: const Color(0xFF90CAF9),
+                        ),
+                      ],
+                      if (_enRouteAlertMessage != null) ...[
+                        const SizedBox(height: 8),
+                        _MapDiscoveryNotice(
+                          message: _enRouteAlertMessage!,
+                          backgroundColor: const Color(0xFFFFEBEE),
+                          borderColor: const Color(0xFFEF9A9A),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       _MapDiscoverySummaryCard(lotCount: _lots.length),
                     ],
@@ -230,7 +323,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
                     right: 0,
                     bottom: 16,
                     child: SizedBox(
-                      height: 156,
+                      height: 212,
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         scrollDirection: Axis.horizontal,
@@ -241,6 +334,8 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
                           return _LotQuickCard(
                             lot: lot,
                             onTap: () => _openLotDetails(lot),
+                            onNavigate: () => _startNavigation(lot),
+                            isNavigating: _navigatingLotId == lot.id,
                           );
                         },
                       ),
@@ -331,9 +426,15 @@ class _LegendChip extends StatelessWidget {
 }
 
 class _MapDiscoveryNotice extends StatelessWidget {
-  const _MapDiscoveryNotice({required this.message});
+  const _MapDiscoveryNotice({
+    required this.message,
+    this.backgroundColor = const Color(0xFFFFF3CD),
+    this.borderColor = const Color(0xFFFFE08A),
+  });
 
   final String message;
+  final Color backgroundColor;
+  final Color borderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -342,9 +443,9 @@ class _MapDiscoveryNotice extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF3CD),
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFFFE08A)),
+          border: Border.all(color: borderColor),
         ),
         child: Text(message),
       ),
@@ -393,10 +494,17 @@ class _MapDiscoveryErrorState extends StatelessWidget {
 }
 
 class _LotQuickCard extends StatelessWidget {
-  const _LotQuickCard({required this.lot, required this.onTap});
+  const _LotQuickCard({
+    required this.lot,
+    required this.onTap,
+    required this.onNavigate,
+    required this.isNavigating,
+  });
 
   final MapDiscoveryLotSummary lot;
   final VoidCallback onTap;
+  final VoidCallback onNavigate;
+  final bool isNavigating;
 
   @override
   Widget build(BuildContext context) {
@@ -421,12 +529,20 @@ class _LotQuickCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(lot.address, maxLines: 2, overflow: TextOverflow.ellipsis),
                 const Spacer(),
-                Row(
-                  children: [
-                    Chip(label: Text(lot.availabilityText)),
-                    const Spacer(),
-                    const Icon(Icons.chevron_right),
-                  ],
+                Chip(label: Text(lot.availabilityText)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    key: ValueKey('navigateLot:${lot.id}'),
+                    onPressed: onNavigate,
+                    icon: Icon(
+                      isNavigating
+                          ? Icons.navigation
+                          : Icons.navigation_outlined,
+                    ),
+                    label: Text(isNavigating ? 'Đang theo dõi' : 'Dẫn đường'),
+                  ),
                 ),
               ],
             ),

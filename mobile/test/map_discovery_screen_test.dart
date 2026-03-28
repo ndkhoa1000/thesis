@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -6,9 +8,13 @@ import 'package:parking_app/src/features/map_discovery/data/map_discovery_servic
 import 'package:parking_app/src/features/map_discovery/presentation/map_discovery_screen.dart';
 
 class FakeMapDiscoveryService implements MapDiscoveryService {
-  FakeMapDiscoveryService({required this.lots});
+  FakeMapDiscoveryService({
+    required this.lots,
+    Stream<MapDiscoveryAvailabilityUpdate>? availabilityStream,
+  }) : _availabilityStream = availabilityStream ?? const Stream.empty();
 
   final List<MapDiscoveryLotSummary> lots;
+  final Stream<MapDiscoveryAvailabilityUpdate> _availabilityStream;
   bool fetchCalled = false;
 
   @override
@@ -16,6 +22,10 @@ class FakeMapDiscoveryService implements MapDiscoveryService {
     fetchCalled = true;
     return lots;
   }
+
+  @override
+  Stream<MapDiscoveryAvailabilityUpdate> watchAvailability() =>
+      _availabilityStream;
 }
 
 class FakeLocationPermissionService implements MapLocationPermissionService {
@@ -54,6 +64,7 @@ void main() {
         locationPermissionService: locationPermissionService,
         mapCanvasBuilder: mapCanvasBuilder,
         onOpenDriverCheckIn: () async {},
+        onOpenParkingHistory: () async {},
         onOpenVehicles: () async {},
         onSignOut: () async {},
       ),
@@ -231,4 +242,62 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'shows a temporary en-route alert without clearing the watched lot',
+    (tester) async {
+      final controller = StreamController<MapDiscoveryAvailabilityUpdate>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(
+        buildSubject(
+          mapDiscoveryService: FakeMapDiscoveryService(
+            lots: const [
+              MapDiscoveryLotSummary(
+                id: 1,
+                name: 'Bãi xe Lê Lợi',
+                address: '45 Lê Lợi, Quận 1',
+                latitude: 10.7729,
+                longitude: 106.6983,
+                currentAvailable: 3,
+                status: 'APPROVED',
+              ),
+            ],
+            availabilityStream: controller.stream,
+          ),
+          lotDetailsService: FakeLotDetailsService(detailsById: const {}),
+          locationPermissionService: FakeLocationPermissionService(true),
+          mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('navigateLot:1')));
+      await tester.pump();
+
+      expect(
+        find.textContaining('Đang theo dõi sức chứa của Bãi xe Lê Lợi'),
+        findsOneWidget,
+      );
+
+      controller.add(
+        MapDiscoveryAvailabilityUpdate(
+          lotId: 1,
+          currentAvailable: 0,
+          previousCurrentAvailable: 3,
+          isFull: true,
+          wasFull: false,
+          source: 'attendant_check_in',
+          occurredAt: DateTime(2026, 3, 28, 9, 30),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('vừa đầy'), findsOneWidget);
+      expect(
+        find.textContaining('Đang theo dõi sức chứa của Bãi xe Lê Lợi'),
+        findsOneWidget,
+      );
+    },
+  );
 }

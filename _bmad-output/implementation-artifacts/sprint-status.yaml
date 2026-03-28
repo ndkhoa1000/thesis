@@ -64,7 +64,7 @@ development_status:
   5-1-view-interactive-map-lots: done
   5-2-view-lot-details-availability: done
   5-3-driver-parking-history: done
-  5-4-en-route-lot-capacity-alert: ready-for-dev
+  5-4-en-route-lot-capacity-alert: done
   epic-5-retrospective: optional
   epic-6: backlog
   6-1-attendant-views-lot-occupancy-stats: backlog
