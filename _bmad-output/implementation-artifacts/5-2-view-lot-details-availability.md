@@ -1,6 +1,6 @@
 # Story 5.2: View Lot Details & Availability
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -134,3 +134,9 @@ GPT-5.4
 
 - 2026-03-28: Created Story 5.2 implementation artifact for backend-backed lot details, effective pricing/hours, and historical peak-hours trend presentation.
 - 2026-03-28: Implemented Story 5.2 with a backend-owned lot detail endpoint, server-derived peak-hour payloads, a dedicated Flutter lot-details feature, and refreshed regression coverage.
+
+### Review Findings
+
+- [x] [Review][Patch] Lot detail endpoint can expose future-dated pricing/config records as if they were already effective [backend/src/app/api/v1/lots.py:117]
+- [x] [Review][Patch] Driver cannot open lot details by tapping the map itself; the sheet is only reachable from the discovery rail cards [mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart:133]
+- [x] [Review][Patch] Peak-hours chart truncates valid history to the first 8 buckets, which can hide the actual busiest arrival windows [mobile/lib/src/features/lot_details/presentation/lot_details_sheet.dart:238]

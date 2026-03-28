@@ -209,6 +209,11 @@ class TestOperatorManagedLots:
         assert result.pricing_mode == PricingMode.HOURLY
         assert result.price_amount == 18000
         assert mock_db.add.call_count == 2
+        parking_lot_config = mock_db.add.call_args_list[0].args[0]
+        pricing = mock_db.add.call_args_list[1].args[0]
+        assert parking_lot_config.opening_time == payload.opening_time
+        assert parking_lot_config.closing_time == payload.closing_time
+        assert pricing.effective_from == datetime.now(UTC).date()
         mock_db.commit.assert_awaited_once()
 
     @pytest.mark.asyncio

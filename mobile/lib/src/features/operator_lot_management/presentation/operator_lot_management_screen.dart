@@ -861,12 +861,14 @@ class _OperatorLotConfigurationFormState
     });
 
     try {
+      final openingTime = _parseTime(_openingTimeController.text.trim());
+      final closingTime = _parseTime(_closingTimeController.text.trim());
       await widget.onSubmit(
         name: _nameController.text.trim(),
         address: _addressController.text.trim(),
         totalCapacity: int.parse(_capacityController.text.trim()),
-        openingTime: _openingTimeController.text.trim(),
-        closingTime: _closingTimeController.text.trim(),
+        openingTime: _formatTime(openingTime!),
+        closingTime: _formatTime(closingTime!),
         pricingMode: _pricingMode,
         priceAmount: double.parse(_priceAmountController.text.trim()),
         description: _emptyToNull(_descriptionController.text),
@@ -898,9 +900,43 @@ class _OperatorLotConfigurationFormState
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  bool _isValidTime(String value) {
-    final timePattern = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
-    return timePattern.hasMatch(value);
+  TimeOfDay? _parseTime(String value) {
+    final trimmed = value.trim();
+    final match = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(trimmed);
+    if (match == null) {
+      return null;
+    }
+    final hour = int.tryParse(match.group(1)!);
+    final minute = int.tryParse(match.group(2)!);
+    if (hour == null ||
+        minute == null ||
+        hour < 0 ||
+        hour > 23 ||
+        minute < 0 ||
+        minute > 59) {
+      return null;
+    }
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  String _formatTime(TimeOfDay value) {
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  Future<void> _pickTime(TextEditingController controller) async {
+    final selected = await showTimePicker(
+      context: context,
+      initialTime:
+          _parseTime(controller.text) ?? const TimeOfDay(hour: 7, minute: 0),
+    );
+    if (selected == null || !mounted) {
+      return;
+    }
+    setState(() {
+      controller.text = _formatTime(selected);
+    });
   }
 
   @override
@@ -977,15 +1013,22 @@ class _OperatorLotConfigurationFormState
                 TextFormField(
                   controller: _openingTimeController,
                   keyboardType: TextInputType.datetime,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Giờ mở cửa (HH:mm)',
+                    suffixIcon: IconButton(
+                      tooltip: 'Chọn giờ mở cửa',
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _pickTime(_openingTimeController),
+                      icon: const Icon(Icons.schedule_outlined),
+                    ),
                   ),
                   validator: (value) {
                     final trimmed = (value ?? '').trim();
                     if (trimmed.isEmpty) {
                       return 'Giờ mở cửa là bắt buộc';
                     }
-                    if (!_isValidTime(trimmed)) {
+                    if (_parseTime(trimmed) == null) {
                       return 'Nhập giờ theo định dạng HH:mm';
                     }
                     return null;
@@ -995,18 +1038,30 @@ class _OperatorLotConfigurationFormState
                 TextFormField(
                   controller: _closingTimeController,
                   keyboardType: TextInputType.datetime,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Giờ đóng cửa (HH:mm)',
+                    suffixIcon: IconButton(
+                      tooltip: 'Chọn giờ đóng cửa',
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => _pickTime(_closingTimeController),
+                      icon: const Icon(Icons.schedule_outlined),
+                    ),
                   ),
                   validator: (value) {
                     final trimmed = (value ?? '').trim();
                     if (trimmed.isEmpty) {
                       return 'Giờ đóng cửa là bắt buộc';
                     }
-                    if (!_isValidTime(trimmed)) {
+                    final parsed = _parseTime(trimmed);
+                    if (parsed == null) {
                       return 'Nhập giờ theo định dạng HH:mm';
                     }
-                    if (trimmed == _openingTimeController.text.trim()) {
+                    final openingTime = _parseTime(
+                      _openingTimeController.text.trim(),
+                    );
+                    if (openingTime != null &&
+                        _formatTime(parsed) == _formatTime(openingTime)) {
                       return 'Giờ đóng cửa phải khác giờ mở cửa';
                     }
                     return null;

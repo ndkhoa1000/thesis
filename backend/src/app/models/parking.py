@@ -1,6 +1,6 @@
 """Parking lot domain models: ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLotTag, Slot, Pricing."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, Time
 from sqlalchemy.dialects.postgresql import JSON
@@ -39,10 +39,10 @@ class ParkingLotConfig(Base):
     total_capacity: Mapped[int] = mapped_column(Integer)
     # Optional / defaulted fields
     vehicle_type: Mapped[str] = mapped_column(String(20), default=VehicleTypeAll.ALL.value)
-    opening_time: Mapped[str | None] = mapped_column(Time, default=None)
-    closing_time: Mapped[str | None] = mapped_column(Time, default=None)
-    effective_from: Mapped[datetime | None] = mapped_column(Date, default=None)
-    effective_to: Mapped[datetime | None] = mapped_column(Date, default=None)
+    opening_time: Mapped[time | None] = mapped_column(Time, default=None)
+    closing_time: Mapped[time | None] = mapped_column(Time, default=None)
+    effective_from: Mapped[date | None] = mapped_column(Date, default=None)
+    effective_to: Mapped[date | None] = mapped_column(Date, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default_factory=lambda: datetime.now(UTC))
 
 
@@ -92,5 +92,5 @@ class Pricing(Base):
     vehicle_type: Mapped[str] = mapped_column(String(20), default=VehicleTypeAll.ALL.value)
     pricing_mode: Mapped[str] = mapped_column(String(20), default=PricingMode.SESSION.value)
     note: Mapped[str | None] = mapped_column(String(100), default=None)
-    effective_from: Mapped[datetime | None] = mapped_column(Date, default=None)
-    effective_to: Mapped[datetime | None] = mapped_column(Date, default=None)
+    effective_from: Mapped[date | None] = mapped_column(Date, default=None)
+    effective_to: Mapped[date | None] = mapped_column(Date, default=None)

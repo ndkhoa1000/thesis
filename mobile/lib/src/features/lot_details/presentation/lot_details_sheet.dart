@@ -235,7 +235,6 @@ class _PeakHoursChart extends StatelessWidget {
     final maxValue = points.fold<int>(0, (maxCount, point) {
       return math.max(maxCount, point.sessionCount);
     });
-    final visiblePoints = points.length > 8 ? points.sublist(0, 8) : points;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -244,35 +243,41 @@ class _PeakHoursChart extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: visiblePoints
-            .map((point) {
-              final ratio = maxValue == 0 ? 0.0 : point.sessionCount / maxValue;
-              final barHeight = 36 + (ratio * 92);
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Text('${point.sessionCount}'),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: barHeight,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1565C0),
-                          borderRadius: BorderRadius.circular(12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: points
+              .map((point) {
+                final ratio = maxValue == 0
+                    ? 0.0
+                    : point.sessionCount / maxValue;
+                final barHeight = 36 + (ratio * 92);
+                return SizedBox(
+                  width: 56,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text('${point.sessionCount}'),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: barHeight,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1565C0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(point.label),
-                    ],
+                        const SizedBox(height: 8),
+                        Text(point.label),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            })
-            .toList(growable: false),
+                );
+              })
+              .toList(growable: false),
+        ),
       ),
     );
   }

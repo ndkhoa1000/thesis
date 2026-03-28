@@ -29,12 +29,14 @@ class MapDiscoveryViewData {
     required this.clusterEnabled,
     required this.locationDenied,
     required this.defaultViewport,
+    required this.onOpenLotDetails,
   });
 
   final List<MapDiscoveryLotSummary> lots;
   final bool clusterEnabled;
   final bool locationDenied;
   final MapDiscoveryViewport defaultViewport;
+  final Future<void> Function(MapDiscoveryLotSummary lot) onOpenLotDetails;
 }
 
 abstract class MapLocationPermissionService {
@@ -150,6 +152,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
       clusterEnabled: true,
       locationDenied: _locationDenied,
       defaultViewport: _defaultViewport,
+      onOpenLotDetails: _openLotDetails,
     );
 
     return Scaffold(
@@ -491,6 +494,12 @@ class _MapboxLotCanvasState extends State<_MapboxLotCanvas> {
   bool _styleLoaded = false;
 
   @override
+  void dispose() {
+    _mapboxMap?.setOnMapTapListener(null);
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant _MapboxLotCanvas oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.viewData.lots != widget.viewData.lots ||
@@ -501,6 +510,7 @@ class _MapboxLotCanvasState extends State<_MapboxLotCanvas> {
 
   void _onMapCreated(MapboxMap mapboxMap) {
     _mapboxMap = mapboxMap;
+    mapboxMap.setOnMapTapListener(_handleMapTap);
     mapboxMap.setCamera(
       CameraOptions(
         center: Point(
@@ -515,6 +525,46 @@ class _MapboxLotCanvasState extends State<_MapboxLotCanvas> {
       ),
     );
     _syncMapState();
+  }
+
+  Future<void> _handleMapTap(MapContentGestureContext context) async {
+    final mapboxMap = _mapboxMap;
+    if (mapboxMap == null || !_styleLoaded) {
+      return;
+    }
+
+    final features = await mapboxMap.queryRenderedFeatures(
+      RenderedQueryGeometry.fromScreenCoordinate(context.touchPosition),
+      RenderedQueryOptions(layerIds: [_lotCircleLayerId]),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    for (final queried in features) {
+      final feature = queried?.queriedFeature.feature;
+      if (feature == null) {
+        continue;
+      }
+      final properties = feature['properties'];
+      if (properties is! Map) {
+        continue;
+      }
+      final rawLotId = properties['lot_id'];
+      final lotId = rawLotId is num
+          ? rawLotId.toInt()
+          : int.tryParse('$rawLotId');
+      if (lotId == null) {
+        continue;
+      }
+      for (final lot in widget.viewData.lots) {
+        if (lot.id != lotId) {
+          continue;
+        }
+        await widget.viewData.onOpenLotDetails(lot);
+        return;
+      }
+    }
   }
 
   void _onStyleLoaded(StyleLoadedEventData _) {

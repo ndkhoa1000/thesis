@@ -1456,14 +1456,14 @@ void main() {
       find.widgetWithText(TextFormField, 'Địa chỉ'),
       '45 Le Loi, Quan 1',
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Vĩ độ'),
-      '10.772900',
+    await tester.tap(find.byKey(const ValueKey('openLocationPickerButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('fallbackLocationPickerCanvas')),
     );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Kinh độ'),
-      '106.698300',
-    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirmLocationPickerButton')));
+    await tester.pumpAndSettle();
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Mô tả'),
       'Co camera va che mua',
@@ -1818,7 +1818,7 @@ void main() {
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Giờ mở cửa (HH:mm)'),
-      '05:00',
+      '5:00',
     );
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Giờ đóng cửa (HH:mm)'),

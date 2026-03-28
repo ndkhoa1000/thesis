@@ -1,4 +1,4 @@
-"""Unit tests for parking lot registration and admin review flows (Story 2-1)."""
+"""Unit tests for parking lot registration and admin review flows."""
 
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -110,19 +110,25 @@ def _lease(lease_id: int = 21, parking_lot_id: int = 7, manager_id: int = 4) -> 
 
 def _parking_lot_config(parking_lot_id: int = 7) -> ParkingLotConfig:
     parking_lot_config = MagicMock(spec=ParkingLotConfig)
+    parking_lot_config.id = 11
     parking_lot_config.parking_lot_id = parking_lot_id
     parking_lot_config.total_capacity = 24
     parking_lot_config.opening_time = "07:00:00"
     parking_lot_config.closing_time = "22:00:00"
+    parking_lot_config.effective_from = None
+    parking_lot_config.effective_to = None
     parking_lot_config.created_at = datetime.now(UTC)
     return parking_lot_config
 
 
 def _pricing(parking_lot_id: int = 7) -> Pricing:
     pricing = MagicMock(spec=Pricing)
+    pricing.id = 17
     pricing.parking_lot_id = parking_lot_id
     pricing.pricing_mode = PricingMode.HOURLY.value
     pricing.price_amount = 5000
+    pricing.effective_from = None
+    pricing.effective_to = None
     return pricing
 
 
@@ -261,6 +267,50 @@ class TestPublicParkingLots:
         assert result.peak_hours.status == "INSUFFICIENT_DATA"
         assert result.peak_hours.total_sessions == 1
         assert result.peak_hours.points == []
+
+    @pytest.mark.asyncio
+    async def test_read_public_lot_detail_uses_current_effective_config_and_pricing(self, mock_db):
+        approved_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
+
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = approved_lot
+        config_result = MagicMock()
+        current_config = _parking_lot_config()
+        current_config.total_capacity = 20
+        config_result.scalar_one_or_none.return_value = current_config
+        pricing_result = MagicMock()
+        current_pricing = _pricing()
+        current_pricing.price_amount = 12000
+        pricing_result.scalar_one_or_none.return_value = current_pricing
+        tags_result = MagicMock()
+        tags_result.scalars.return_value.all.return_value = []
+        features_result = MagicMock()
+        features_result.scalars.return_value.all.return_value = []
+        peak_hours_result = MagicMock()
+        peak_hours_result.all.return_value = [(8, 3)]
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                lot_result,
+                config_result,
+                pricing_result,
+                tags_result,
+                features_result,
+                peak_hours_result,
+            ]
+        )
+
+        result = await read_public_lot_detail(Mock(), approved_lot.id, mock_db)
+
+        config_query = mock_db.execute.await_args_list[1].args[0]
+        pricing_query = mock_db.execute.await_args_list[2].args[0]
+
+        assert str(config_query.compile(compile_kwargs={"literal_binds": True}))
+        assert "effective_from" in str(config_query)
+        assert "effective_to" in str(config_query)
+        assert "effective_from" in str(pricing_query)
+        assert "effective_to" in str(pricing_query)
+        assert result.total_capacity == 20
+        assert result.price_amount == 12000
 
     @pytest.mark.asyncio
     async def test_read_public_lot_detail_rejects_missing_or_inaccessible_lot(self, mock_db):

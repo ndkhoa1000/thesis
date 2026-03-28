@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
 import '../data/parking_lot_service.dart';
 
@@ -79,7 +81,9 @@ class _ParkingLotRegistrationScreenState
 
     if (created == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã kích hoạt quyền điều hành cho operator.')),
+        const SnackBar(
+          content: Text('Đã kích hoạt quyền điều hành cho operator.'),
+        ),
       );
       _reload();
     }
@@ -309,9 +313,9 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
   Future<void> _submit() async {
     final operator = _selectedOperator;
     if (operator == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn operator.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn operator.')));
       return;
     }
 
@@ -371,7 +375,8 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
               );
             }
 
-            final operators = snapshot.data ?? const <AvailableOperatorOption>[];
+            final operators =
+                snapshot.data ?? const <AvailableOperatorOption>[];
             return Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,7 +389,9 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
                 if (operators.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Text('Chưa có operator đã được duyệt để gán thử nghiệm.'),
+                    child: Text(
+                      'Chưa có operator đã được duyệt để gán thử nghiệm.',
+                    ),
                   )
                 else
                   ...operators.map(
@@ -406,9 +413,13 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _isSubmitting || operators.isEmpty ? null : _submit,
+                    onPressed: _isSubmitting || operators.isEmpty
+                        ? null
+                        : _submit,
                     child: Text(
-                      _isSubmitting ? 'Đang kích hoạt...' : 'Kích hoạt điều hành',
+                      _isSubmitting
+                          ? 'Đang kích hoạt...'
+                          : 'Kích hoạt điều hành',
                     ),
                   ),
                 ),
@@ -473,6 +484,16 @@ class _ParkingLotErrorState extends StatelessWidget {
   }
 }
 
+class _PickedLotLocation {
+  const _PickedLotLocation({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+
+  String get label =>
+      '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}';
+}
+
 class _ParkingLotRegistrationForm extends StatefulWidget {
   const _ParkingLotRegistrationForm({required this.onSubmit});
 
@@ -496,27 +517,44 @@ class _ParkingLotRegistrationFormState
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
-  final _latitudeController = TextEditingController();
-  final _longitudeController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _coverImageController = TextEditingController();
 
+  _PickedLotLocation? _selectedLocation;
   bool _isSubmitting = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     _addressController.dispose();
-    _latitudeController.dispose();
-    _longitudeController.dispose();
     _descriptionController.dispose();
     _coverImageController.dispose();
     super.dispose();
   }
 
+  Future<void> _openLocationPicker() async {
+    final selected = await showModalBottomSheet<_PickedLotLocation>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) =>
+          _ParkingLotLocationPicker(initialLocation: _selectedLocation),
+    );
+    if (selected == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _selectedLocation = selected;
+    });
+  }
+
   Future<void> _submit() async {
     final form = _formKey.currentState;
     if (form == null || !form.validate()) {
+      return;
+    }
+
+    final location = _selectedLocation;
+    if (location == null) {
       return;
     }
 
@@ -528,8 +566,8 @@ class _ParkingLotRegistrationFormState
       await widget.onSubmit(
         name: _nameController.text.trim(),
         address: _addressController.text.trim(),
-        latitude: double.parse(_latitudeController.text.trim()),
-        longitude: double.parse(_longitudeController.text.trim()),
+        latitude: location.latitude,
+        longitude: location.longitude,
         description: _emptyToNull(_descriptionController.text),
         coverImage: _emptyToNull(_coverImageController.text),
       );
@@ -557,30 +595,6 @@ class _ParkingLotRegistrationFormState
   String? _emptyToNull(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
-  }
-
-  String? _validateLatitude(String? value) {
-    final trimmed = (value ?? '').trim();
-    if (trimmed.isEmpty) {
-      return 'Vĩ độ là bắt buộc';
-    }
-    final parsed = double.tryParse(trimmed);
-    if (parsed == null || parsed < -90 || parsed > 90) {
-      return 'Vĩ độ phải nằm trong khoảng -90 đến 90';
-    }
-    return null;
-  }
-
-  String? _validateLongitude(String? value) {
-    final trimmed = (value ?? '').trim();
-    if (trimmed.isEmpty) {
-      return 'Kinh độ là bắt buộc';
-    }
-    final parsed = double.tryParse(trimmed);
-    if (parsed == null || parsed < -180 || parsed > 180) {
-      return 'Kinh độ phải nằm trong khoảng -180 đến 180';
-    }
-    return null;
   }
 
   @override
@@ -634,26 +648,53 @@ class _ParkingLotRegistrationFormState
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _latitudeController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                    signed: true,
-                  ),
-                  decoration: const InputDecoration(labelText: 'Vĩ độ'),
-                  validator: _validateLatitude,
+                const SizedBox(height: 16),
+                Text(
+                  'Vị trí bãi xe',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _longitudeController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                    signed: true,
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  decoration: const InputDecoration(labelText: 'Kinh độ'),
-                  validator: _validateLongitude,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedLocation == null
+                            ? 'Chưa chọn vị trí. Hãy ghim bãi xe trên bản đồ để hệ thống tự lấy kinh độ và vĩ độ.'
+                            : 'Đã chọn tọa độ: ${_selectedLocation!.label}',
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        key: const ValueKey('openLocationPickerButton'),
+                        onPressed: _isSubmitting ? null : _openLocationPicker,
+                        icon: const Icon(Icons.map_outlined),
+                        label: Text(
+                          _selectedLocation == null
+                              ? 'Chọn vị trí trên bản đồ'
+                              : 'Chọn lại vị trí trên bản đồ',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                if (_selectedLocation == null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Bạn cần chọn vị trí trước khi gửi đăng ký.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _descriptionController,
@@ -689,5 +730,281 @@ class _ParkingLotRegistrationFormState
         ),
       ),
     );
+  }
+}
+
+class _ParkingLotLocationPicker extends StatefulWidget {
+  const _ParkingLotLocationPicker({this.initialLocation});
+
+  final _PickedLotLocation? initialLocation;
+
+  @override
+  State<_ParkingLotLocationPicker> createState() =>
+      _ParkingLotLocationPickerState();
+}
+
+class _ParkingLotLocationPickerState extends State<_ParkingLotLocationPicker> {
+  static const _defaultLatitude = 10.7730;
+  static const _defaultLongitude = 106.7030;
+  _PickedLotLocation? _selectedLocation;
+
+  bool get _hasMapboxToken {
+    final token =
+        dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dotenv.env['ACCESS_TOKEN'];
+    return token != null && token.isNotEmpty;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLocation = widget.initialLocation;
+  }
+
+  void _setSelectedLocation(double latitude, double longitude) {
+    setState(() {
+      _selectedLocation = _PickedLotLocation(
+        latitude: latitude,
+        longitude: longitude,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.72,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Chọn vị trí bãi xe',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _hasMapboxToken
+                    ? 'Chạm vào bản đồ để ghim vị trí bãi xe.'
+                    : 'Workspace chưa có MAPBOX_ACCESS_TOKEN. Bạn vẫn có thể chọn vị trí gần đúng bằng bản đồ đơn giản bên dưới.',
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _hasMapboxToken
+                    ? _LotLocationMapboxCanvas(
+                        initialLocation: _selectedLocation,
+                        onLocationSelected: _setSelectedLocation,
+                      )
+                    : _LotLocationFallbackCanvas(
+                        initialLocation: _selectedLocation,
+                        onLocationSelected: _setSelectedLocation,
+                      ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _selectedLocation == null
+                    ? 'Chưa có tọa độ nào được chọn.'
+                    : 'Tọa độ đã ghim: ${_selectedLocation!.label}',
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const ValueKey('confirmLocationPickerButton'),
+                  onPressed: _selectedLocation == null
+                      ? null
+                      : () => Navigator.of(context).pop(_selectedLocation),
+                  icon: const Icon(Icons.place_outlined),
+                  label: const Text('Xác nhận vị trí'),
+                ),
+              ),
+              if (_selectedLocation == null)
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: () => _setSelectedLocation(
+                      widget.initialLocation?.latitude ?? _defaultLatitude,
+                      widget.initialLocation?.longitude ?? _defaultLongitude,
+                    ),
+                    child: const Text('Dùng vị trí trung tâm mặc định'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LotLocationFallbackCanvas extends StatelessWidget {
+  const _LotLocationFallbackCanvas({
+    required this.initialLocation,
+    required this.onLocationSelected,
+  });
+
+  final _PickedLotLocation? initialLocation;
+  final void Function(double latitude, double longitude) onLocationSelected;
+
+  static const _minLatitude = 10.745;
+  static const _maxLatitude = 10.800;
+  static const _minLongitude = 106.675;
+  static const _maxLongitude = 106.725;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          key: const ValueKey('fallbackLocationPickerCanvas'),
+          onTapUp: (details) {
+            final width = constraints.maxWidth <= 0
+                ? 1.0
+                : constraints.maxWidth;
+            final height = constraints.maxHeight <= 0
+                ? 1.0
+                : constraints.maxHeight;
+            final dx = details.localPosition.dx.clamp(0.0, width);
+            final dy = details.localPosition.dy.clamp(0.0, height);
+            final longitude =
+                _minLongitude + (dx / width) * (_maxLongitude - _minLongitude);
+            final latitude =
+                _maxLatitude - (dy / height) * (_maxLatitude - _minLatitude);
+            onLocationSelected(latitude, longitude);
+          },
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFD7F0FF), Color(0xFFF6F7F9)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _FallbackGridPainter(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                ),
+                const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.location_city,
+                        size: 44,
+                        color: Color(0xFF1565C0),
+                      ),
+                      SizedBox(height: 8),
+                      Text('Khu vực trung tâm TP.HCM'),
+                      SizedBox(height: 4),
+                      Text('Chạm để ghim vị trí gần đúng'),
+                    ],
+                  ),
+                ),
+                if (initialLocation != null)
+                  const Align(
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.place,
+                      color: Color(0xFFC62828),
+                      size: 32,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LotLocationMapboxCanvas extends StatefulWidget {
+  const _LotLocationMapboxCanvas({
+    required this.initialLocation,
+    required this.onLocationSelected,
+  });
+
+  final _PickedLotLocation? initialLocation;
+  final void Function(double latitude, double longitude) onLocationSelected;
+
+  @override
+  State<_LotLocationMapboxCanvas> createState() =>
+      _LotLocationMapboxCanvasState();
+}
+
+class _LotLocationMapboxCanvasState extends State<_LotLocationMapboxCanvas> {
+  MapboxMap? _mapboxMap;
+
+  @override
+  void dispose() {
+    _mapboxMap?.setOnMapTapListener(null);
+    super.dispose();
+  }
+
+  void _onMapCreated(MapboxMap mapboxMap) {
+    _mapboxMap = mapboxMap;
+    final latitude = widget.initialLocation?.latitude ?? 10.7730;
+    final longitude = widget.initialLocation?.longitude ?? 106.7030;
+    mapboxMap.setCamera(
+      CameraOptions(
+        center: Point(coordinates: Position(longitude, latitude)),
+        zoom: 14.5,
+      ),
+    );
+    mapboxMap.setOnMapTapListener((context) {
+      final coordinates = context.point.coordinates;
+      widget.onLocationSelected(
+        coordinates.lat.toDouble(),
+        coordinates.lng.toDouble(),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: MapWidget(onMapCreated: _onMapCreated),
+    );
+  }
+}
+
+class _FallbackGridPainter extends CustomPainter {
+  const _FallbackGridPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.28)
+      ..strokeWidth = 1;
+    const divisions = 6;
+    for (var index = 1; index < divisions; index += 1) {
+      final dx = size.width * index / divisions;
+      final dy = size.height * index / divisions;
+      canvas.drawLine(Offset(dx, 0), Offset(dx, size.height), paint);
+      canvas.drawLine(Offset(0, dy), Offset(size.width, dy), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FallbackGridPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }

@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_superuser, get_current_user
@@ -118,11 +118,20 @@ async def _get_latest_parking_lot_config(
     db: AsyncSession,
     parking_lot_id: int,
 ) -> ParkingLotConfig | None:
+    today = _utcnow().date()
     config_result = await db.execute(
         select(ParkingLotConfig)
         .where(
             ParkingLotConfig.parking_lot_id == parking_lot_id,
             ParkingLotConfig.vehicle_type == VehicleTypeAll.ALL.value,
+            or_(
+                ParkingLotConfig.effective_from.is_(None),
+                ParkingLotConfig.effective_from <= today,
+            ),
+            or_(
+                ParkingLotConfig.effective_to.is_(None),
+                ParkingLotConfig.effective_to >= today,
+            ),
         )
         .order_by(ParkingLotConfig.created_at.desc(), ParkingLotConfig.id.desc())
         .limit(1)
@@ -299,13 +308,16 @@ def _build_lease_bootstrap_read(lease: LotLease, user: User) -> ParkingLotLeaseB
 
 
 async def _get_latest_pricing(db: AsyncSession, parking_lot_id: int) -> Pricing | None:
+    today = _utcnow().date()
     pricing_result = await db.execute(
         select(Pricing)
         .where(
             Pricing.parking_lot_id == parking_lot_id,
             Pricing.vehicle_type == VehicleTypeAll.ALL.value,
+            or_(Pricing.effective_from.is_(None), Pricing.effective_from <= today),
+            or_(Pricing.effective_to.is_(None), Pricing.effective_to >= today),
         )
-        .order_by(Pricing.id.desc())
+        .order_by(Pricing.effective_from.desc(), Pricing.id.desc())
         .limit(1)
     )
     return pricing_result.scalar_one_or_none()
@@ -674,6 +686,7 @@ async def patch_operator_parking_lot(
     if parking_lot.status not in {ParkingLotStatus.APPROVED.value, ParkingLotStatus.CLOSED.value}:
         raise BadRequestException("Only approved or suspended parking lots can be configured")
 
+    effective_today = _utcnow().date()
     occupied_count = await _count_active_sessions(db, parking_lot.id)
     parking_lot.name = payload.name
     parking_lot.address = payload.address
@@ -687,14 +700,16 @@ async def patch_operator_parking_lot(
         set_by=manager.id,
         total_capacity=payload.total_capacity,
         vehicle_type=VehicleTypeAll.ALL.value,
-        opening_time=payload.opening_time.isoformat(),
-        closing_time=payload.closing_time.isoformat(),
+        opening_time=payload.opening_time,
+        closing_time=payload.closing_time,
+        effective_from=effective_today,
     )
     pricing = Pricing(
         parking_lot_id=parking_lot.id,
         price_amount=payload.price_amount,
         pricing_mode=payload.pricing_mode.value,
         vehicle_type=VehicleTypeAll.ALL.value,
+        effective_from=effective_today,
     )
     db.add(parking_lot_config)
     db.add(pricing)
