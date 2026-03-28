@@ -29,6 +29,44 @@ class AttendantCheckInResult {
   }
 }
 
+class AttendantCheckOutPreviewResult {
+  const AttendantCheckOutPreviewResult({
+    required this.sessionId,
+    required this.parkingLotId,
+    required this.parkingLotName,
+    required this.licensePlate,
+    required this.vehicleType,
+    required this.checkedInAt,
+    required this.elapsedMinutes,
+    required this.finalFee,
+    required this.pricingMode,
+  });
+
+  final int sessionId;
+  final int parkingLotId;
+  final String parkingLotName;
+  final String licensePlate;
+  final String vehicleType;
+  final DateTime checkedInAt;
+  final int elapsedMinutes;
+  final double finalFee;
+  final String pricingMode;
+
+  factory AttendantCheckOutPreviewResult.fromJson(Map<String, dynamic> json) {
+    return AttendantCheckOutPreviewResult(
+      sessionId: json['session_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      parkingLotName: json['parking_lot_name'] as String,
+      licensePlate: json['license_plate'] as String,
+      vehicleType: json['vehicle_type'] as String,
+      checkedInAt: DateTime.parse(json['checked_in_at'] as String),
+      elapsedMinutes: json['elapsed_minutes'] as int,
+      finalFee: (json['final_fee'] as num).toDouble(),
+      pricingMode: json['pricing_mode'] as String,
+    );
+  }
+}
+
 abstract class AttendantCheckInService {
   Future<AttendantCheckInResult> checkInDriver({required String token});
 
@@ -36,6 +74,10 @@ abstract class AttendantCheckInService {
     required String vehicleType,
     required String plateImagePath,
     String? overviewImagePath,
+  });
+
+  Future<AttendantCheckOutPreviewResult> checkOutPreview({
+    required String token,
   });
 }
 
@@ -104,6 +146,28 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         );
       }
       return AttendantCheckInResult.fromJson(raw);
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantCheckOutPreviewResult> checkOutPreview({
+    required String token,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/sessions/attendant-check-out-preview',
+        data: {'token': token},
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AttendantCheckInException(
+          'Phan hoi check-out tu may chu khong hop le.',
+        );
+      }
+      return AttendantCheckOutPreviewResult.fromJson(raw);
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }

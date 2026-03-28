@@ -144,6 +144,13 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }) async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<AttendantCheckOutPreviewResult> checkOutPreview({
+    required String token,
+  }) async {
+    throw UnimplementedError();
+  }
 }
 
 Widget _fakeAttendantScannerBuilder(

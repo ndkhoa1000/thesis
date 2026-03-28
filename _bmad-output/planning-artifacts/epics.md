@@ -289,15 +289,17 @@ N/A
 
 #### Story 4.5: Attendant Scans QR for Check-Out & Calculates Fee
 **As an** Attendant,
-**I want** to scan a driver's check-out QR or NFC to calculate the fee,
+**I want** to scan a driver's check-out credential to calculate the fee,
 **So that** I know how much to charge rapidly.
 
 **Acceptance Criteria:**
 * **Given** a driver wants to leave
-* **When** I scan their check-out QR or NFC
+* **When** I scan their backend-issued check-out QR in the MVP flow
 * **Then** the final fee is computed based on lot pricing rules.
 * **And (UX)** the price is displayed using oversized typography (ExtraBold).
 * **And (UX)** I am not required to visually verify the entry photos on-screen (No-Look Verification) to maximize exit speed.
+* **And** the session remains active until the payment-resolution step completes.
+* **And** future NFC or walk-in exit media must resolve through the same backend checkout-preview contract rather than a separate pricing flow.
 
 #### Story 4.6: Record Payment & Finalize Session
 **As an** Attendant,
@@ -309,6 +311,14 @@ N/A
 * **When** I use the "Swipe-to-Resolve" gesture (Swipe Left for Cash, Swipe Right for Online paid)
 * **Then** the session state changes to COMPLETED.
 * **And (UX)** a non-blocking 3-second Undo Toast appears to allow reverting the swipe if a mistake was made, without interrupting the camera for the next vehicle.
+* **And** the backend revalidates the active session and authoritative fee before finalizing, instead of trusting a client-supplied amount.
+
+> **Epic 4 Checkout Convention (MVP):**
+> - App-driver exit uses the backend-issued check-out QR from Story 4.4.
+> - Story 4.5 is a read-only checkout preview step: validate media, resolve the single active session for the attendant's lot, and calculate the authoritative fee.
+> - Story 4.6 is the only mutation step: record payment, stamp attendant checkout metadata, close the session, and restore availability.
+> - NFC remains a post-MVP transport for the same checkout contract, not a second business flow.
+> - Walk-in exit should use a session-scoped credential tied to the created `ParkingSession` rather than free-text lookup at the gate; that credential is not part of the current MVP implementation scope.
 
 ### Epic 5: Map Discovery & History
 **Goal:** Drivers can find parking lots and view parking history.

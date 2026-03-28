@@ -41,6 +41,13 @@ class FakeAttendantWalkInService implements AttendantCheckInService {
           checkedInAt: DateTime(2026, 3, 27, 11, 15),
         );
   }
+
+  @override
+  Future<AttendantCheckOutPreviewResult> checkOutPreview({
+    required String token,
+  }) async {
+    throw UnimplementedError();
+  }
 }
 
 Widget _fakeScanner(

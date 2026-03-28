@@ -23,6 +23,8 @@ from ...models.vehicles import Vehicle
 from ...schemas.session import (
     AttendantCheckInCreate,
     AttendantCheckInRead,
+    AttendantCheckOutPreviewCreate,
+    AttendantCheckOutPreviewRead,
     DriverActiveSessionRead,
     DriverCheckInTokenCreate,
     DriverCheckInTokenRead,
@@ -118,6 +120,24 @@ def _decode_driver_check_in_token(token: str) -> dict[str, Any]:
     driver_id = payload.get("driver_id")
     vehicle_id = payload.get("vehicle_id")
     if not isinstance(driver_id, int) or not isinstance(vehicle_id, int):
+        raise BadRequestException("Invalid QR code. Please try again.")
+
+    return payload
+
+
+def _decode_driver_check_out_token(token: str) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(token, SECRET_KEY.get_secret_value(), algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise BadRequestException("Invalid QR code. Please try again.") from exc
+
+    if payload.get("purpose") != "driver_check_out":
+        raise BadRequestException("Invalid QR code. Please try again.")
+
+    session_id = payload.get("session_id")
+    driver_id = payload.get("driver_id")
+    parking_lot_id = payload.get("parking_lot_id")
+    if not isinstance(session_id, int) or not isinstance(driver_id, int) or not isinstance(parking_lot_id, int):
         raise BadRequestException("Invalid QR code. Please try again.")
 
     return payload
@@ -279,6 +299,56 @@ async def create_driver_check_out_token(
         expires_in_seconds=int(DRIVER_CHECK_OUT_TOKEN_TTL.total_seconds()),
         session_id=active_session.id,
         license_plate=active_session.license_plate,
+    )
+
+
+@router.post("/sessions/attendant-check-out-preview", response_model=AttendantCheckOutPreviewRead, status_code=200)
+async def attendant_check_out_preview(
+    request: Request,
+    payload: AttendantCheckOutPreviewCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> AttendantCheckOutPreviewRead:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant)
+    token_payload = _decode_driver_check_out_token(payload.token)
+
+    active_session = await _get_active_session_for_driver(db, token_payload["driver_id"])
+    if active_session is None:
+        session_result = await db.execute(
+            select(ParkingSession).where(ParkingSession.id == token_payload["session_id"]).limit(1)
+        )
+        session = session_result.scalar_one_or_none()
+        if session is not None and session.status == SessionStatus.CHECKED_OUT.value:
+            raise BadRequestException("Session already checked out.")
+        raise NotFoundException("No active parking session found")
+
+    if active_session.id != token_payload["session_id"] or active_session.driver_id != token_payload["driver_id"]:
+        raise BadRequestException("Invalid QR code. Please try again.")
+
+    if active_session.parking_lot_id != token_payload["parking_lot_id"]:
+        raise BadRequestException("Invalid QR code. Please try again.")
+
+    if active_session.parking_lot_id != parking_lot.id:
+        raise BadRequestException("This session belongs to a different parking lot")
+
+    pricing = await _get_latest_pricing(db, parking_lot.id, active_session.vehicle_type)
+    if pricing is None:
+        raise BadRequestException("No active pricing found for this parking session.")
+
+    elapsed_minutes = max(int((_utcnow() - active_session.checkin_time).total_seconds() // 60), 0)
+    final_fee = _calculate_estimated_cost(active_session, pricing)
+
+    return AttendantCheckOutPreviewRead(
+        session_id=active_session.id,
+        parking_lot_id=parking_lot.id,
+        parking_lot_name=parking_lot.name,
+        license_plate=active_session.license_plate,
+        vehicle_type=active_session.vehicle_type,
+        checked_in_at=active_session.checkin_time,
+        elapsed_minutes=elapsed_minutes,
+        final_fee=final_fee,
+        pricing_mode=pricing.pricing_mode,
     )
 
 

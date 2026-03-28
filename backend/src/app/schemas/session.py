@@ -44,6 +44,26 @@ class DriverCheckOutTokenRead(BaseModel):
     license_plate: str
 
 
+class AttendantCheckOutPreviewCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=1)
+
+
+class AttendantCheckOutPreviewRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    parking_lot_name: str
+    license_plate: str
+    vehicle_type: str
+    checked_in_at: datetime
+    elapsed_minutes: int
+    final_fee: float
+    pricing_mode: str
+
+
 class AttendantCheckInCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

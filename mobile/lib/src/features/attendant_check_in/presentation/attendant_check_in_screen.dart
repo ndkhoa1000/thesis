@@ -15,6 +15,8 @@ typedef AttendantImageCapture = Future<String?> Function();
 
 enum _AttendantGateMode { scanner, walkIn }
 
+enum _AttendantScannerFlow { checkIn, checkOut }
+
 class AttendantCheckInScreen extends StatefulWidget {
   const AttendantCheckInScreen({
     super.key,
@@ -37,19 +39,31 @@ class AttendantCheckInScreen extends StatefulWidget {
 
 class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
   _AttendantGateMode _mode = _AttendantGateMode.scanner;
+  _AttendantScannerFlow _scannerFlow = _AttendantScannerFlow.checkIn;
   bool _isBusy = false;
   String? _errorMessage;
-  AttendantCheckInResult? _lastResult;
+  AttendantCheckInResult? _lastCheckInResult;
+  AttendantCheckOutPreviewResult? _lastCheckOutPreview;
   String _walkInVehicleType = 'MOTORBIKE';
   String? _overviewImagePath;
   String? _plateImagePath;
 
   Future<void> _handleScan(String token) async {
+    if (_scannerFlow == _AttendantScannerFlow.checkOut) {
+      await _handleCheckOutScan(token);
+      return;
+    }
+
+    await _handleCheckInScan(token);
+  }
+
+  Future<void> _handleCheckInScan(String token) async {
     if (_isBusy) return;
 
     setState(() {
       _isBusy = true;
       _errorMessage = null;
+      _lastCheckOutPreview = null;
     });
 
     try {
@@ -58,13 +72,41 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _lastResult = result;
+        _lastCheckInResult = result;
         _isBusy = false;
       });
     } on AttendantCheckInException catch (error) {
       if (!mounted) return;
       setState(() {
-        _lastResult = null;
+        _lastCheckInResult = null;
+        _errorMessage = error.message;
+        _isBusy = false;
+      });
+    }
+  }
+
+  Future<void> _handleCheckOutScan(String token) async {
+    if (_isBusy) return;
+
+    setState(() {
+      _isBusy = true;
+      _errorMessage = null;
+      _lastCheckInResult = null;
+    });
+
+    try {
+      final result = await widget.attendantCheckInService.checkOutPreview(
+        token: token,
+      );
+      if (!mounted) return;
+      setState(() {
+        _lastCheckOutPreview = result;
+        _isBusy = false;
+      });
+    } on AttendantCheckInException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _lastCheckOutPreview = null;
         _errorMessage = error.message;
         _isBusy = false;
       });
@@ -93,7 +135,8 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
     if (_isBusy) return;
     if (_plateImagePath == null) {
       setState(() {
-        _lastResult = null;
+        _lastCheckInResult = null;
+        _lastCheckOutPreview = null;
         _errorMessage = 'Can chup anh bien so truoc khi tao phien walk-in.';
       });
       return;
@@ -112,16 +155,18 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _lastResult = result;
+        _lastCheckInResult = result;
+        _lastCheckOutPreview = null;
         _isBusy = false;
         _mode = _AttendantGateMode.scanner;
+        _scannerFlow = _AttendantScannerFlow.checkIn;
         _overviewImagePath = null;
         _plateImagePath = null;
       });
     } on AttendantCheckInException catch (error) {
       if (!mounted) return;
       setState(() {
-        _lastResult = null;
+        _lastCheckInResult = null;
         _errorMessage = error.message;
         _isBusy = false;
       });
@@ -132,7 +177,9 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
     if (_isBusy) return;
     setState(() {
       _mode = _AttendantGateMode.walkIn;
-      _lastResult = null;
+      _scannerFlow = _AttendantScannerFlow.checkIn;
+      _lastCheckInResult = null;
+      _lastCheckOutPreview = null;
       _errorMessage = null;
     });
   }
@@ -141,20 +188,40 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
     if (_isBusy) return;
     setState(() {
       _mode = _AttendantGateMode.scanner;
+      _scannerFlow = _AttendantScannerFlow.checkIn;
       _overviewImagePath = null;
       _plateImagePath = null;
       _errorMessage = null;
     });
   }
 
+  void _selectScannerFlow(_AttendantScannerFlow flow) {
+    if (_isBusy) return;
+    setState(() {
+      _mode = _AttendantGateMode.scanner;
+      _scannerFlow = flow;
+      _overviewImagePath = null;
+      _plateImagePath = null;
+      _errorMessage = null;
+      _lastCheckInResult = null;
+      _lastCheckOutPreview = null;
+    });
+  }
+
   String get _statusLabel {
     if (_isBusy) {
-      return _mode == _AttendantGateMode.walkIn
-          ? 'Dang tao phien walk-in...'
+      if (_mode == _AttendantGateMode.walkIn) {
+        return 'Dang tao phien walk-in...';
+      }
+      return _scannerFlow == _AttendantScannerFlow.checkOut
+          ? 'Dang tinh phi check-out...'
           : 'Dang xac nhan ma check-in...';
     }
-    return _mode == _AttendantGateMode.walkIn
-        ? 'San sang tao phien walk-in'
+    if (_mode == _AttendantGateMode.walkIn) {
+      return 'San sang tao phien walk-in';
+    }
+    return _scannerFlow == _AttendantScannerFlow.checkOut
+        ? 'San sang quet xe ra bai'
         : 'Sẵn sàng quét xe vào bãi';
   }
 
@@ -177,6 +244,8 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
           title: Text(
             _mode == _AttendantGateMode.walkIn
                 ? 'Walk-in check-in'
+                : _scannerFlow == _AttendantScannerFlow.checkOut
+                ? 'Quet ma check-out'
                 : 'Quét mã check-in',
           ),
           actions: widget.onSignOut == null
@@ -203,6 +272,35 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
+                if (_mode == _AttendantGateMode.scanner) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ScannerModeButton(
+                          key: const ValueKey('attendant-check-in-mode'),
+                          label: 'Xe vao',
+                          isSelected:
+                              _scannerFlow == _AttendantScannerFlow.checkIn,
+                          onPressed: () =>
+                              _selectScannerFlow(_AttendantScannerFlow.checkIn),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _ScannerModeButton(
+                          key: const ValueKey('attendant-check-out-mode'),
+                          label: 'Xe ra',
+                          isSelected:
+                              _scannerFlow == _AttendantScannerFlow.checkOut,
+                          onPressed: () => _selectScannerFlow(
+                            _AttendantScannerFlow.checkOut,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Expanded(
                   child: _mode == _AttendantGateMode.scanner
                       ? DecoratedBox(
@@ -241,14 +339,16 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                         ),
                 ),
                 const SizedBox(height: 16),
-                if (_mode == _AttendantGateMode.scanner)
+                if (_mode == _AttendantGateMode.scanner &&
+                    _scannerFlow == _AttendantScannerFlow.checkIn)
                   FilledButton.icon(
                     key: const ValueKey('walk-in-entry-button'),
                     onPressed: _isBusy ? null : _openWalkInMode,
                     icon: const Icon(Icons.camera_alt_outlined),
                     label: const Text('Xe vang lai'),
                   ),
-                if (_mode == _AttendantGateMode.scanner)
+                if (_mode == _AttendantGateMode.scanner &&
+                    _scannerFlow == _AttendantScannerFlow.checkIn)
                   const SizedBox(height: 16),
                 if (_errorMessage != null)
                   _FeedbackCard(
@@ -257,13 +357,19 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                     color: colorScheme.errorContainer,
                     foregroundColor: colorScheme.onErrorContainer,
                   ),
-                if (_lastResult != null)
+                if (_lastCheckInResult != null)
                   _FeedbackCard(
                     title: 'Check-in thành công',
                     message:
-                        '${_lastResult!.licensePlate}\n${_vehicleTypeLabel(_lastResult!.vehicleType)}\nCòn ${_lastResult!.currentAvailable} chỗ trong bãi',
+                        '${_lastCheckInResult!.licensePlate}\n${_vehicleTypeLabel(_lastCheckInResult!.vehicleType)}\nCòn ${_lastCheckInResult!.currentAvailable} chỗ trong bãi',
                     color: const Color(0xFF003B1F),
                     foregroundColor: const Color(0xFFB9F6CA),
+                  ),
+                if (_lastCheckOutPreview != null)
+                  _CheckOutPreviewCard(
+                    preview: _lastCheckOutPreview!,
+                    vehicleTypeLabel: _vehicleTypeLabel,
+                    formatCurrency: _formatCurrency,
                   ),
               ],
             ),
@@ -275,6 +381,44 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
 
   String _vehicleTypeLabel(String vehicleType) {
     return vehicleType.toUpperCase() == 'CAR' ? 'Ô tô' : 'Xe máy';
+  }
+
+  String _formatCurrency(double amount) {
+    final digits = amount.round().toString();
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < digits.length; index += 1) {
+      final remaining = digits.length - index;
+      buffer.write(digits[index]);
+      if (remaining > 1 && remaining % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+
+    return '${buffer.toString()} VND';
+  }
+}
+
+class _ScannerModeButton extends StatelessWidget {
+  const _ScannerModeButton({
+    super.key,
+    required this.label,
+    required this.isSelected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Text(label);
+    if (isSelected) {
+      return FilledButton(onPressed: onPressed, child: child);
+    }
+
+    return OutlinedButton(onPressed: onPressed, child: child);
   }
 }
 
@@ -460,6 +604,74 @@ class _FeedbackCard extends StatelessWidget {
               style: Theme.of(
                 context,
               ).textTheme.bodyLarge?.copyWith(color: foregroundColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckOutPreviewCard extends StatelessWidget {
+  const _CheckOutPreviewCard({
+    required this.preview,
+    required this.vehicleTypeLabel,
+    required this.formatCurrency,
+  });
+
+  final AttendantCheckOutPreviewResult preview;
+  final String Function(String vehicleType) vehicleTypeLabel;
+  final String Function(double amount) formatCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFF101F16),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              preview.licensePlate,
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              preview.parkingLotName,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${vehicleTypeLabel(preview.vehicleType)} • ${preview.elapsedMinutes} phut',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              formatCurrency(preview.finalFee),
+              key: const ValueKey('attendant-check-out-amount'),
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                color: const Color(0xFFB9F6CA),
+                fontWeight: FontWeight.w900,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tinh theo ${preview.pricingMode}',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(color: Colors.white60),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
