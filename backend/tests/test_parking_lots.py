@@ -127,6 +127,24 @@ class TestPublicParkingLots:
 
         assert result == [approved_lot]
 
+    @pytest.mark.asyncio
+    async def test_list_public_lots_exposes_marker_summary_fields(self, mock_db):
+        approved_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
+        approved_lot.current_available = 12
+        lots_result = MagicMock()
+        lots_result.scalars.return_value.all.return_value = [approved_lot]
+        mock_db.execute = AsyncMock(return_value=lots_result)
+
+        result = await list_lots(Mock(), mock_db)
+        marker_summary = ParkingLotRead.model_validate(result[0])
+
+        assert marker_summary.id == approved_lot.id
+        assert marker_summary.name == approved_lot.name
+        assert marker_summary.latitude == approved_lot.latitude
+        assert marker_summary.longitude == approved_lot.longitude
+        assert marker_summary.current_available == 12
+        assert marker_summary.status == ParkingLotStatus.APPROVED.value
+
 
 class TestLotOwnerParkingLots:
     @pytest.mark.asyncio

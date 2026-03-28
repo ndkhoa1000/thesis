@@ -1,6 +1,6 @@
 # Story 5.1: View Interactive Map & Lots
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,21 +28,21 @@ so that I can locate nearby parking instantly.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Introduce backend-backed driver lot-discovery contract (AC: 1, 3)
-  - [ ] Reuse or extend `GET /lots` in `backend/src/app/api/v1/lots.py` so driver clients receive only active lots with coordinates, availability, and enough summary metadata for map markers.
-  - [ ] Keep the response read-only; this story does not mutate lots, sessions, or bookings.
-  - [ ] Preserve the current backend pattern of explicit schema builders and role-safe access checks.
+- [x] Task 1: Introduce backend-backed driver lot-discovery contract (AC: 1, 3)
+  - [x] Reuse or extend `GET /lots` in `backend/src/app/api/v1/lots.py` so driver clients receive only active lots with coordinates, availability, and enough summary metadata for map markers.
+  - [x] Keep the response read-only; this story does not mutate lots, sessions, or bookings.
+  - [x] Preserve the current backend pattern of explicit schema builders and role-safe access checks.
 
-- [ ] Task 2: Move the driver map into a dedicated feature module (AC: 1, 2, 3, 4)
-  - [ ] Extract the temporary `MapScreen` logic from `mobile/lib/main.dart` into a dedicated feature folder such as `mobile/lib/src/features/map_discovery/`.
-  - [ ] Add a typed service and model layer that fetches lot markers from FastAPI using `Dio` and the authenticated access token.
-  - [ ] Render clustered markers with color-coded availability states and visible counts, replacing mock marker text rendering.
-  - [ ] Keep a non-blocking fallback viewport when location permission is denied.
+- [x] Task 2: Move the driver map into a dedicated feature module (AC: 1, 2, 3, 4)
+  - [x] Extract the temporary `MapScreen` logic from `mobile/lib/main.dart` into a dedicated feature folder such as `mobile/lib/src/features/map_discovery/`.
+  - [x] Add a typed service and model layer that fetches lot markers from FastAPI using `Dio` and the authenticated access token.
+  - [x] Render clustered markers with color-coded availability states and visible counts, replacing mock marker text rendering.
+  - [x] Keep a non-blocking fallback viewport when location permission is denied.
 
-- [ ] Task 3: Add focused regression coverage (AC: 1, 2, 3, 4)
-  - [ ] Add backend tests for the driver lot-list contract, verifying inactive lots are excluded and the payload exposes coordinates plus availability.
-  - [ ] Add Flutter widget or integration-oriented tests for marker rendering, permission-denied fallback UI, and marker color/availability labeling behavior.
-  - [ ] Verify backend in Docker and Flutter locally after wiring the feature.
+- [x] Task 3: Add focused regression coverage (AC: 1, 2, 3, 4)
+  - [x] Add backend tests for the driver lot-list contract, verifying inactive lots are excluded and the payload exposes coordinates plus availability.
+  - [x] Add Flutter widget or integration-oriented tests for marker rendering, permission-denied fallback UI, and marker color/availability labeling behavior.
+  - [x] Verify backend in Docker and Flutter locally after wiring the feature.
 
 ## Dev Notes
 
@@ -112,12 +112,22 @@ GPT-5.4
 
 - Story created from Epic 5 planning with explicit guardrails to replace the current mock map implementation with backend-backed discovery.
 - Current codebase anchor: the temporary driver map lives in `mobile/lib/main.dart`; this story should extract it into a dedicated feature module rather than extending the bootstrap file further.
+- Reused the existing `GET /lots` contract as the driver discovery backend and added a marker-summary regression test to lock coordinates, availability, and approved-only payload expectations.
+- Extracted the driver map into `mobile/lib/src/features/map_discovery/` with a dedicated Dio-backed service, permission fallback notice, activity summary/legend, and a production Mapbox canvas that renders clustered GeoJSON layers plus color-coded availability counts.
+- Removed the obsolete mock `MapScreen` implementation from `mobile/lib/main.dart` so the bootstrap file now routes into the extracted feature instead of holding map domain logic directly.
+- Added focused Flutter coverage for backend lot loading, cluster-enabled marker state handoff, and denied-location fallback messaging, then validated with the full Flutter suite (`48 passed`) and full backend suite (`131 passed`).
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/5-1-view-interactive-map-lots.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/tests/test_parking_lots.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/features/map_discovery/data/map_discovery_service.dart`
+- `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
+- `mobile/test/map_discovery_screen_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 5.1 implementation artifact for backend-backed map discovery, permission fallback, and clustered availability markers.
+- 2026-03-28: Implemented Story 5.1 by extracting the driver map into a backend-backed `map_discovery` feature, locking the lot marker contract with tests, and validating full backend/mobile regressions.
