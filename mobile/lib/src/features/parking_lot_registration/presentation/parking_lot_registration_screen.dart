@@ -73,7 +73,7 @@ class _ParkingLotRegistrationScreenState
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _LeaseBootstrapSheet(
+      builder: (context) => _LeaseContractSheet(
         parkingLotService: widget.parkingLotService,
         parkingLot: parkingLot,
       ),
@@ -82,7 +82,7 @@ class _ParkingLotRegistrationScreenState
     if (created == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã kích hoạt quyền điều hành cho operator.'),
+          content: Text('Đã tạo hợp đồng thuê và gửi cho operator.'),
         ),
       );
       _reload();
@@ -201,6 +201,11 @@ class _ParkingLotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canCreateLeaseContract =
+      parkingLot.isApproved &&
+      (parkingLot.activeLeaseStatus == null ||
+        !{'PENDING', 'ACTIVE'}.contains(parkingLot.activeLeaseStatus));
+
     final (color, icon, title, message) = switch (parkingLot.status) {
       'APPROVED' => (
         Colors.green,
@@ -272,11 +277,11 @@ class _ParkingLotCard extends StatelessWidget {
                 label: 'Lease',
                 value: parkingLot.activeLeaseStatus!,
               ),
-            if (parkingLot.isApproved && parkingLot.activeLeaseId == null) ...[
+            if (canCreateLeaseContract) ...[
               const SizedBox(height: 8),
               FilledButton(
                 onPressed: onBootstrapLease,
-                child: const Text('Gán operator thử nghiệm'),
+                child: const Text('Tạo hợp đồng thuê'),
               ),
             ],
           ],
@@ -286,8 +291,8 @@ class _ParkingLotCard extends StatelessWidget {
   }
 }
 
-class _LeaseBootstrapSheet extends StatefulWidget {
-  const _LeaseBootstrapSheet({
+class _LeaseContractSheet extends StatefulWidget {
+  const _LeaseContractSheet({
     required this.parkingLotService,
     required this.parkingLot,
   });
@@ -296,18 +301,31 @@ class _LeaseBootstrapSheet extends StatefulWidget {
   final ParkingLotRegistration parkingLot;
 
   @override
-  State<_LeaseBootstrapSheet> createState() => _LeaseBootstrapSheetState();
+  State<_LeaseContractSheet> createState() => _LeaseContractSheetState();
 }
 
-class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
+class _LeaseContractSheetState extends State<_LeaseContractSheet> {
   late Future<List<AvailableOperatorOption>> _operatorsFuture;
   AvailableOperatorOption? _selectedOperator;
+  final _monthlyFeeController = TextEditingController(text: '15000000');
+  final _revenueShareController = TextEditingController(text: '35');
+  final _termMonthsController = TextEditingController(text: '6');
+  final _additionalTermsController = TextEditingController();
   bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _operatorsFuture = widget.parkingLotService.getAvailableOperators();
+  }
+
+  @override
+  void dispose() {
+    _monthlyFeeController.dispose();
+    _revenueShareController.dispose();
+    _termMonthsController.dispose();
+    _additionalTermsController.dispose();
+    super.dispose();
   }
 
   Future<void> _submit() async {
@@ -319,14 +337,40 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
       return;
     }
 
+    final monthlyFee = double.tryParse(_monthlyFeeController.text.trim());
+    final revenueShare = double.tryParse(_revenueShareController.text.trim());
+    final termMonths = int.tryParse(_termMonthsController.text.trim());
+    if (monthlyFee == null || monthlyFee < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Phí thuê hàng tháng không hợp lệ.')),
+      );
+      return;
+    }
+    if (revenueShare == null || revenueShare <= 0 || revenueShare > 100) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tỷ lệ chia doanh thu phải từ 0 đến 100.')),
+      );
+      return;
+    }
+    if (termMonths == null || termMonths <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thời hạn hợp đồng phải lớn hơn 0 tháng.')),
+      );
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
 
     try {
-      await widget.parkingLotService.bootstrapLease(
+      await widget.parkingLotService.createLeaseContract(
         parkingLotId: widget.parkingLot.id,
         managerUserId: operator.userId,
+        monthlyFee: monthlyFee,
+        revenueSharePercentage: revenueShare,
+        termMonths: termMonths,
+        additionalTerms: _emptyToNull(_additionalTermsController.text),
       );
       if (!mounted) {
         return;
@@ -346,6 +390,11 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
         });
       }
     }
+  }
+
+  String? _emptyToNull(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   @override
@@ -382,7 +431,7 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Kích hoạt operator cho ${widget.parkingLot.name}',
+                  'Tạo hợp đồng thuê cho ${widget.parkingLot.name}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
@@ -394,20 +443,60 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
                     ),
                   )
                 else
-                  ...operators.map(
-                    (operator) => RadioListTile<int>(
-                      value: operator.userId,
-                      groupValue: _selectedOperator?.userId,
-                      title: Text(operator.name),
-                      subtitle: Text(operator.email),
-                      onChanged: _isSubmitting
-                          ? null
-                          : (_) {
-                              setState(() {
-                                _selectedOperator = operator;
-                              });
-                            },
-                    ),
+                  Column(
+                    children: [
+                      ...operators.map(
+                        (operator) => RadioListTile<int>(
+                          value: operator.userId,
+                          groupValue: _selectedOperator?.userId,
+                          title: Text(operator.name),
+                          subtitle: Text(operator.email),
+                          onChanged: _isSubmitting
+                              ? null
+                              : (_) {
+                                  setState(() {
+                                    _selectedOperator = operator;
+                                  });
+                                },
+                        ),
+                      ),
+                      TextField(
+                        controller: _monthlyFeeController,
+                        enabled: !_isSubmitting,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Phí thuê hàng tháng (VND)',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _revenueShareController,
+                        enabled: !_isSubmitting,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Tỷ lệ doanh thu cho chủ bãi (%)',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _termMonthsController,
+                        enabled: !_isSubmitting,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Thời hạn hợp đồng (tháng)',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _additionalTermsController,
+                        enabled: !_isSubmitting,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                          labelText: 'Điều khoản bổ sung (tuỳ chọn)',
+                        ),
+                      ),
+                    ],
                   ),
                 const SizedBox(height: 12),
                 SizedBox(
@@ -418,8 +507,8 @@ class _LeaseBootstrapSheetState extends State<_LeaseBootstrapSheet> {
                         : _submit,
                     child: Text(
                       _isSubmitting
-                          ? 'Đang kích hoạt...'
-                          : 'Kích hoạt điều hành',
+                          ? 'Đang tạo hợp đồng...'
+                          : 'Gửi hợp đồng cho operator',
                     ),
                   ),
                 ),

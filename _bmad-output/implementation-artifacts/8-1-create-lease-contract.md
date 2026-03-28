@@ -1,6 +1,6 @@
 # Story 8.1: Create Lease Contract
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -29,25 +29,25 @@ so that they can manage my lot for a revenue split.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement the backend lease-contract lifecycle for owner invitation and operator acceptance (AC: 1, 2, 3, 4)
-  - [ ] Add or complete the backend schemas, route contracts, and persistence logic required for a Lot Owner to create a lease contract draft for an approved lot and invited Operator.
-  - [ ] Ensure the Operator can read and accept the received contract through backend-owned state transitions that activate the lease without duplicate active-lease records.
-  - [ ] Reject invalid lot/operator combinations, duplicate active leases, and malformed commercial terms without partial state.
+- [x] Task 1: Implement the backend lease-contract lifecycle for owner invitation and operator acceptance (AC: 1, 2, 3, 4)
+  - [x] Add or complete the backend schemas, route contracts, and persistence logic required for a Lot Owner to create a lease contract draft for an approved lot and invited Operator.
+  - [x] Ensure the Operator can read and accept the received contract through backend-owned state transitions that activate the lease without duplicate active-lease records.
+  - [x] Reject invalid lot/operator combinations, duplicate active leases, and malformed commercial terms without partial state.
 
-- [ ] Task 2: Replace the temporary bootstrap path with a first-class owner/operator workflow (AC: 2, 5)
-  - [ ] Rework the current lease-bootstrap entry point in the Lot Owner flow so it leads into a formal contract-generation experience instead of directly activating an operator.
-  - [ ] Add the minimum Operator-facing contract review/acceptance surface needed to exercise the lease lifecycle in the current app shell arrangement.
-  - [ ] Keep the workflow consistent with the existing multi-capability public account model and avoid introducing a second workspace-routing mechanism ahead of Epic 9.
+- [x] Task 2: Replace the temporary bootstrap path with a first-class owner/operator workflow (AC: 2, 5)
+  - [x] Rework the current lease-bootstrap entry point in the Lot Owner flow so it leads into a formal contract-generation experience instead of directly activating an operator.
+  - [x] Add the minimum Operator-facing contract review/acceptance surface needed to exercise the lease lifecycle in the current app shell arrangement.
+  - [x] Keep the workflow consistent with the existing multi-capability public account model and avoid introducing a second workspace-routing mechanism ahead of Epic 9.
 
-- [ ] Task 3: Preserve lifecycle truth for active and expired leases (AC: 3, 4)
-  - [ ] Enforce that only one authoritative active lease exists per lot at a time.
-  - [ ] Surface explicit lease/contract status information to owner/operator reads so expired or inactive contracts do not masquerade as active management.
-  - [ ] Keep the owner-visible manual override seam for expired leases aligned with the repo's existing lot-status and suspension patterns.
+- [x] Task 3: Preserve lifecycle truth for active and expired leases (AC: 3, 4)
+  - [x] Enforce that only one authoritative active lease exists per lot at a time.
+  - [x] Surface explicit lease/contract status information to owner/operator reads so expired or inactive contracts do not masquerade as active management.
+  - [x] Keep the owner-visible manual override seam for expired leases aligned with the repo's existing lot-status and suspension patterns.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for contract creation, duplicate-lease rejection, operator acceptance, and expired-state visibility.
-  - [ ] Add mobile tests for the Lot Owner contract-invitation surface and the Operator contract-review/acceptance path.
-  - [ ] Verify with backend Docker tests and local `flutter test` for the touched lease-management surfaces.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for contract creation, duplicate-lease rejection, operator acceptance, and expired-state visibility.
+  - [x] Add mobile tests for the Lot Owner contract-invitation surface and the Operator contract-review/acceptance path.
+  - [x] Verify with backend Docker tests and local `flutter test` for the touched lease-management surfaces.
 
 ## Dev Notes
 
@@ -154,13 +154,31 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story context anchored on Epic 8 lease-lifecycle goals, PRD leasing requirements, Epic 3 retrospective guidance, existing backend lease models, and the current mobile bootstrap owner/operator flows.
+- Added a dedicated backend lease router with owner contract creation plus operator contract list and acceptance endpoints, backed by canonical lease commercial-term fields and generated contract content.
+- Replaced the owner-side temporary bootstrap interaction with a contract-draft flow in the current Lot Owner workspace and added an operator pending-contract review/acceptance surface in the current operator workspace.
+- Hardened lease reads so expired leases surface explicitly without leaving operator-managed flows looking actively assigned forever.
+- Validation completed with `cd backend && uv run pytest`, `cd mobile && flutter test`, focused owner/operator widget tests, and `cd backend && docker compose run --rm pytest python -m pytest tests/test_leases.py tests/test_parking_lots.py`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/8-1-create-lease-contract.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/__init__.py`
+- `backend/src/app/api/v1/leases.py`
+- `backend/src/app/api/v1/lots.py`
+- `backend/src/app/models/leases.py`
+- `backend/src/app/schemas/lease_contract.py`
+- `backend/src/migrations/versions/c1b2c3d4e5f6_add_lease_terms_fields.py`
+- `backend/tests/test_leases.py`
+- `mobile/lib/src/features/lease_contract/data/lease_contract_models.dart`
+- `mobile/lib/src/features/parking_lot_registration/data/parking_lot_service.dart`
+- `mobile/lib/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart`
+- `mobile/lib/src/features/operator_lot_management/data/operator_lot_management_service.dart`
+- `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
+- `mobile/test/final_shift_close_out_test.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 8.1 implementation artifact for replacing temporary lease bootstrap with a first-class lease contract lifecycle.
+- 2026-03-28: Implemented Story 8.1 with canonical lease commercial-term fields, backend contract draft/accept APIs, owner/operator workspace integration, and focused plus full regression validation.

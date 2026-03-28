@@ -11,6 +11,7 @@ import 'package:parking_app/src/features/attendant_check_in/data/attendant_check
 import 'package:parking_app/src/features/auth/data/auth_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
+import 'package:parking_app/src/features/lease_contract/data/lease_contract_models.dart';
 import 'package:parking_app/src/features/lot_details/data/lot_details_service.dart';
 import 'package:parking_app/src/features/map_discovery/data/map_discovery_service.dart';
 import 'package:parking_app/src/features/map_discovery/presentation/map_discovery_screen.dart';
@@ -492,6 +493,8 @@ class FakeParkingLotService implements ParkingLotService {
       businessLicense: 'OP-001',
     ),
   ];
+  int _nextLeaseId = 88;
+  int _nextContractId = 120;
   int _nextId = 100;
 
   @override
@@ -527,6 +530,61 @@ class FakeParkingLotService implements ParkingLotService {
   @override
   Future<List<AvailableOperatorOption>> getAvailableOperators() async {
     return List<AvailableOperatorOption>.from(_operators);
+  }
+
+  @override
+  Future<LeaseContractSummary> createLeaseContract({
+    required int parkingLotId,
+    required int managerUserId,
+    required double monthlyFee,
+    required double revenueSharePercentage,
+    required int termMonths,
+    String? additionalTerms,
+  }) async {
+    final operator = _operators.firstWhere(
+      (item) => item.userId == managerUserId,
+    );
+    final index = _parkingLots.indexWhere((lot) => lot.id == parkingLotId);
+    final current = _parkingLots[index];
+    final leaseId = _nextLeaseId++;
+    _parkingLots[index] = ParkingLotRegistration(
+      id: current.id,
+      lotOwnerId: current.lotOwnerId,
+      name: current.name,
+      address: current.address,
+      latitude: current.latitude,
+      longitude: current.longitude,
+      currentAvailable: current.currentAvailable,
+      status: current.status,
+      description: current.description,
+      coverImage: current.coverImage,
+      createdAt: current.createdAt,
+      updatedAt: DateTime(2026, 3, 28),
+      activeLeaseId: leaseId,
+      activeLeaseStatus: 'PENDING',
+      activeOperatorUserId: operator.userId,
+      activeOperatorName: operator.name,
+    );
+    return LeaseContractSummary(
+      contractId: _nextContractId++,
+      leaseId: leaseId,
+      parkingLotId: parkingLotId,
+      parkingLotName: current.name,
+      managerId: operator.managerId,
+      managerUserId: operator.userId,
+      operatorName: operator.name,
+      operatorEmail: operator.email,
+      ownerName: 'Nguyen Van A',
+      ownerEmail: 'owner@test.com',
+      leaseStatus: 'PENDING',
+      contractStatus: 'DRAFT',
+      monthlyFee: monthlyFee,
+      revenueSharePercentage: revenueSharePercentage,
+      termMonths: termMonths,
+      contractNumber: 'LC-$parkingLotId-$leaseId',
+      content: additionalTerms,
+      generatedAt: DateTime(2026, 3, 28),
+    );
   }
 
   @override
@@ -574,11 +632,13 @@ class FakeParkingLotService implements ParkingLotService {
 class FakeOperatorLotManagementService implements OperatorLotManagementService {
   FakeOperatorLotManagementService({
     List<OperatorManagedParkingLot>? initialLots,
+    List<LeaseContractSummary>? initialContracts,
     Map<int, List<OperatorManagedAttendant>>? attendantsByLot,
     Map<int, List<OperatorLotAnnouncement>>? announcementsByLot,
   }) : _parkingLots = List<OperatorManagedParkingLot>.from(
          initialLots ?? const [],
        ),
+       _contracts = List<LeaseContractSummary>.from(initialContracts ?? const []),
        _attendantsByLot = {
          for (final entry
              in (attendantsByLot ??
@@ -595,6 +655,7 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
        };
 
   final List<OperatorManagedParkingLot> _parkingLots;
+  final List<LeaseContractSummary> _contracts;
   final Map<int, List<OperatorManagedAttendant>> _attendantsByLot;
   final Map<int, List<OperatorLotAnnouncement>> _announcementsByLot;
   int _nextAttendantId = 200;
@@ -603,6 +664,56 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   @override
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots() async {
     return List<OperatorManagedParkingLot>.from(_parkingLots);
+  }
+
+  @override
+  Future<List<LeaseContractSummary>> getLeaseContracts() async {
+    return List<LeaseContractSummary>.from(_contracts);
+  }
+
+  @override
+  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId}) async {
+    final index = _contracts.indexWhere((item) => item.leaseId == leaseId);
+    final current = _contracts[index];
+    final accepted = LeaseContractSummary(
+      contractId: current.contractId,
+      leaseId: current.leaseId,
+      parkingLotId: current.parkingLotId,
+      parkingLotName: current.parkingLotName,
+      managerId: current.managerId,
+      managerUserId: current.managerUserId,
+      operatorName: current.operatorName,
+      operatorEmail: current.operatorEmail,
+      ownerName: current.ownerName,
+      ownerEmail: current.ownerEmail,
+      leaseStatus: 'ACTIVE',
+      contractStatus: 'ACTIVE',
+      monthlyFee: current.monthlyFee,
+      revenueSharePercentage: current.revenueSharePercentage,
+      termMonths: current.termMonths,
+      contractNumber: current.contractNumber,
+      content: current.content,
+      generatedAt: current.generatedAt,
+      startDate: DateTime(2026, 3, 28),
+      endDate: DateTime(2026, 9, 28),
+    );
+    _contracts[index] = accepted;
+    _parkingLots.insert(
+      0,
+      OperatorManagedParkingLot(
+        id: current.parkingLotId,
+        leaseId: current.leaseId,
+        lotOwnerId: 1,
+        name: current.parkingLotName,
+        address: '1 Nguyen Hue, Quan 1',
+        latitude: 10.7732,
+        longitude: 106.7041,
+        currentAvailable: 0,
+        status: 'APPROVED',
+        occupiedCount: 0,
+      ),
+    );
+    return accepted;
   }
 
   @override
@@ -1694,7 +1805,7 @@ void main() {
     expect(find.text('Đang chờ duyệt'), findsOneWidget);
   });
 
-  testWidgets('Lot owner workspace can bootstrap an operator lease', (
+  testWidgets('Lot owner workspace can create a lease contract draft', (
     WidgetTester tester,
   ) async {
     final parkingLotService = FakeParkingLotService(
@@ -1722,21 +1833,82 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.widgetWithText(FilledButton, 'Gán operator thử nghiệm'),
-    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Tạo hợp đồng thuê'));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Tran Thi B'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Kích hoạt điều hành'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Phí thuê hàng tháng (VND)'),
+      '15000000',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Tỷ lệ doanh thu cho chủ bãi (%)'),
+      '35',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Thời hạn hợp đồng (tháng)'),
+      '6',
+    );
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Gửi hợp đồng cho operator'),
+    );
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.text('Operator đang phụ trách'), findsOneWidget);
     expect(find.text('Tran Thi B'), findsWidgets);
     expect(find.text('Lease'), findsOneWidget);
-    expect(find.text('ACTIVE'), findsOneWidget);
+    expect(find.text('PENDING'), findsOneWidget);
+  });
+
+  testWidgets('Operator workspace can accept a pending lease contract', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialContracts: [
+        LeaseContractSummary(
+          contractId: 120,
+          leaseId: 88,
+          parkingLotId: 7,
+          parkingLotName: 'Bai xe Nguyen Hue',
+          managerId: 4,
+          managerUserId: 9,
+          operatorName: 'Tran Thi B',
+          operatorEmail: 'operator@test.com',
+          ownerName: 'Nguyen Van A',
+          ownerEmail: 'owner@test.com',
+          leaseStatus: 'PENDING',
+          contractStatus: 'DRAFT',
+          monthlyFee: 15000000,
+          revenueSharePercentage: 35,
+          termMonths: 6,
+          contractNumber: 'LC-7-88',
+          content: 'Operator manages the lot under owner oversight.',
+          generatedAt: DateTime(2026, 3, 28),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hợp đồng chờ xác nhận'), findsOneWidget);
+    expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Chấp nhận hợp đồng'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hợp đồng chờ xác nhận'), findsNothing);
+    expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
   });
 
   testWidgets('Admin dashboard can approve a pending parking lot', (

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.db.database import Base
@@ -17,6 +17,8 @@ class LotLease(Base):
     parking_lot_id: Mapped[int] = mapped_column(ForeignKey("parking_lot.id"), index=True)
     manager_id: Mapped[int] = mapped_column(ForeignKey("manager.id"), index=True)
     monthly_fee: Mapped[float] = mapped_column(Numeric(12, 2))
+    revenue_share_percentage: Mapped[float] = mapped_column(Numeric(5, 2), default=0.00)
+    term_months: Mapped[int] = mapped_column(Integer, default=1)
     # Optional / defaulted fields
     start_date: Mapped[datetime | None] = mapped_column(Date, default=None)
     end_date: Mapped[datetime | None] = mapped_column(Date, default=None)

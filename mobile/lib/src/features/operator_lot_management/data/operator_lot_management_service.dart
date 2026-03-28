@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../lease_contract/data/lease_contract_models.dart';
+
 DateTime? _parseDateTime(dynamic value) {
   if (value is! String || value.isEmpty) {
     return null;
@@ -274,6 +276,10 @@ class OperatorFinalShiftCloseOutDetail {
 abstract class OperatorLotManagementService {
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots();
 
+  Future<List<LeaseContractSummary>> getLeaseContracts();
+
+  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId});
+
   Future<List<OperatorShiftAlert>> getShiftHandoverAlerts();
 
   Future<OperatorFinalShiftCloseOutDetail> getFinalShiftCloseOutDetail({
@@ -374,6 +380,47 @@ class BackendOperatorLotManagementService
           .whereType<Map<String, dynamic>>()
           .map(OperatorManagedParkingLot.fromJson)
           .toList(growable: false);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<List<LeaseContractSummary>> getLeaseContracts() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/leases/operator/contracts',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! List) {
+        throw const OperatorLotManagementException(
+          'Phản hồi danh sách hợp đồng thuê không hợp lệ.',
+        );
+      }
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(LeaseContractSummary.fromJson)
+          .toList(growable: false);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId}) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/leases/operator/contracts/$leaseId/accept',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const OperatorLotManagementException(
+          'Phản hồi chấp nhận hợp đồng thuê không hợp lệ.',
+        );
+      }
+      return LeaseContractSummary.fromJson(raw);
     } on DioException catch (error) {
       throw OperatorLotManagementException(_extractMessage(error));
     }

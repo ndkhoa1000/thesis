@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:parking_app/src/features/attendant_check_in/data/attendant_check_in_service.dart';
+import 'package:parking_app/src/features/lease_contract/data/lease_contract_models.dart';
 import 'package:parking_app/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart';
 import 'package:parking_app/src/features/operator_lot_management/data/operator_lot_management_service.dart';
 import 'package:parking_app/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart';
@@ -106,6 +107,16 @@ class FakeFinalShiftCloseOutAttendantService
 class FakeFinalShiftCloseOutOperatorService
     implements OperatorLotManagementService {
   int completeCalls = 0;
+
+  @override
+  Future<List<LeaseContractSummary>> getLeaseContracts() async {
+    return const [];
+  }
+
+  @override
+  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId}) async {
+    throw UnimplementedError();
+  }
 
   @override
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots() async {

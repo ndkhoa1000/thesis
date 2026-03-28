@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../lease_contract/data/lease_contract_models.dart';
 import '../data/operator_lot_management_service.dart';
 
 String _formatAnnouncementDateTime(DateTime value) {
@@ -68,7 +69,7 @@ class OperatorLotManagementScreen extends StatefulWidget {
 
 class _OperatorLotManagementScreenState
     extends State<OperatorLotManagementScreen> {
-  late Future<List<OperatorManagedParkingLot>> _managedLotsFuture;
+  late Future<_OperatorWorkspaceData> _workspaceFuture;
 
   @override
   void initState() {
@@ -78,8 +79,34 @@ class _OperatorLotManagementScreenState
 
   void _reload() {
     setState(() {
-      _managedLotsFuture = widget.lotManagementService.getManagedParkingLots();
+      _workspaceFuture = _loadWorkspace();
     });
+  }
+
+  Future<_OperatorWorkspaceData> _loadWorkspace() async {
+    final lots = await widget.lotManagementService.getManagedParkingLots();
+    final contracts = await widget.lotManagementService.getLeaseContracts();
+    return _OperatorWorkspaceData(lots: lots, contracts: contracts);
+  }
+
+  Future<void> _acceptLeaseContract(LeaseContractSummary contract) async {
+    try {
+      await widget.lotManagementService.acceptLeaseContract(leaseId: contract.leaseId);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đã chấp nhận hợp đồng cho ${contract.parkingLotName}.')),
+      );
+      _reload();
+    } on OperatorLotManagementException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+      );
+    }
   }
 
   Future<void> _openForm(OperatorManagedParkingLot lot) async {
@@ -182,8 +209,8 @@ class _OperatorLotManagementScreenState
           ),
         ],
       ),
-      body: FutureBuilder<List<OperatorManagedParkingLot>>(
-        future: _managedLotsFuture,
+      body: FutureBuilder<_OperatorWorkspaceData>(
+        future: _workspaceFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -196,24 +223,48 @@ class _OperatorLotManagementScreenState
             );
           }
 
-          final lots = snapshot.data ?? const <OperatorManagedParkingLot>[];
-          if (lots.isEmpty) {
+          final workspace = snapshot.data ?? const _OperatorWorkspaceData();
+          final lots = workspace.lots;
+          final pendingContracts = workspace.contracts
+              .where((contract) => contract.isPending)
+              .toList(growable: false);
+
+          if (lots.isEmpty && pendingContracts.isEmpty) {
             return const _OperatorLotEmptyState();
           }
 
-          return ListView.separated(
+          return ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: lots.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final lot = lots[index];
-              return _ManagedLotCard(
-                parkingLot: lot,
-                onConfigure: () => _openForm(lot),
-                onManageAttendants: () => _openAttendantManagement(lot),
-                onManageAnnouncements: () => _openAnnouncementManagement(lot),
-              );
-            },
+            children: [
+              if (pendingContracts.isNotEmpty) ...[
+                Text(
+                  'Hợp đồng chờ xác nhận',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                ...pendingContracts.map(
+                  (contract) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PendingLeaseContractCard(
+                      contract: contract,
+                      onAccept: () => _acceptLeaseContract(contract),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              ...lots.map(
+                (lot) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _ManagedLotCard(
+                    parkingLot: lot,
+                    onConfigure: () => _openForm(lot),
+                    onManageAttendants: () => _openAttendantManagement(lot),
+                    onManageAnnouncements: () => _openAnnouncementManagement(lot),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -253,6 +304,78 @@ class _OperatorLotEmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PendingLeaseContractCard extends StatelessWidget {
+  const _PendingLeaseContractCard({
+    required this.contract,
+    required this.onAccept,
+  });
+
+  final LeaseContractSummary contract;
+  final VoidCallback onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: const Color(0xFFE8F5E9),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    contract.parkingLotName,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                const Chip(label: Text('DRAFT')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _InfoRow(label: 'Chủ bãi', value: contract.ownerName),
+            _InfoRow(label: 'Số hợp đồng', value: contract.contractNumber),
+            _InfoRow(
+              label: 'Phí thuê hàng tháng',
+              value: '${contract.monthlyFee.toStringAsFixed(0)} VND',
+            ),
+            _InfoRow(
+              label: 'Tỷ lệ doanh thu cho chủ bãi',
+              value: '${contract.revenueSharePercentage.toStringAsFixed(0)}%',
+            ),
+            _InfoRow(
+              label: 'Thời hạn',
+              value: '${contract.termMonths} tháng',
+            ),
+            if ((contract.content ?? '').isNotEmpty)
+              _InfoRow(label: 'Điều khoản', value: contract.content!),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: onAccept,
+                icon: const Icon(Icons.task_alt_outlined),
+                label: const Text('Chấp nhận hợp đồng'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OperatorWorkspaceData {
+  const _OperatorWorkspaceData({
+    this.lots = const <OperatorManagedParkingLot>[],
+    this.contracts = const <LeaseContractSummary>[],
+  });
+
+  final List<OperatorManagedParkingLot> lots;
+  final List<LeaseContractSummary> contracts;
 }
 
 class _ManagedLotCard extends StatelessWidget {

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../lease_contract/data/lease_contract_models.dart';
+
 class ParkingLotRegistration {
   const ParkingLotRegistration({
     required this.id,
@@ -139,6 +141,15 @@ abstract class ParkingLotService {
 
   Future<List<AvailableOperatorOption>> getAvailableOperators();
 
+  Future<LeaseContractSummary> createLeaseContract({
+    required int parkingLotId,
+    required int managerUserId,
+    required double monthlyFee,
+    required double revenueSharePercentage,
+    required int termMonths,
+    String? additionalTerms,
+  });
+
   Future<LeaseBootstrapAssignment> bootstrapLease({
     required int parkingLotId,
     required int managerUserId,
@@ -203,6 +214,37 @@ class BackendParkingLotService implements ParkingLotService {
           .whereType<Map<String, dynamic>>()
           .map(AvailableOperatorOption.fromJson)
           .toList(growable: false);
+    } on DioException catch (error) {
+      throw ParkingLotException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<LeaseContractSummary> createLeaseContract({
+    required int parkingLotId,
+    required int managerUserId,
+    required double monthlyFee,
+    required double revenueSharePercentage,
+    required int termMonths,
+    String? additionalTerms,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/leases/owner/parking-lots/$parkingLotId/contracts',
+        data: {
+          'manager_user_id': managerUserId,
+          'monthly_fee': monthlyFee,
+          'revenue_share_percentage': revenueSharePercentage,
+          'term_months': termMonths,
+          'additional_terms': additionalTerms,
+        },
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const ParkingLotException('Phản hồi tạo hợp đồng thuê không hợp lệ.');
+      }
+      return LeaseContractSummary.fromJson(raw);
     } on DioException catch (error) {
       throw ParkingLotException(_extractMessage(error));
     }

@@ -2,10 +2,17 @@
 
 import asyncio
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,17 +24,21 @@ from ...core.exceptions.http_exceptions import (
     ForbiddenException,
     NotFoundException,
 )
-from ...core.lot_availability import lot_availability_hub, publish_lot_availability_update
+from ...core.lot_availability import (
+    lot_availability_hub,
+    publish_lot_availability_update,
+)
 from ...core.security import TokenType, get_password_hash, verify_token
 from ...crud.crud_users import crud_users
 from ...models.enums import (
+    LeaseContractStatus,
     LeaseStatus,
     ParkingLotStatus,
     SessionStatus,
     UserRole,
     VehicleTypeAll,
 )
-from ...models.leases import LotLease
+from ...models.leases import LeaseContract, LotLease
 from ...models.notifications import ParkingLotAnnouncement
 from ...models.parking import (
     ParkingLot,
@@ -45,10 +56,10 @@ from ...schemas.parking_lot import (
     OperatorManagedAnnouncementUpdate,
     OperatorManagedAttendantCreate,
     OperatorManagedAttendantRead,
-    ParkingLotAnnouncementRead,
     OperatorManagedParkingLotRead,
     OperatorManagedParkingLotUpdate,
     ParkingLotAdminRead,
+    ParkingLotAnnouncementRead,
     ParkingLotCreate,
     ParkingLotDriverDetailRead,
     ParkingLotLeaseBootstrapCreate,
@@ -66,6 +77,24 @@ router = APIRouter(tags=["lots"])
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+async def _expire_lease_and_contract_if_needed(db: AsyncSession, lease: LotLease) -> LotLease:
+    lease_end = lease.end_date.date() if isinstance(lease.end_date, datetime) else lease.end_date
+    if (
+        lease.status != LeaseStatus.ACTIVE.value
+        or not isinstance(lease_end, date)
+        or lease_end >= _utcnow().date()
+    ):
+        return lease
+
+    lease.status = LeaseStatus.EXPIRED.value
+    contract_result = await db.execute(select(LeaseContract).where(LeaseContract.lease_id == lease.id).limit(1))
+    contract = contract_result.scalar_one_or_none()
+    if contract is not None and contract.status == LeaseContractStatus.ACTIVE.value:
+        contract.status = LeaseContractStatus.EXPIRED.value
+    await db.commit()
+    return lease
 
 
 def _ensure_public_account(current_user: dict[str, Any]) -> None:
@@ -209,7 +238,13 @@ async def _get_active_lease_for_manager(
         .order_by(LotLease.created_at.desc(), LotLease.id.desc())
         .limit(1)
     )
-    return lease_result.scalar_one_or_none()
+    lease = lease_result.scalar_one_or_none()
+    if lease is None:
+        return None
+    lease = await _expire_lease_and_contract_if_needed(db, lease)
+    if lease.status != LeaseStatus.ACTIVE.value:
+        return None
+    return lease
 
 
 async def _get_operator_lot_announcement(
@@ -574,7 +609,7 @@ def _build_driver_detail_read(
     )
 
 
-async def _get_active_lease_snapshot(
+async def _get_latest_lease_snapshot(
     db: AsyncSession,
     parking_lot_id: int,
 ) -> tuple[LotLease, User] | None:
@@ -584,7 +619,6 @@ async def _get_active_lease_snapshot(
         .join(User, Manager.user_id == User.id)
         .where(
             LotLease.parking_lot_id == parking_lot_id,
-            LotLease.status == LeaseStatus.ACTIVE.value,
             User.is_deleted.is_(False),
         )
         .order_by(LotLease.created_at.desc(), LotLease.id.desc())
@@ -593,7 +627,9 @@ async def _get_active_lease_snapshot(
     lease_snapshot = lease_result.one_or_none()
     if lease_snapshot is None:
         return None
-    return tuple(lease_snapshot)
+    lease, operator_user = tuple(lease_snapshot)
+    lease = await _expire_lease_and_contract_if_needed(db, lease)
+    return lease, operator_user
 
 
 @router.get("/lots", response_model=list[ParkingLotRead])
@@ -671,11 +707,11 @@ async def read_my_parking_lots(
     parking_lots = list(lots_result.scalars().all())
     results: list[ParkingLotRead] = []
     for parking_lot in parking_lots:
-        active_lease = await _get_active_lease_snapshot(db, parking_lot.id)
-        if active_lease is None:
+        latest_lease = await _get_latest_lease_snapshot(db, parking_lot.id)
+        if latest_lease is None:
             results.append(_build_parking_lot_read(parking_lot))
             continue
-        lease, operator_user = active_lease
+        lease, operator_user = latest_lease
         results.append(
             _build_parking_lot_read(
                 parking_lot,
@@ -728,8 +764,11 @@ async def bootstrap_parking_lot_lease(
     if parking_lot.status != ParkingLotStatus.APPROVED.value:
         raise BadRequestException("Only approved parking lots can bootstrap operator access")
 
-    existing_lease = await _get_active_lease_snapshot(db, parking_lot_id)
-    if existing_lease is not None:
+    existing_lease = await _get_latest_lease_snapshot(db, parking_lot_id)
+    if existing_lease is not None and existing_lease[0].status in {
+        LeaseStatus.PENDING.value,
+        LeaseStatus.ACTIVE.value,
+    }:
         raise BadRequestException("Parking lot already has an active operator lease")
 
     manager_pair = await _get_manager_user(db, payload.manager_user_id)
