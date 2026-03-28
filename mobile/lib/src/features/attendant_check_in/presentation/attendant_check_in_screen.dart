@@ -44,6 +44,9 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
   String? _errorMessage;
   AttendantCheckInResult? _lastCheckInResult;
   AttendantCheckOutPreviewResult? _lastCheckOutPreview;
+  AttendantCheckOutFinalizeResult? _lastCheckOutFinalize;
+  AttendantCheckOutPreviewResult? _undoPreviewSnapshot;
+  double _settlementDragOffset = 0;
   String _walkInVehicleType = 'MOTORBIKE';
   String? _overviewImagePath;
   String? _plateImagePath;
@@ -64,6 +67,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       _isBusy = true;
       _errorMessage = null;
       _lastCheckOutPreview = null;
+      _lastCheckOutFinalize = null;
     });
 
     try {
@@ -92,6 +96,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       _isBusy = true;
       _errorMessage = null;
       _lastCheckInResult = null;
+      _lastCheckOutFinalize = null;
     });
 
     try {
@@ -110,6 +115,127 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
         _errorMessage = error.message;
         _isBusy = false;
       });
+    }
+  }
+
+  Future<void> _finalizeCheckOut(String paymentMethod) async {
+    if (_isBusy || _lastCheckOutPreview == null) return;
+
+    final preview = _lastCheckOutPreview!;
+    setState(() {
+      _isBusy = true;
+      _errorMessage = null;
+      _lastCheckInResult = null;
+      _settlementDragOffset = 0;
+    });
+
+    try {
+      final result = await widget.attendantCheckInService.finalizeCheckOut(
+        sessionId: preview.sessionId,
+        paymentMethod: paymentMethod,
+        quotedFinalFee: preview.finalFee,
+      );
+      if (!mounted) return;
+      setState(() {
+        _lastCheckOutFinalize = result;
+        _undoPreviewSnapshot = preview;
+        _lastCheckOutPreview = null;
+        _isBusy = false;
+      });
+      _showUndoSnackBar(result);
+    } on AttendantCheckInException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.message;
+        _isBusy = false;
+      });
+    }
+  }
+
+  Future<void> _undoCheckOut() async {
+    if (_isBusy || _lastCheckOutFinalize == null || _undoPreviewSnapshot == null) {
+      return;
+    }
+
+    final finalized = _lastCheckOutFinalize!;
+    final preview = _undoPreviewSnapshot!;
+    setState(() {
+      _isBusy = true;
+      _errorMessage = null;
+      _settlementDragOffset = 0;
+    });
+
+    try {
+      await widget.attendantCheckInService.undoCheckOut(
+        sessionId: finalized.sessionId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      setState(() {
+        _lastCheckOutPreview = preview;
+        _lastCheckOutFinalize = null;
+        _undoPreviewSnapshot = null;
+        _isBusy = false;
+      });
+    } on AttendantCheckInException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.message;
+        _isBusy = false;
+      });
+    }
+  }
+
+  void _showUndoSnackBar(AttendantCheckOutFinalizeResult result) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        content: Text(
+          result.paymentMethod == 'CASH'
+              ? 'Da ghi nhan tien mat cho ${result.licensePlate}'
+              : 'Da xac nhan thanh toan online cho ${result.licensePlate}',
+        ),
+        action: SnackBarAction(
+          label: 'Hoan tac',
+          onPressed: () {
+            _undoCheckOut();
+          },
+        ),
+      ),
+    );
+  }
+
+  void _handleSettlementDragStart(DragStartDetails details) {
+    if (_isBusy) return;
+    setState(() {
+      _settlementDragOffset = 0;
+    });
+  }
+
+  void _handleSettlementDragUpdate(DragUpdateDetails details) {
+    if (_isBusy) return;
+    setState(() {
+      _settlementDragOffset += details.primaryDelta ?? 0;
+    });
+  }
+
+  void _handleSettlementDragEnd(DragEndDetails details) {
+    if (_isBusy) return;
+    final dragOffset = _settlementDragOffset;
+    setState(() {
+      _settlementDragOffset = 0;
+    });
+
+    final velocity = details.primaryVelocity ?? 0;
+    if (dragOffset <= -140 || velocity <= -600) {
+      _finalizeCheckOut('CASH');
+      return;
+    }
+    if (dragOffset >= 140 || velocity >= 600) {
+      _finalizeCheckOut('ONLINE');
     }
   }
 
@@ -180,6 +306,8 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       _scannerFlow = _AttendantScannerFlow.checkIn;
       _lastCheckInResult = null;
       _lastCheckOutPreview = null;
+      _lastCheckOutFinalize = null;
+      _undoPreviewSnapshot = null;
       _errorMessage = null;
     });
   }
@@ -191,6 +319,8 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       _scannerFlow = _AttendantScannerFlow.checkIn;
       _overviewImagePath = null;
       _plateImagePath = null;
+      _lastCheckOutFinalize = null;
+      _undoPreviewSnapshot = null;
       _errorMessage = null;
     });
   }
@@ -205,6 +335,8 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       _errorMessage = null;
       _lastCheckInResult = null;
       _lastCheckOutPreview = null;
+      _lastCheckOutFinalize = null;
+      _undoPreviewSnapshot = null;
     });
   }
 
@@ -213,12 +345,24 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       if (_mode == _AttendantGateMode.walkIn) {
         return 'Dang tao phien walk-in...';
       }
+      if (_scannerFlow == _AttendantScannerFlow.checkOut &&
+          _lastCheckOutFinalize != null) {
+        return 'Dang hoan tac giao dich...';
+      }
+      if (_scannerFlow == _AttendantScannerFlow.checkOut &&
+          _lastCheckOutPreview != null) {
+        return 'Dang chot thanh toan...';
+      }
       return _scannerFlow == _AttendantScannerFlow.checkOut
           ? 'Dang tinh phi check-out...'
           : 'Dang xac nhan ma check-in...';
     }
     if (_mode == _AttendantGateMode.walkIn) {
       return 'San sang tao phien walk-in';
+    }
+    if (_scannerFlow == _AttendantScannerFlow.checkOut &&
+        _lastCheckOutPreview != null) {
+      return 'Vuot trai hoac phai de chot thanh toan';
     }
     return _scannerFlow == _AttendantScannerFlow.checkOut
         ? 'San sang quet xe ra bai'
@@ -303,25 +447,40 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                 ],
                 Expanded(
                   child: _mode == _AttendantGateMode.scanner
-                      ? DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: _errorMessage == null
-                                  ? colorScheme.primary
-                                  : colorScheme.error,
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(26),
-                            child: widget.scannerBuilder(
-                              context,
-                              _handleScan,
-                              _isBusy,
-                            ),
-                          ),
-                        )
+                      ? _scannerFlow == _AttendantScannerFlow.checkOut &&
+                              _lastCheckOutPreview != null
+                          ? _CheckOutSettlementZone(
+                              key: const ValueKey(
+                                'attendant-check-out-settlement-zone',
+                              ),
+                              preview: _lastCheckOutPreview!,
+                              isBusy: _isBusy,
+                              dragOffset: _settlementDragOffset,
+                              onDragStart: _handleSettlementDragStart,
+                              onDragUpdate: _handleSettlementDragUpdate,
+                              onDragEnd: _handleSettlementDragEnd,
+                              vehicleTypeLabel: _vehicleTypeLabel,
+                              formatCurrency: _formatCurrency,
+                            )
+                          : DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(28),
+                                border: Border.all(
+                                  color: _errorMessage == null
+                                      ? colorScheme.primary
+                                      : colorScheme.error,
+                                  width: 2,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(26),
+                                child: widget.scannerBuilder(
+                                  context,
+                                  _handleScan,
+                                  _isBusy,
+                                ),
+                              ),
+                            )
                       : _WalkInPanel(
                           isBusy: _isBusy,
                           vehicleType: _walkInVehicleType,
@@ -365,11 +524,21 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                     color: const Color(0xFF003B1F),
                     foregroundColor: const Color(0xFFB9F6CA),
                   ),
-                if (_lastCheckOutPreview != null)
+                if (_lastCheckOutPreview != null &&
+                    !(_mode == _AttendantGateMode.scanner &&
+                        _scannerFlow == _AttendantScannerFlow.checkOut))
                   _CheckOutPreviewCard(
                     preview: _lastCheckOutPreview!,
                     vehicleTypeLabel: _vehicleTypeLabel,
                     formatCurrency: _formatCurrency,
+                  ),
+                if (_lastCheckOutFinalize != null)
+                  _FeedbackCard(
+                    title: 'Hoan tat xe ra',
+                    message:
+                        '${_lastCheckOutFinalize!.licensePlate}\n${_paymentMethodLabel(_lastCheckOutFinalize!.paymentMethod)}\nCon ${_lastCheckOutFinalize!.currentAvailable} cho trong bai',
+                    color: const Color(0xFF003B1F),
+                    foregroundColor: const Color(0xFFB9F6CA),
                   ),
               ],
             ),
@@ -396,6 +565,12 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
     }
 
     return '${buffer.toString()} VND';
+  }
+
+  String _paymentMethodLabel(String paymentMethod) {
+    return paymentMethod == 'CASH'
+        ? 'Da thu tien mat'
+        : 'Da xac nhan thanh toan online';
   }
 }
 
@@ -674,6 +849,87 @@ class _CheckOutPreviewCard extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckOutSettlementZone extends StatelessWidget {
+  const _CheckOutSettlementZone({
+    super.key,
+    required this.preview,
+    required this.isBusy,
+    required this.dragOffset,
+    required this.onDragStart,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+    required this.vehicleTypeLabel,
+    required this.formatCurrency,
+  });
+
+  final AttendantCheckOutPreviewResult preview;
+  final bool isBusy;
+  final double dragOffset;
+  final GestureDragStartCallback onDragStart;
+  final GestureDragUpdateCallback onDragUpdate;
+  final GestureDragEndCallback onDragEnd;
+  final String Function(String vehicleType) vehicleTypeLabel;
+  final String Function(double amount) formatCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    final hint = dragOffset <= -40
+        ? 'Tha tay de thu tien mat'
+        : dragOffset >= 40
+        ? 'Tha tay de xac nhan online'
+        : 'Vuot trai: Tien mat • Vuot phai: Online';
+
+    return Semantics(
+      label: 'Swipe to Pay Cash or Online',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: isBusy ? null : onDragStart,
+        onHorizontalDragUpdate: isBusy ? null : onDragUpdate,
+        onHorizontalDragEnd: isBusy ? null : onDragEnd,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFF07140E),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0xFF00E676), width: 2),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: _CheckOutPreviewCard(
+                    preview: preview,
+                    vehicleTypeLabel: vehicleTypeLabel,
+                    formatCurrency: formatCurrency,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  hint,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Khong can ban phim. Quet xong, vuot de chot.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

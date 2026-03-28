@@ -48,6 +48,20 @@ class FakeAttendantWalkInService implements AttendantCheckInService {
   }) async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
+    required int sessionId,
+    required String paymentMethod,
+    double? quotedFinalFee,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId}) async {
+    throw UnimplementedError();
+  }
 }
 
 Widget _fakeScanner(

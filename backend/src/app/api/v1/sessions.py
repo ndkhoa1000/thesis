@@ -15,14 +15,28 @@ from ...api.dependencies import get_current_user
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
 from ...core.security import ALGORITHM, SECRET_KEY
+from ...models.financials import Payment
 from ...models.parking import ParkingLot, Pricing
-from ...models.enums import PricingMode, SessionStatus, UserRole, VehicleType, VehicleTypeAll
+from ...models.enums import (
+    PayableType,
+    PaymentMethod,
+    PaymentStatus,
+    PricingMode,
+    SessionStatus,
+    UserRole,
+    VehicleType,
+    VehicleTypeAll,
+)
 from ...models.sessions import ParkingSession
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
 from ...schemas.session import (
     AttendantCheckInCreate,
     AttendantCheckInRead,
+    AttendantCheckOutFinalizeCreate,
+    AttendantCheckOutFinalizeRead,
+    AttendantCheckOutUndoCreate,
+    AttendantCheckOutUndoRead,
     AttendantCheckOutPreviewCreate,
     AttendantCheckOutPreviewRead,
     DriverActiveSessionRead,
@@ -35,6 +49,7 @@ from ...schemas.vehicle import VehicleRead
 router = APIRouter(tags=["sessions"])
 DRIVER_CHECK_IN_TOKEN_TTL = timedelta(minutes=5)
 DRIVER_CHECK_OUT_TOKEN_TTL = timedelta(minutes=5)
+CHECK_OUT_UNDO_WINDOW = timedelta(seconds=3)
 WALK_IN_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "walk_in_check_in"
 
 
@@ -197,6 +212,19 @@ async def _get_latest_pricing(
     return None
 
 
+async def _get_completed_payments_for_session(db: AsyncSession, session_id: int) -> list[Payment]:
+    payment_result = await db.execute(
+        select(Payment)
+        .where(
+            Payment.payable_type == PayableType.SESSION.value,
+            Payment.payable_id == session_id,
+            Payment.payment_status == PaymentStatus.COMPLETED.value,
+        )
+        .order_by(Payment.id.desc())
+    )
+    return list(payment_result.scalars().all())
+
+
 def _calculate_estimated_cost(session: ParkingSession, pricing: Pricing | None) -> float:
     if pricing is None:
         return 0.0
@@ -349,6 +377,159 @@ async def attendant_check_out_preview(
         elapsed_minutes=elapsed_minutes,
         final_fee=final_fee,
         pricing_mode=pricing.pricing_mode,
+    )
+
+
+@router.post("/sessions/attendant-check-out-finalize", response_model=AttendantCheckOutFinalizeRead, status_code=200)
+async def attendant_check_out_finalize(
+    request: Request,
+    payload: AttendantCheckOutFinalizeCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> AttendantCheckOutFinalizeRead:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant)
+
+    session_result = await db.execute(
+        select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1)
+    )
+    session = session_result.scalar_one_or_none()
+    if session is None:
+        raise NotFoundException("Parking session not found")
+
+    if session.parking_lot_id != parking_lot.id:
+        raise BadRequestException("This session belongs to a different parking lot")
+
+    if session.status != SessionStatus.CHECKED_IN.value:
+        raise BadRequestException("Session already checked out.")
+
+    if session.driver_id is None:
+        raise BadRequestException("This parking session cannot be finalized through QR checkout yet.")
+
+    existing_payments = await _get_completed_payments_for_session(db, session.id)
+    if existing_payments:
+        raise BadRequestException("This parking session has already been finalized.")
+
+    pricing = await _get_latest_pricing(db, parking_lot.id, session.vehicle_type)
+    if pricing is None:
+        raise BadRequestException("No active pricing found for this parking session.")
+
+    final_fee = _calculate_estimated_cost(session, pricing)
+    if payload.quoted_final_fee is not None and abs(payload.quoted_final_fee - final_fee) > 0.009:
+        raise BadRequestException("Checkout preview is stale. Please rescan and confirm again.")
+
+    checked_out_at = _utcnow()
+    previous_status = session.status
+    previous_checkout_time = session.checkout_time
+    previous_attendant_checkout_id = session.attendant_checkout_id
+    previous_current_available = parking_lot.current_available
+
+    payment = Payment(
+        payable_id=session.id,
+        payable_type=PayableType.SESSION.value,
+        driver_id=session.driver_id,
+        amount=final_fee,
+        final_amount=final_fee,
+        payment_method=payload.payment_method,
+        payment_status=PaymentStatus.COMPLETED.value,
+        processed_by=current_user["id"],
+    )
+
+    session.attendant_checkout_id = attendant.id
+    session.checkout_time = checked_out_at
+    session.status = SessionStatus.CHECKED_OUT.value
+    parking_lot.current_available += 1
+    db.add(payment)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        session.status = previous_status
+        session.checkout_time = previous_checkout_time
+        session.attendant_checkout_id = previous_attendant_checkout_id
+        parking_lot.current_available = previous_current_available
+        raise
+
+    return AttendantCheckOutFinalizeRead(
+        session_id=session.id,
+        parking_lot_id=parking_lot.id,
+        parking_lot_name=parking_lot.name,
+        license_plate=session.license_plate,
+        vehicle_type=session.vehicle_type,
+        final_fee=final_fee,
+        payment_method=payload.payment_method,
+        checked_out_at=checked_out_at,
+        current_available=parking_lot.current_available,
+    )
+
+
+@router.post("/sessions/attendant-check-out-undo", response_model=AttendantCheckOutUndoRead, status_code=200)
+async def attendant_check_out_undo(
+    request: Request,
+    payload: AttendantCheckOutUndoCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> AttendantCheckOutUndoRead:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant)
+
+    session_result = await db.execute(
+        select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1)
+    )
+    session = session_result.scalar_one_or_none()
+    if session is None:
+        raise NotFoundException("Parking session not found")
+
+    if session.parking_lot_id != parking_lot.id:
+        raise BadRequestException("This session belongs to a different parking lot")
+
+    if (
+        session.status != SessionStatus.CHECKED_OUT.value
+        or session.attendant_checkout_id != attendant.id
+        or session.checkout_time is None
+    ):
+        raise BadRequestException("This parking session is not eligible for undo.")
+
+    if _utcnow() - session.checkout_time > CHECK_OUT_UNDO_WINDOW:
+        raise BadRequestException("Undo window has expired for this parking session.")
+
+    completed_payments = await _get_completed_payments_for_session(db, session.id)
+    if len(completed_payments) != 1:
+        raise BadRequestException("This parking session is not eligible for undo.")
+
+    payment = completed_payments[0]
+    previous_status = session.status
+    previous_checkout_time = session.checkout_time
+    previous_attendant_checkout_id = session.attendant_checkout_id
+    previous_current_available = parking_lot.current_available
+    previous_payment_status = payment.payment_status
+    previous_payment_note = payment.note
+
+    session.status = SessionStatus.CHECKED_IN.value
+    session.checkout_time = None
+    session.attendant_checkout_id = None
+    parking_lot.current_available = max(parking_lot.current_available - 1, 0)
+    payment.payment_status = PaymentStatus.FAILED.value
+    payment.note = "Settlement undone within recovery window."
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        session.status = previous_status
+        session.checkout_time = previous_checkout_time
+        session.attendant_checkout_id = previous_attendant_checkout_id
+        parking_lot.current_available = previous_current_available
+        payment.payment_status = previous_payment_status
+        payment.note = previous_payment_note
+        raise
+
+    return AttendantCheckOutUndoRead(
+        session_id=session.id,
+        parking_lot_id=parking_lot.id,
+        current_available=parking_lot.current_available,
+        status=session.status,
     )
 
 

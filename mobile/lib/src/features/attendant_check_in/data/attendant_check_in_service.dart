@@ -67,6 +67,67 @@ class AttendantCheckOutPreviewResult {
   }
 }
 
+class AttendantCheckOutFinalizeResult {
+  const AttendantCheckOutFinalizeResult({
+    required this.sessionId,
+    required this.parkingLotId,
+    required this.parkingLotName,
+    required this.licensePlate,
+    required this.vehicleType,
+    required this.finalFee,
+    required this.paymentMethod,
+    required this.checkedOutAt,
+    required this.currentAvailable,
+  });
+
+  final int sessionId;
+  final int parkingLotId;
+  final String parkingLotName;
+  final String licensePlate;
+  final String vehicleType;
+  final double finalFee;
+  final String paymentMethod;
+  final DateTime checkedOutAt;
+  final int currentAvailable;
+
+  factory AttendantCheckOutFinalizeResult.fromJson(Map<String, dynamic> json) {
+    return AttendantCheckOutFinalizeResult(
+      sessionId: json['session_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      parkingLotName: json['parking_lot_name'] as String,
+      licensePlate: json['license_plate'] as String,
+      vehicleType: json['vehicle_type'] as String,
+      finalFee: (json['final_fee'] as num).toDouble(),
+      paymentMethod: json['payment_method'] as String,
+      checkedOutAt: DateTime.parse(json['checked_out_at'] as String),
+      currentAvailable: json['current_available'] as int,
+    );
+  }
+}
+
+class AttendantCheckOutUndoResult {
+  const AttendantCheckOutUndoResult({
+    required this.sessionId,
+    required this.parkingLotId,
+    required this.currentAvailable,
+    required this.status,
+  });
+
+  final int sessionId;
+  final int parkingLotId;
+  final int currentAvailable;
+  final String status;
+
+  factory AttendantCheckOutUndoResult.fromJson(Map<String, dynamic> json) {
+    return AttendantCheckOutUndoResult(
+      sessionId: json['session_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      currentAvailable: json['current_available'] as int,
+      status: json['status'] as String,
+    );
+  }
+}
+
 abstract class AttendantCheckInService {
   Future<AttendantCheckInResult> checkInDriver({required String token});
 
@@ -79,6 +140,14 @@ abstract class AttendantCheckInService {
   Future<AttendantCheckOutPreviewResult> checkOutPreview({
     required String token,
   });
+
+  Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
+    required int sessionId,
+    required String paymentMethod,
+    double? quotedFinalFee,
+  });
+
+  Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId});
 }
 
 class BackendAttendantCheckInService implements AttendantCheckInService {
@@ -168,6 +237,54 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         );
       }
       return AttendantCheckOutPreviewResult.fromJson(raw);
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
+    required int sessionId,
+    required String paymentMethod,
+    double? quotedFinalFee,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/sessions/attendant-check-out-finalize',
+        data: {
+          'session_id': sessionId,
+          'payment_method': paymentMethod,
+          if (quotedFinalFee != null) 'quoted_final_fee': quotedFinalFee,
+        },
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AttendantCheckInException(
+          'Phan hoi finalize checkout tu may chu khong hop le.',
+        );
+      }
+      return AttendantCheckOutFinalizeResult.fromJson(raw);
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId}) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/sessions/attendant-check-out-undo',
+        data: {'session_id': sessionId},
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const AttendantCheckInException(
+          'Phan hoi undo checkout tu may chu khong hop le.',
+        );
+      }
+      return AttendantCheckOutUndoResult.fromJson(raw);
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }

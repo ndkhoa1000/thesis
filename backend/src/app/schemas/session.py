@@ -64,6 +64,43 @@ class AttendantCheckOutPreviewRead(BaseModel):
     pricing_mode: str
 
 
+class AttendantCheckOutFinalizeCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: int = Field(gt=0)
+    payment_method: str = Field(pattern="^(CASH|ONLINE)$")
+    quoted_final_fee: float | None = Field(default=None, ge=0)
+
+
+class AttendantCheckOutFinalizeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    parking_lot_name: str
+    license_plate: str
+    vehicle_type: str
+    final_fee: float
+    payment_method: str
+    checked_out_at: datetime
+    current_available: int
+
+
+class AttendantCheckOutUndoCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: int = Field(gt=0)
+
+
+class AttendantCheckOutUndoRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    current_available: int
+    status: str
+
+
 class AttendantCheckInCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

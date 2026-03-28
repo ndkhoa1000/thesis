@@ -4,12 +4,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:parking_app/src/features/attendant_check_in/data/attendant_check_in_service.dart';
 import 'package:parking_app/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart';
 
-class FakeAttendantCheckOutService implements AttendantCheckInService {
-  FakeAttendantCheckOutService({this.previewResult, this.previewErrorMessage});
+class FakeAttendantCheckOutFinalizeService implements AttendantCheckInService {
+  FakeAttendantCheckOutFinalizeService({
+    this.previewResult,
+    this.finalizeResult,
+    this.undoResult,
+  });
 
   final AttendantCheckOutPreviewResult? previewResult;
-  final String? previewErrorMessage;
-  String? lastPreviewToken;
+  final AttendantCheckOutFinalizeResult? finalizeResult;
+  final AttendantCheckOutUndoResult? undoResult;
+  final List<String> paymentMethods = <String>[];
+  final List<int> undoSessionIds = <int>[];
 
   @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
@@ -29,11 +35,6 @@ class FakeAttendantCheckOutService implements AttendantCheckInService {
   Future<AttendantCheckOutPreviewResult> checkOutPreview({
     required String token,
   }) async {
-    lastPreviewToken = token;
-    if (previewErrorMessage != null) {
-      throw AttendantCheckInException(previewErrorMessage!);
-    }
-
     return previewResult ??
         AttendantCheckOutPreviewResult(
           sessionId: 404,
@@ -54,12 +55,31 @@ class FakeAttendantCheckOutService implements AttendantCheckInService {
     required String paymentMethod,
     double? quotedFinalFee,
   }) async {
-    throw UnimplementedError();
+    paymentMethods.add(paymentMethod);
+    return finalizeResult ??
+        AttendantCheckOutFinalizeResult(
+          sessionId: sessionId,
+          parkingLotId: 13,
+          parkingLotName: 'Bai xe Quan 1',
+          licensePlate: '30A-99999',
+          vehicleType: 'CAR',
+          finalFee: quotedFinalFee ?? 45000,
+          paymentMethod: paymentMethod,
+          checkedOutAt: DateTime(2026, 3, 28, 10, 20),
+          currentAvailable: 8,
+        );
   }
 
   @override
   Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId}) async {
-    throw UnimplementedError();
+    undoSessionIds.add(sessionId);
+    return undoResult ??
+        AttendantCheckOutUndoResult(
+          sessionId: sessionId,
+          parkingLotId: 13,
+          currentAvailable: 7,
+          status: 'CHECKED_IN',
+        );
   }
 }
 
@@ -85,23 +105,10 @@ void main() {
     );
   }
 
-  testWidgets('enters checkout scan mode from attendant workspace', (
+  testWidgets('swipe settlement finalizes as cash and returns to standby', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      buildSubject(service: FakeAttendantCheckOutService()),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('attendant-check-out-mode')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Quet ma check-out'), findsOneWidget);
-    expect(find.text('San sang quet xe ra bai'), findsOneWidget);
-  });
-
-  testWidgets('renders oversized checkout summary after scan', (tester) async {
-    final service = FakeAttendantCheckOutService();
+    final service = FakeAttendantCheckOutFinalizeService();
 
     await tester.pumpWidget(buildSubject(service: service));
     await tester.pumpAndSettle();
@@ -113,25 +120,22 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(service.lastPreviewToken, 'driver-check-out-token');
-    expect(find.text('30A-99999'), findsOneWidget);
-    expect(find.text('45.000 VND'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('attendant-check-out-amount')),
-      findsOneWidget,
+    await tester.drag(
+      find.byKey(const ValueKey('attendant-check-out-settlement-zone')),
+      const Offset(-420, 0),
     );
-    expect(find.textContaining('125 phut'), findsOneWidget);
+    await tester.pumpAndSettle();
+
+    expect(service.paymentMethods, <String>['CASH']);
+    expect(find.text('San sang quet xe ra bai'), findsOneWidget);
+    expect(find.text('Hoan tat xe ra'), findsOneWidget);
+    expect(find.text('Hoan tac'), findsOneWidget);
   });
 
-  testWidgets('shows backend pricing error in checkout mode', (tester) async {
-    await tester.pumpWidget(
-      buildSubject(
-        service: FakeAttendantCheckOutService(
-          previewErrorMessage:
-              'No active pricing found for this parking session.',
-        ),
-      ),
-    );
+  testWidgets('undo affordance restores the checkout preview', (tester) async {
+    final service = FakeAttendantCheckOutFinalizeService();
+
+    await tester.pumpWidget(buildSubject(service: service));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('attendant-check-out-mode')));
@@ -141,9 +145,21 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.drag(
+      find.byKey(const ValueKey('attendant-check-out-settlement-zone')),
+      const Offset(420, 0),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(TextButton, 'Hoan tac'));
+    await tester.pumpAndSettle();
+
+    expect(service.paymentMethods, <String>['ONLINE']);
+    expect(service.undoSessionIds, <int>[404]);
     expect(
-      find.text('No active pricing found for this parking session.'),
+      find.byKey(const ValueKey('attendant-check-out-settlement-zone')),
       findsOneWidget,
     );
+    expect(find.text('45.000 VND'), findsOneWidget);
   });
 }
