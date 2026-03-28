@@ -271,7 +271,9 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
   }
 
   @override
-  Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId}) async {
+  Future<AttendantCheckOutUndoResult> undoCheckOut({
+    required int sessionId,
+  }) async {
     try {
       final response = await _dio.post<dynamic>(
         '/sessions/attendant-check-out-undo',

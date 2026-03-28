@@ -153,7 +153,9 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
   }
 
   Future<void> _undoCheckOut() async {
-    if (_isBusy || _lastCheckOutFinalize == null || _undoPreviewSnapshot == null) {
+    if (_isBusy ||
+        _lastCheckOutFinalize == null ||
+        _undoPreviewSnapshot == null) {
       return;
     }
 
@@ -448,39 +450,39 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                 Expanded(
                   child: _mode == _AttendantGateMode.scanner
                       ? _scannerFlow == _AttendantScannerFlow.checkOut &&
-                              _lastCheckOutPreview != null
-                          ? _CheckOutSettlementZone(
-                              key: const ValueKey(
-                                'attendant-check-out-settlement-zone',
-                              ),
-                              preview: _lastCheckOutPreview!,
-                              isBusy: _isBusy,
-                              dragOffset: _settlementDragOffset,
-                              onDragStart: _handleSettlementDragStart,
-                              onDragUpdate: _handleSettlementDragUpdate,
-                              onDragEnd: _handleSettlementDragEnd,
-                              vehicleTypeLabel: _vehicleTypeLabel,
-                              formatCurrency: _formatCurrency,
-                            )
-                          : DecoratedBox(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(28),
-                                border: Border.all(
-                                  color: _errorMessage == null
-                                      ? colorScheme.primary
-                                      : colorScheme.error,
-                                  width: 2,
+                                _lastCheckOutPreview != null
+                            ? _CheckOutSettlementZone(
+                                key: const ValueKey(
+                                  'attendant-check-out-settlement-zone',
                                 ),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(26),
-                                child: widget.scannerBuilder(
-                                  context,
-                                  _handleScan,
-                                  _isBusy,
+                                preview: _lastCheckOutPreview!,
+                                isBusy: _isBusy,
+                                dragOffset: _settlementDragOffset,
+                                onDragStart: _handleSettlementDragStart,
+                                onDragUpdate: _handleSettlementDragUpdate,
+                                onDragEnd: _handleSettlementDragEnd,
+                                vehicleTypeLabel: _vehicleTypeLabel,
+                                formatCurrency: _formatCurrency,
+                              )
+                            : DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(28),
+                                  border: Border.all(
+                                    color: _errorMessage == null
+                                        ? colorScheme.primary
+                                        : colorScheme.error,
+                                    width: 2,
+                                  ),
                                 ),
-                              ),
-                            )
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(26),
+                                  child: widget.scannerBuilder(
+                                    context,
+                                    _handleScan,
+                                    _isBusy,
+                                  ),
+                                ),
+                              )
                       : _WalkInPanel(
                           isBusy: _isBusy,
                           vehicleType: _walkInVehicleType,
@@ -923,9 +925,9 @@ class _CheckOutSettlementZone extends StatelessWidget {
                 Text(
                   'Khong can ban phim. Quet xong, vuot de chot.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white70,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                 ),
               ],
             ),

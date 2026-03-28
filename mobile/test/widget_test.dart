@@ -162,7 +162,9 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }
 
   @override
-  Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId}) async {
+  Future<AttendantCheckOutUndoResult> undoCheckOut({
+    required int sessionId,
+  }) async {
     throw UnimplementedError();
   }
 }
