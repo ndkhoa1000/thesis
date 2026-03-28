@@ -1,7 +1,7 @@
 """Parking lot endpoints for registration, admin review, and operator management."""
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
@@ -26,7 +26,13 @@ from ...models.enums import (
     VehicleTypeAll,
 )
 from ...models.leases import LotLease
-from ...models.parking import ParkingLot, ParkingLotConfig, Pricing
+from ...models.parking import (
+    ParkingLot,
+    ParkingLotConfig,
+    ParkingLotFeature,
+    ParkingLotTag,
+    Pricing,
+)
 from ...models.sessions import ParkingSession
 from ...models.user import User
 from ...models.users import Attendant, LotOwner, Manager
@@ -38,8 +44,11 @@ from ...schemas.parking_lot import (
     OperatorManagedParkingLotUpdate,
     ParkingLotAdminRead,
     ParkingLotCreate,
+    ParkingLotDriverDetailRead,
     ParkingLotLeaseBootstrapCreate,
     ParkingLotLeaseBootstrapRead,
+    ParkingLotPeakHourPointRead,
+    ParkingLotPeakHoursRead,
     ParkingLotRead,
     ParkingLotReview,
     ParkingLotStatusUpdate,
@@ -358,6 +367,100 @@ async def _get_manager_user(db: AsyncSession, manager_user_id: int) -> tuple[Man
     return tuple(manager_pair)
 
 
+async def _get_parking_lot_tags(db: AsyncSession, parking_lot_id: int) -> list[ParkingLotTag]:
+    tags_result = await db.execute(
+        select(ParkingLotTag)
+        .where(ParkingLotTag.parking_lot_id == parking_lot_id)
+        .order_by(ParkingLotTag.id.asc())
+    )
+    return list(tags_result.scalars().all())
+
+
+async def _get_enabled_parking_lot_features(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> list[ParkingLotFeature]:
+    features_result = await db.execute(
+        select(ParkingLotFeature)
+        .where(
+            ParkingLotFeature.parking_lot_id == parking_lot_id,
+            ParkingLotFeature.enabled.is_(True),
+        )
+        .order_by(ParkingLotFeature.id.asc())
+    )
+    return list(features_result.scalars().all())
+
+
+async def _get_peak_hour_rows(
+    db: AsyncSession,
+    parking_lot_id: int,
+    lookback_days: int = 30,
+) -> list[tuple[int, int]]:
+    cutoff = _utcnow() - timedelta(days=lookback_days)
+    hour_bucket = func.extract("hour", ParkingSession.checkin_time)
+    peak_hours_result = await db.execute(
+        select(hour_bucket, func.count(ParkingSession.id))
+        .where(
+            ParkingSession.parking_lot_id == parking_lot_id,
+            ParkingSession.checkin_time >= cutoff,
+        )
+        .group_by(hour_bucket)
+        .order_by(hour_bucket.asc())
+    )
+    return [(int(hour), int(count)) for hour, count in peak_hours_result.all()]
+
+
+def _build_peak_hours_read(
+    peak_hour_rows: list[tuple[int, int]],
+    lookback_days: int = 30,
+) -> ParkingLotPeakHoursRead:
+    total_sessions = sum(count for _, count in peak_hour_rows)
+    status = "READY" if total_sessions >= 3 else "INSUFFICIENT_DATA"
+    points = [
+        ParkingLotPeakHourPointRead(hour=hour, session_count=count)
+        for hour, count in peak_hour_rows
+    ]
+    if status != "READY":
+        points = []
+    return ParkingLotPeakHoursRead(
+        status=status,
+        lookback_days=lookback_days,
+        total_sessions=total_sessions,
+        points=points,
+    )
+
+
+def _build_driver_detail_read(
+    parking_lot: ParkingLot,
+    latest_config: ParkingLotConfig | None,
+    latest_pricing: Pricing | None,
+    features: list[ParkingLotFeature],
+    tags: list[ParkingLotTag],
+    peak_hours: ParkingLotPeakHoursRead,
+) -> ParkingLotDriverDetailRead:
+    return ParkingLotDriverDetailRead.model_validate(
+        {
+            "id": parking_lot.id,
+            "name": parking_lot.name,
+            "address": parking_lot.address,
+            "latitude": float(parking_lot.latitude),
+            "longitude": float(parking_lot.longitude),
+            "current_available": parking_lot.current_available,
+            "status": parking_lot.status,
+            "description": parking_lot.description,
+            "cover_image": parking_lot.cover_image,
+            "total_capacity": latest_config.total_capacity if latest_config else None,
+            "opening_time": latest_config.opening_time if latest_config else None,
+            "closing_time": latest_config.closing_time if latest_config else None,
+            "pricing_mode": latest_pricing.pricing_mode if latest_pricing else None,
+            "price_amount": float(latest_pricing.price_amount) if latest_pricing else None,
+            "feature_labels": [feature.feature_type for feature in features],
+            "tag_labels": [tag.tag_name for tag in tags],
+            "peak_hours": peak_hours,
+        }
+    )
+
+
 async def _get_active_lease_snapshot(
     db: AsyncSession,
     parking_lot_id: int,
@@ -391,6 +494,32 @@ async def list_lots(
         .order_by(ParkingLot.created_at.desc(), ParkingLot.id.desc())
     )
     return list(lots_result.scalars().all())
+
+
+@router.get("/lots/{parking_lot_id}", response_model=ParkingLotDriverDetailRead)
+async def read_public_lot_detail(
+    request: Request,
+    parking_lot_id: int,
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ParkingLotDriverDetailRead:
+    parking_lot = await _get_parking_lot(db, parking_lot_id)
+    if parking_lot is None or parking_lot.status != ParkingLotStatus.APPROVED.value:
+        raise NotFoundException("Parking lot not found")
+
+    latest_config = await _get_latest_parking_lot_config(db, parking_lot_id)
+    latest_pricing = await _get_latest_pricing(db, parking_lot_id)
+    tags = await _get_parking_lot_tags(db, parking_lot_id)
+    features = await _get_enabled_parking_lot_features(db, parking_lot_id)
+    peak_hours = _build_peak_hours_read(await _get_peak_hour_rows(db, parking_lot_id))
+
+    return _build_driver_detail_read(
+        parking_lot,
+        latest_config,
+        latest_pricing,
+        features,
+        tags,
+        peak_hours,
+    )
 
 
 @router.get("/user/me/parking-lots", response_model=list[ParkingLotRead])

@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../lot_details/data/lot_details_service.dart';
+import '../../lot_details/presentation/lot_details_sheet.dart';
 import '../data/map_discovery_service.dart';
 
-typedef DriverMapCanvasBuilder = Widget Function(
-  BuildContext context,
-  MapDiscoveryViewData viewData,
-);
+typedef DriverMapCanvasBuilder =
+    Widget Function(BuildContext context, MapDiscoveryViewData viewData);
 
 class MapDiscoveryViewport {
   const MapDiscoveryViewport({
@@ -59,6 +59,7 @@ class MapDiscoveryScreen extends StatefulWidget {
   const MapDiscoveryScreen({
     super.key,
     required this.mapDiscoveryService,
+    required this.lotDetailsService,
     required this.onOpenDriverCheckIn,
     required this.onOpenVehicles,
     required this.onSignOut,
@@ -69,6 +70,7 @@ class MapDiscoveryScreen extends StatefulWidget {
   });
 
   final MapDiscoveryService mapDiscoveryService;
+  final LotDetailsService lotDetailsService;
   final Future<void> Function() onOpenDriverCheckIn;
   final Future<void> Function() onOpenVehicles;
   final Future<void> Function() onSignOut;
@@ -106,8 +108,8 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
     });
 
     try {
-      final locationGranted =
-          await widget.locationPermissionService.requestAccess();
+      final locationGranted = await widget.locationPermissionService
+          .requestAccess();
       final lots = await widget.mapDiscoveryService.fetchActiveLots();
       if (!mounted) {
         return;
@@ -126,6 +128,19 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _openLotDetails(MapDiscoveryLotSummary lot) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => LotDetailsSheet(
+        lotId: lot.id,
+        lotName: lot.name,
+        lotDetailsService: widget.lotDetailsService,
+      ),
+    );
   }
 
   @override
@@ -199,6 +214,28 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
                 ),
                 if (_lots.isEmpty && !_isLoading)
                   const Center(child: _MapDiscoveryEmptyState()),
+                if (_lots.isNotEmpty)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 16,
+                    child: SizedBox(
+                      height: 156,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _lots.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final lot = _lots[index];
+                          return _LotQuickCard(
+                            lot: lot,
+                            onTap: () => _openLotDetails(lot),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 if (_isLoading)
                   const Positioned.fill(
                     child: ColoredBox(
@@ -228,9 +265,9 @@ class _MapDiscoverySummaryCard extends StatelessWidget {
           children: [
             Text(
               '$lotCount bãi đang hoạt động',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -240,6 +277,10 @@ class _MapDiscoverySummaryCard extends StatelessWidget {
                 _LegendChip(label: 'Xanh: còn nhiều', color: Color(0xFF2E7D32)),
                 _LegendChip(label: 'Cam: sắp đầy', color: Color(0xFFEF6C00)),
                 _LegendChip(label: 'Đỏ: hết chỗ', color: Color(0xFFC62828)),
+                _LegendChip(
+                  label: 'Xanh dương: cụm khi thu nhỏ',
+                  color: Color(0xFF1565C0),
+                ),
               ],
             ),
           ],
@@ -318,10 +359,7 @@ class _MapDiscoveryEmptyState extends StatelessWidget {
 }
 
 class _MapDiscoveryErrorState extends StatelessWidget {
-  const _MapDiscoveryErrorState({
-    required this.message,
-    required this.onRetry,
-  });
+  const _MapDiscoveryErrorState({required this.message, required this.onRetry});
 
   final String message;
   final Future<void> Function() onRetry;
@@ -336,11 +374,53 @@ class _MapDiscoveryErrorState extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            FilledButton(
-              onPressed: onRetry,
-              child: const Text('Thử lại'),
-            ),
+            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LotQuickCard extends StatelessWidget {
+  const _LotQuickCard({required this.lot, required this.onTap});
+
+  final MapDiscoveryLotSummary lot;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 252,
+      child: Card(
+        child: InkWell(
+          key: ValueKey('lotCard:${lot.id}'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lot.name,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Text(lot.address, maxLines: 2, overflow: TextOverflow.ellipsis),
+                const Spacer(),
+                Row(
+                  children: [
+                    Chip(label: Text(lot.availabilityText)),
+                    const Spacer(),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -352,6 +432,43 @@ Widget defaultDriverMapCanvasBuilder(
   MapDiscoveryViewData viewData,
 ) {
   return _MapboxLotCanvas(viewData: viewData);
+}
+
+Widget defaultDriverMapFallbackCanvasBuilder(
+  BuildContext context,
+  MapDiscoveryViewData viewData,
+) {
+  return DecoratedBox(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFFE3F2FD), Color(0xFFF5F5F5)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.map_outlined, size: 56, color: Color(0xFF1565C0)),
+            const SizedBox(height: 16),
+            Text(
+              'Bản đồ tương tác đang ở chế độ fallback vì workspace chưa có MAPBOX_ACCESS_TOKEN.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Bạn vẫn có thể xem ${viewData.lots.length} bãi đang hoạt động và mở chi tiết từ danh sách bên dưới.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _MapboxLotCanvas extends StatefulWidget {
@@ -500,15 +617,7 @@ class _MapboxLotCanvasState extends State<_MapboxLotCanvas> {
       'source': _sourceId,
       'filter': ['has', 'point_count'],
       'paint': {
-        'circle-color': [
-          'step',
-          ['get', 'point_count'],
-          '#2E7D32',
-          10,
-          '#EF6C00',
-          25,
-          '#C62828',
-        ],
+        'circle-color': '#1565C0',
         'circle-radius': [
           'step',
           ['get', 'point_count'],
@@ -550,9 +659,17 @@ class _MapboxLotCanvasState extends State<_MapboxLotCanvas> {
       'paint': {
         'circle-color': [
           'case',
-          ['<=', ['get', 'current_available'], 0],
+          [
+            '<=',
+            ['get', 'current_available'],
+            0,
+          ],
           '#C62828',
-          ['<=', ['get', 'current_available'], 5],
+          [
+            '<=',
+            ['get', 'current_available'],
+            5,
+          ],
           '#EF6C00',
           '#2E7D32',
         ],

@@ -57,6 +57,42 @@ class ParkingLotRead(BaseModel):
     updated_at: datetime | None = None
 
 
+class ParkingLotPeakHourPointRead(BaseModel):
+    hour: Annotated[int, Field(ge=0, le=23)]
+    session_count: Annotated[int, Field(ge=0)]
+
+
+class ParkingLotPeakHoursRead(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    lookback_days: Annotated[int, Field(ge=1)]
+    total_sessions: Annotated[int, Field(ge=0)]
+    points: list[ParkingLotPeakHourPointRead] = Field(default_factory=list)
+
+
+class ParkingLotDriverDetailRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    current_available: int
+    status: str
+    description: str | None = None
+    cover_image: str | None = None
+    total_capacity: int | None = None
+    opening_time: time | None = None
+    closing_time: time | None = None
+    pricing_mode: PricingMode | None = None
+    price_amount: float | None = None
+    feature_labels: list[str] = Field(default_factory=list)
+    tag_labels: list[str] = Field(default_factory=list)
+    peak_hours: ParkingLotPeakHoursRead
+
+
 class ParkingLotAdminRead(ParkingLotRead):
     owner_name: str | None = None
     owner_phone: str | None = None

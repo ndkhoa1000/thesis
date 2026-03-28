@@ -61,8 +61,8 @@ development_status:
   4-6-record-payment-finalize-session: done
   epic-4-retrospective: done
   epic-5: in-progress
-  5-1-view-interactive-map-lots: review
-  5-2-view-lot-details-availability: ready-for-dev
+  5-1-view-interactive-map-lots: done
+  5-2-view-lot-details-availability: review
   5-3-driver-parking-history: ready-for-dev
   5-4-en-route-lot-capacity-alert: ready-for-dev
   epic-5-retrospective: optional

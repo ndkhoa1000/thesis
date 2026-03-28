@@ -1,6 +1,6 @@
 # Story 5.1: View Interactive Map & Lots
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -116,6 +116,8 @@ GPT-5.4
 - Extracted the driver map into `mobile/lib/src/features/map_discovery/` with a dedicated Dio-backed service, permission fallback notice, activity summary/legend, and a production Mapbox canvas that renders clustered GeoJSON layers plus color-coded availability counts.
 - Removed the obsolete mock `MapScreen` implementation from `mobile/lib/main.dart` so the bootstrap file now routes into the extracted feature instead of holding map domain logic directly.
 - Added focused Flutter coverage for backend lot loading, cluster-enabled marker state handoff, and denied-location fallback messaging, then validated with the full Flutter suite (`48 passed`) and full backend suite (`131 passed`).
+- Resolved the post-review follow-ups by making cluster markers neutral instead of availability-colored, replacing the hard `MAPBOX_ACCESS_TOKEN` gate with an in-app fallback canvas, and removing the stray walk-in upload artifact from the repo.
+- Revalidated after the review-fix pass with focused Flutter/backend suites plus the current full regressions (`49 passed` Flutter, `134 passed` backend).
 
 ### File List
 
@@ -131,3 +133,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 5.1 implementation artifact for backend-backed map discovery, permission fallback, and clustered availability markers.
 - 2026-03-28: Implemented Story 5.1 by extracting the driver map into a backend-backed `map_discovery` feature, locking the lot marker contract with tests, and validating full backend/mobile regressions.
+- 2026-03-28: Cleared Story 5.1 review findings by normalizing cluster semantics, adding a non-blocking map fallback canvas, and deleting the stray upload artifact before rerunning focused and full validation.

@@ -37,8 +37,7 @@ class MapDiscoveryLotSummary {
     return MapDiscoveryAvailabilityState.available;
   }
 
-  String get availabilityText =>
-      isFull ? 'Đầy' : 'Còn $currentAvailable chỗ';
+  String get availabilityText => isFull ? 'Đầy' : 'Còn $currentAvailable chỗ';
 
   String get markerCountLabel => isFull ? '0' : '$currentAvailable';
 

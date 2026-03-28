@@ -1,6 +1,6 @@
 # Story 5.2: View Lot Details & Availability
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -25,20 +25,20 @@ so that I can decide if I want to park there.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add a driver-facing lot-details backend contract (AC: 1, 2)
-  - [ ] Extend the lots API with a focused detail endpoint such as `GET /lots/{lot_id}` that returns the lot summary, effective pricing snapshot, operating hours, features/tags, and current availability.
-  - [ ] Add a server-owned trend payload for the Historical Peak Hours visualization, using deterministic historical or aggregate occupancy data rather than client-generated guesses.
-  - [ ] Reject missing or inaccessible lots without leaking suspended or unauthorized inventory.
+- [x] Task 1: Add a driver-facing lot-details backend contract (AC: 1, 2)
+  - [x] Extend the lots API with a focused detail endpoint such as `GET /lots/{lot_id}` that returns the lot summary, effective pricing snapshot, operating hours, features/tags, and current availability.
+  - [x] Add a server-owned trend payload for the Historical Peak Hours visualization, using deterministic historical or aggregate occupancy data rather than client-generated guesses.
+  - [x] Reject missing or inaccessible lots without leaking suspended or unauthorized inventory.
 
-- [ ] Task 2: Build the mobile lot-details experience on top of Story 5.1 (AC: 1, 2)
-  - [ ] Introduce a dedicated lot-details feature module and typed DTOs instead of keeping an ad hoc modal in `main.dart`.
-  - [ ] Render pricing, hours, capacity/availability, tags/features, and the trend chart in a driver-friendly detail surface.
-  - [ ] Ensure the detail view can accept fresh availability updates cleanly so Story 5.4 and later realtime work can reuse the same state boundary.
+- [x] Task 2: Build the mobile lot-details experience on top of Story 5.1 (AC: 1, 2)
+  - [x] Introduce a dedicated lot-details feature module and typed DTOs instead of keeping an ad hoc modal in `main.dart`.
+  - [x] Render pricing, hours, capacity/availability, tags/features, and the trend chart in a driver-friendly detail surface.
+  - [x] Ensure the detail view can accept fresh availability updates cleanly so Story 5.4 and later realtime work can reuse the same state boundary.
 
-- [ ] Task 3: Add focused regression coverage (AC: 1, 2)
-  - [ ] Add backend tests for lot-detail reads, missing-lot rejection, and trend payload shape.
-  - [ ] Add Flutter tests for detail rendering, empty/blocked trend states, and driver-facing availability display.
-  - [ ] Verify backend in Docker and Flutter locally after wiring the flow.
+- [x] Task 3: Add focused regression coverage (AC: 1, 2)
+  - [x] Add backend tests for lot-detail reads, missing-lot rejection, and trend payload shape.
+  - [x] Add Flutter tests for detail rendering, empty/blocked trend states, and driver-facing availability display.
+  - [x] Verify backend in Docker and Flutter locally after wiring the flow.
 
 ## Dev Notes
 
@@ -110,12 +110,27 @@ GPT-5.4
 
 - Story created as the read-only lot decision surface that sits directly on top of Story 5.1 map discovery.
 - Current codebase anchor: the existing map bottom sheet is only a placeholder and should be replaced by a dedicated detail feature with backend-owned data.
+- Added `GET /lots/{lot_id}` as a driver-safe detail contract that aggregates effective pricing, operating hours, enabled features, tags, and a server-owned peak-hours payload derived from historical `ParkingSession.checkin_time` buckets.
+- Preserved an honest analytics boundary by returning `INSUFFICIENT_DATA` with empty trend points when the lot does not yet have enough history instead of fabricating peak-hour bars in Flutter.
+- Introduced a dedicated `lot_details` mobile feature with typed DTOs, a refreshable detail sheet, and a lightweight bar-chart surface that renders real peak-hour data or the required empty state.
+- Integrated the detail flow into the Story 5.1 discovery surface through a bottom discovery rail so drivers can open lot details directly from the map experience without restoring the old mock bottom sheet.
+- Validated the implementation with focused Flutter/backend suites and the current full regressions (`49 passed` Flutter, `134 passed` backend).
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/5-2-view-lot-details-availability.md`
+- `_bmad-output/implementation-artifacts/5-1-view-interactive-map-lots.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/lots.py`
+- `backend/src/app/schemas/parking_lot.py`
+- `backend/tests/test_parking_lots.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/features/lot_details/data/lot_details_service.dart`
+- `mobile/lib/src/features/lot_details/presentation/lot_details_sheet.dart`
+- `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
+- `mobile/test/map_discovery_screen_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 5.2 implementation artifact for backend-backed lot details, effective pricing/hours, and historical peak-hours trend presentation.
+- 2026-03-28: Implemented Story 5.2 with a backend-owned lot detail endpoint, server-derived peak-hour payloads, a dedicated Flutter lot-details feature, and refreshed regression coverage.

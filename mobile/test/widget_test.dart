@@ -11,6 +11,9 @@ import 'package:parking_app/src/features/attendant_check_in/data/attendant_check
 import 'package:parking_app/src/features/auth/data/auth_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'package:parking_app/src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
+import 'package:parking_app/src/features/lot_details/data/lot_details_service.dart';
+import 'package:parking_app/src/features/map_discovery/data/map_discovery_service.dart';
+import 'package:parking_app/src/features/map_discovery/presentation/map_discovery_screen.dart';
 import 'package:parking_app/src/features/operator_application/data/operator_application_service.dart';
 import 'package:parking_app/src/features/operator_application/presentation/operator_application_screen.dart';
 import 'package:parking_app/src/features/operator_lot_management/data/operator_lot_management_service.dart';
@@ -167,6 +170,45 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }) async {
     throw UnimplementedError();
   }
+}
+
+class FakeMapDiscoveryService implements MapDiscoveryService {
+  FakeMapDiscoveryService({this.lots = const []});
+
+  final List<MapDiscoveryLotSummary> lots;
+
+  @override
+  Future<List<MapDiscoveryLotSummary>> fetchActiveLots() async => lots;
+}
+
+class FakeLotDetailsService implements LotDetailsService {
+  @override
+  Future<DriverLotDetail> fetchLotDetail({required int lotId}) async {
+    return DriverLotDetail(
+      id: lotId,
+      name: 'Bãi xe $lotId',
+      address: '1 Nguyen Hue, Quan 1',
+      latitude: 10.7732,
+      longitude: 106.7041,
+      currentAvailable: 8,
+      status: 'APPROVED',
+      peakHours: const LotHistoricalTrend(
+        status: 'INSUFFICIENT_DATA',
+        lookbackDays: 30,
+        totalSessions: 0,
+        points: [],
+      ),
+    );
+  }
+}
+
+class FakeMapLocationPermissionService implements MapLocationPermissionService {
+  const FakeMapLocationPermissionService(this.isGranted);
+
+  final bool isGranted;
+
+  @override
+  Future<bool> requestAccess() async => isGranted;
 }
 
 Widget _fakeAttendantScannerBuilder(
@@ -588,7 +630,16 @@ void main() {
   testWidgets('ParkingApp shows login screen without session', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(MyApp(authService: FakeAuthService()));
+    await tester.pumpWidget(
+      MyApp(
+        authService: FakeAuthService(),
+        mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+        lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+        mapLocationPermissionService: const FakeMapLocationPermissionService(
+          true,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byType(MaterialApp), findsOneWidget);
@@ -603,7 +654,16 @@ void main() {
   ) async {
     final authService = FakeAuthService();
 
-    await tester.pumpWidget(MyApp(authService: authService));
+    await tester.pumpWidget(
+      MyApp(
+        authService: authService,
+        mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+        lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+        mapLocationPermissionService: const FakeMapLocationPermissionService(
+          true,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -967,12 +1027,16 @@ void main() {
             onSignOut: () async {},
             onSessionUpdated: (_) {},
             vehicleServiceFactory: (_) => vehicleService,
+            mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+            lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+            mapLocationPermissionService:
+                const FakeMapLocationPermissionService(true),
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('quản lý xe của mình'), findsOneWidget);
+      expect(find.textContaining('chế độ fallback'), findsOneWidget);
       expect(find.byTooltip('Xe của tôi'), findsOneWidget);
       expect(find.byTooltip('Chủ bãi'), findsOneWidget);
       expect(find.byTooltip('Operator'), findsOneWidget);
@@ -1040,7 +1104,16 @@ void main() {
       ),
     );
 
-    await tester.pumpWidget(MyApp(authService: authService));
+    await tester.pumpWidget(
+      MyApp(
+        authService: authService,
+        mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+        lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+        mapLocationPermissionService: const FakeMapLocationPermissionService(
+          true,
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Đăng xuất'), findsOneWidget);
@@ -1076,6 +1149,11 @@ void main() {
           onSignOut: () async {},
           onSessionUpdated: (_) {},
           applicationServiceFactory: (_) => applicationService,
+          mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+          lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+          mapLocationPermissionService: const FakeMapLocationPermissionService(
+            true,
+          ),
         ),
       ),
     );
@@ -1169,6 +1247,11 @@ void main() {
           onSignOut: () async {},
           onSessionUpdated: (_) {},
           operatorApplicationServiceFactory: (_) => applicationService,
+          mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+          lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+          mapLocationPermissionService: const FakeMapLocationPermissionService(
+            true,
+          ),
         ),
       ),
     );

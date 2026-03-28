@@ -10,14 +10,15 @@ from src.app.api.v1.lots import (
     create_my_parking_lot,
     list_available_operators,
     list_lots,
+    read_public_lot_detail,
     read_my_parking_lots,
     read_parking_lot_applications,
     review_parking_lot,
 )
 from src.app.core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
-from src.app.models.enums import LeaseStatus, ParkingLotStatus
+from src.app.models.enums import LeaseStatus, ParkingLotStatus, PricingMode
 from src.app.models.leases import LotLease
-from src.app.models.parking import ParkingLot
+from src.app.models.parking import ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLotTag, Pricing
 from src.app.models.user import User
 from src.app.models.users import LotOwner, Manager
 from src.app.schemas.parking_lot import ParkingLotLeaseBootstrapCreate
@@ -107,6 +108,42 @@ def _lease(lease_id: int = 21, parking_lot_id: int = 7, manager_id: int = 4) -> 
     return lease
 
 
+def _parking_lot_config(parking_lot_id: int = 7) -> ParkingLotConfig:
+    parking_lot_config = MagicMock(spec=ParkingLotConfig)
+    parking_lot_config.parking_lot_id = parking_lot_id
+    parking_lot_config.total_capacity = 24
+    parking_lot_config.opening_time = "07:00:00"
+    parking_lot_config.closing_time = "22:00:00"
+    parking_lot_config.created_at = datetime.now(UTC)
+    return parking_lot_config
+
+
+def _pricing(parking_lot_id: int = 7) -> Pricing:
+    pricing = MagicMock(spec=Pricing)
+    pricing.parking_lot_id = parking_lot_id
+    pricing.pricing_mode = PricingMode.HOURLY.value
+    pricing.price_amount = 5000
+    return pricing
+
+
+def _parking_lot_feature(
+    parking_lot_id: int = 7,
+    feature_type: str = "CAMERA",
+) -> ParkingLotFeature:
+    feature = MagicMock(spec=ParkingLotFeature)
+    feature.parking_lot_id = parking_lot_id
+    feature.feature_type = feature_type
+    feature.enabled = True
+    return feature
+
+
+def _parking_lot_tag(parking_lot_id: int = 7, tag_name: str = "co-mai-che") -> ParkingLotTag:
+    tag = MagicMock(spec=ParkingLotTag)
+    tag.parking_lot_id = parking_lot_id
+    tag.tag_name = tag_name
+    return tag
+
+
 class TestPublicParkingLots:
     def test_read_schema_supports_orm_objects(self):
         parking_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
@@ -144,6 +181,104 @@ class TestPublicParkingLots:
         assert marker_summary.longitude == approved_lot.longitude
         assert marker_summary.current_available == 12
         assert marker_summary.status == ParkingLotStatus.APPROVED.value
+
+    @pytest.mark.asyncio
+    async def test_read_public_lot_detail_returns_driver_safe_snapshot(self, mock_db):
+        approved_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
+        approved_lot.current_available = 9
+
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = approved_lot
+        config_result = MagicMock()
+        config_result.scalar_one_or_none.return_value = _parking_lot_config()
+        pricing_result = MagicMock()
+        pricing_result.scalar_one_or_none.return_value = _pricing()
+        tags_result = MagicMock()
+        tags_result.scalars.return_value.all.return_value = [
+            _parking_lot_tag(tag_name="trung-tam"),
+            _parking_lot_tag(tag_name="co-mai-che"),
+        ]
+        features_result = MagicMock()
+        features_result.scalars.return_value.all.return_value = [
+            _parking_lot_feature(feature_type="CAMERA"),
+        ]
+        peak_hours_result = MagicMock()
+        peak_hours_result.all.return_value = [(8, 3), (18, 5)]
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                lot_result,
+                config_result,
+                pricing_result,
+                tags_result,
+                features_result,
+                peak_hours_result,
+            ]
+        )
+
+        result = await read_public_lot_detail(Mock(), approved_lot.id, mock_db)
+
+        assert result.id == approved_lot.id
+        assert result.current_available == 9
+        assert result.total_capacity == 24
+        assert result.pricing_mode == PricingMode.HOURLY
+        assert result.price_amount == 5000
+        assert result.tag_labels == ["trung-tam", "co-mai-che"]
+        assert result.feature_labels == ["CAMERA"]
+        assert result.peak_hours.status == "READY"
+        assert result.peak_hours.total_sessions == 8
+        assert result.peak_hours.points[0].hour == 8
+        assert result.peak_hours.points[1].session_count == 5
+
+    @pytest.mark.asyncio
+    async def test_read_public_lot_detail_returns_honest_empty_trend(self, mock_db):
+        approved_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
+
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = approved_lot
+        config_result = MagicMock()
+        config_result.scalar_one_or_none.return_value = None
+        pricing_result = MagicMock()
+        pricing_result.scalar_one_or_none.return_value = None
+        tags_result = MagicMock()
+        tags_result.scalars.return_value.all.return_value = []
+        features_result = MagicMock()
+        features_result.scalars.return_value.all.return_value = []
+        peak_hours_result = MagicMock()
+        peak_hours_result.all.return_value = [(9, 1)]
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                lot_result,
+                config_result,
+                pricing_result,
+                tags_result,
+                features_result,
+                peak_hours_result,
+            ]
+        )
+
+        result = await read_public_lot_detail(Mock(), approved_lot.id, mock_db)
+
+        assert result.peak_hours.status == "INSUFFICIENT_DATA"
+        assert result.peak_hours.total_sessions == 1
+        assert result.peak_hours.points == []
+
+    @pytest.mark.asyncio
+    async def test_read_public_lot_detail_rejects_missing_or_inaccessible_lot(self, mock_db):
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = None
+        mock_db.execute = AsyncMock(return_value=lot_result)
+
+        with pytest.raises(NotFoundException, match="Parking lot not found"):
+            await read_public_lot_detail(Mock(), 999, mock_db)
+
+        hidden_lot_result = MagicMock()
+        hidden_lot_result.scalar_one_or_none.return_value = _parking_lot(
+            status=ParkingLotStatus.PENDING.value,
+        )
+        mock_db.execute = AsyncMock(return_value=hidden_lot_result)
+
+        with pytest.raises(NotFoundException, match="Parking lot not found"):
+            await read_public_lot_detail(Mock(), 7, mock_db)
 
 
 class TestLotOwnerParkingLots:

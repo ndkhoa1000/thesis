@@ -14,6 +14,7 @@ import 'src/features/driver_check_in/data/driver_check_in_service.dart';
 import 'src/features/driver_check_in/presentation/driver_check_in_screen.dart';
 import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
 import 'src/features/lot_owner_application/presentation/lot_owner_application_screen.dart';
+import 'src/features/lot_details/data/lot_details_service.dart';
 import 'src/features/map_discovery/data/map_discovery_service.dart';
 import 'src/features/map_discovery/presentation/map_discovery_screen.dart';
 import 'src/features/operator_application/data/operator_application_service.dart';
@@ -41,7 +42,9 @@ typedef DriverCheckInServiceFactory =
 typedef AttendantCheckInServiceFactory =
     AttendantCheckInService Function(String accessToken);
 typedef MapDiscoveryServiceFactory =
-  MapDiscoveryService Function(String accessToken);
+    MapDiscoveryService Function(String accessToken);
+typedef LotDetailsServiceFactory =
+    LotDetailsService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -115,6 +118,14 @@ AttendantCheckInService defaultAttendantCheckInServiceFactory(
 MapDiscoveryService defaultMapDiscoveryServiceFactory(String accessToken) {
   final apiClient = ApiClient();
   return BackendMapDiscoveryService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+LotDetailsService defaultLotDetailsServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendLotDetailsService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -226,12 +237,17 @@ class MyApp extends StatelessWidget {
     required this.authService,
     this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
     this.mapDiscoveryServiceFactory = defaultMapDiscoveryServiceFactory,
+    this.lotDetailsServiceFactory = defaultLotDetailsServiceFactory,
+    this.mapLocationPermissionService =
+        const DeviceMapLocationPermissionService(),
     this.attendantScannerBuilder = defaultAttendantScannerBuilder,
   });
 
   final AuthService authService;
   final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
   final MapDiscoveryServiceFactory mapDiscoveryServiceFactory;
+  final LotDetailsServiceFactory lotDetailsServiceFactory;
+  final MapLocationPermissionService mapLocationPermissionService;
   final AttendantScannerBuilder attendantScannerBuilder;
 
   @override
@@ -252,6 +268,8 @@ class MyApp extends StatelessWidget {
               onSessionUpdated: onSessionUpdated,
               attendantCheckInServiceFactory: attendantCheckInServiceFactory,
               mapDiscoveryServiceFactory: mapDiscoveryServiceFactory,
+              lotDetailsServiceFactory: lotDetailsServiceFactory,
+              mapLocationPermissionService: mapLocationPermissionService,
               attendantScannerBuilder: attendantScannerBuilder,
             ),
       ),
@@ -277,6 +295,9 @@ class AuthenticatedHome extends StatelessWidget {
     this.driverCheckInServiceFactory = defaultDriverCheckInServiceFactory,
     this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
     this.mapDiscoveryServiceFactory = defaultMapDiscoveryServiceFactory,
+    this.lotDetailsServiceFactory = defaultLotDetailsServiceFactory,
+    this.mapLocationPermissionService =
+        const DeviceMapLocationPermissionService(),
     this.attendantScannerBuilder = defaultAttendantScannerBuilder,
   });
 
@@ -293,39 +314,9 @@ class AuthenticatedHome extends StatelessWidget {
   final DriverCheckInServiceFactory driverCheckInServiceFactory;
   final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
   final MapDiscoveryServiceFactory mapDiscoveryServiceFactory;
+  final LotDetailsServiceFactory lotDetailsServiceFactory;
+  final MapLocationPermissionService mapLocationPermissionService;
   final AttendantScannerBuilder attendantScannerBuilder;
-
-  List<Widget> _buildPublicActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.storefront_outlined),
-        tooltip: 'Chủ bãi',
-        onPressed: () => openLotOwnerApplication(
-          context,
-          session,
-          authService: authService,
-          onSessionUpdated: onSessionUpdated,
-          applicationServiceFactory: applicationServiceFactory,
-        ),
-      ),
-      IconButton(
-        icon: const Icon(Icons.settings_suggest_outlined),
-        tooltip: 'Operator',
-        onPressed: () => openOperatorApplication(
-          context,
-          session,
-          authService: authService,
-          onSessionUpdated: onSessionUpdated,
-          applicationServiceFactory: operatorApplicationServiceFactory,
-        ),
-      ),
-      IconButton(
-        icon: const Icon(Icons.logout),
-        tooltip: 'Đăng xuất',
-        onPressed: onSignOut,
-      ),
-    ];
-  }
 
   bool get _hasLotOwnerWorkspace =>
       (session.capabilities['lot_owner'] ?? false) ||
@@ -404,47 +395,15 @@ class AuthenticatedHome extends StatelessWidget {
 
     final mapboxToken =
         dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? dotenv.env['ACCESS_TOKEN'];
-    if (mapboxToken == null || mapboxToken.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('ParkingApp'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.qr_code_2_outlined),
-              tooltip: 'Mã check-in',
-              onPressed: () => openDriverCheckIn(
-                context,
-                session,
-                vehicleServiceFactory: vehicleServiceFactory,
-                driverCheckInServiceFactory: driverCheckInServiceFactory,
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.directions_car_outlined),
-              tooltip: 'Xe của tôi',
-              onPressed: () => openVehicleManagement(
-                context,
-                session,
-                vehicleServiceFactory: vehicleServiceFactory,
-              ),
-            ),
-            ..._buildPublicActions(context),
-          ],
-        ),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'Xác thực thành công. Bạn vẫn có thể quản lý xe của mình ngay bây giờ. Hãy thêm MAPBOX_ACCESS_TOKEN vào mobile/.env để bật bản đồ thử nghiệm cho workspace public.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    }
+    final mapCanvasBuilder = mapboxToken == null || mapboxToken.isEmpty
+        ? defaultDriverMapFallbackCanvasBuilder
+        : defaultDriverMapCanvasBuilder;
 
     return MapDiscoveryScreen(
       mapDiscoveryService: mapDiscoveryServiceFactory(session.accessToken),
+      lotDetailsService: lotDetailsServiceFactory(session.accessToken),
+      locationPermissionService: mapLocationPermissionService,
+      mapCanvasBuilder: mapCanvasBuilder,
       onOpenDriverCheckIn: () => openDriverCheckIn(
         context,
         session,
