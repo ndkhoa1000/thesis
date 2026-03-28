@@ -143,7 +143,7 @@ N/A
 
 **Acceptance Criteria:**
 * **Given** I am logged into the app
-* **When** I add a new license plate
+* **When** I add a new license plate via a native mobile Image Picker (not a text URL)
 * **Then** it is saved to my profile and visible in my registered vehicles list.
 
 #### Story 1.4: Apply to Become Lot Owner
@@ -153,7 +153,7 @@ N/A
 
 **Acceptance Criteria:**
 * **Given** I am authenticated with a public account
-* **When** I submit the required ownership and verification documents
+* **When** I submit the required ownership and verification documents via an explicit File/Image Picker (no arbitrary text links allowed)
 * **Then** the system creates a pending LotOwner application linked to my existing account
 * **And** after Admin approval, the same `user` identity gains a linked `lot_owner` capability record and may update `user.role` to `LOT_OWNER` as its primary public workspace.
 
@@ -164,7 +164,7 @@ N/A
 
 **Acceptance Criteria:**
 * **Given** I am authenticated with a public account
-* **When** I submit the required business and verification documents
+* **When** I submit the required business and verification documents via an explicit File/Image Picker
 * **Then** the system creates a pending Operator application linked to my existing account
 * **And** after Admin approval, the same `user` identity gains a linked `manager` capability record and may update `user.role` to `MANAGER` as its primary public workspace.
 
@@ -179,7 +179,7 @@ N/A
 
 **Acceptance Criteria:**
 * **Given** I am authenticated as a Lot Owner
-* **When** I fill out the Lot Registration form with required details
+* **When** I fill out the Lot Registration form with required details, using explicit File Pickers for lot photos and ownership documents
 * **Then** a new Lot record is created with PENDING_APPROVAL status.
 
 #### Story 2.2: Admin Dashboard & Pending Approvals
@@ -213,8 +213,9 @@ N/A
 
 **Acceptance Criteria:**
 * **Given** I am an Operator of a lot
-* **When** I set the maximum capacity
+* **When** I set the maximum capacity using a standardized numeric input
 * **Then** the lot will not accept check-ins beyond this capacity.
+* **And (Edge Case)** if the updated capacity is less than `current_occupied_slots`, the lot enters an `OVERFLOW` warning state alerting Operators/Attendants, but check-outs continue to work.
 
 #### Story 3.2: Set Operating Hours & Pricing Rules
 **As an** Operator,
@@ -223,8 +224,9 @@ N/A
 
 **Acceptance Criteria:**
 * **Given** I am the Operator
-* **When** I set pricing rules
-* **Then** they are saved and applied to future check-ins.
+* **When** I set operating hours via a native UI `TimePicker` and define pricing rules
+* **Then** they are saved and applied to future check-ins via `effective_date` (ensuring existing opened sessions are not impacted by the new price).
+* **And (Edge Case)** the lot remains in `INCOMPLETE_CONFIG` and hidden from the map until both Capacity and at least one Pricing Rule are set.
 
 #### Story 3.3: Create Attendant Accounts
 **As an** Operator,
@@ -274,7 +276,8 @@ N/A
 **Acceptance Criteria:**
 * **Given** I am an Attendant
 * **When** a driver arrives without the app or with an unregistered NFC card
-* **Then** I am prompted to take a photo of the front and back of the vehicle (Conditional Friction).
+* **Then** I am prompted to take a photo of the front and back of the vehicle via the Camera (Conditional Friction).
+* **And (UX/Edge Case)** the photo upload to Cloudinary runs *asynchronously* in the background, allowing the UI to instantly reset for the next vehicle, preventing 5-sec SLA violations.
 * **And (UX)** the system relies entirely on camera OCR or swipe gestures; the on-screen keyboard is disabled at the gate to prevent manual typing delays.
 
 #### Story 4.4: Driver Generates Check-Out QR
@@ -333,6 +336,7 @@ N/A
 * **Given** I am on the Map tab
 * **When** it loads
 * **Then** I see pins for ACTIVE lots.
+* **And (Edge Case)** if I deny GPS location permissions, I receive a gentle fallback UI (e.g. toast warning + default city view) so I can still manually select a lot without the app crashing or hard-blocking me.
 * **And (UX)** lot markers are Dynamic Color-Coded Pins (Green/Orange/Red) that display the live available slot number without requiring a tap.
 * **And (UX)** map pins are clustered when zoomed out to prevent UI clutter.
 
@@ -462,6 +466,7 @@ N/A
 * **Given** I am a Lot Owner
 * **When** I invite an Operator with a revenue split %
 * **Then** they receive the contract and can accept it.
+* **And (Edge Case)** if the lease expires, it displays as EXPIRED, and the Lot Owner is provided a "Disable Lot" manual override button to suspend new check-ins.
 
 #### Story 8.2: Owner Revenue Dashboard
 **As a** Lot Owner,
@@ -578,6 +583,17 @@ N/A
   - User-facing error messages: Vietnamese strings
 * **And** all existing English placeholder workspace title strings are removed
 * **And** each shared widget is used by at least one screen per workspace to validate integration
+
+#### Story 9.7: Media Storage & Backend Infrastructure
+**As a** developer,
+**I want** a standardized Media Storage service bridging Flutter and FastAPI to Cloudinary,
+**So that** all business forms that require file/image paths (profile, lot, walk-in camera) can correctly upload binary data (Multipart) without falling back to manual string URL inputs.
+
+**Acceptance Criteria:**
+* **Given** the app requires a media upload
+* **When** a native `ImagePicker` or `FilePicker` is used
+* **Then** the compressed file is transmitted via FastAPI to Cloudinary.
+* **And** Cloudinary responds with a `secure_url` stored correctly in the database entity, abstracting manual text entry away entirely.
 
 ---
 

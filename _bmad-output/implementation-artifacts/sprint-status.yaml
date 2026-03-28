@@ -1,5 +1,5 @@
-# generated: 2026-03-26
-# last_updated: 2026-03-26
+# generated: 2026-03-28
+# last_updated: 2026-03-28
 # project: thesis
 # project_key: NOKEY
 # tracking_system: file-system
@@ -27,7 +27,7 @@
 #   - optional: Can be completed but not required
 #   - done: Retrospective has been completed
 
-generated: 2026-03-26
+generated: 2026-03-28
 last_updated: 2026-03-28
 project: thesis
 project_key: NOKEY
@@ -35,8 +35,6 @@ tracking_system: file-system
 story_location: /home/khoa/thesis/app/_bmad-output/implementation-artifacts
 
 development_status:
-  epic-0: done
-  epic-0-retrospective: optional
   epic-1: done
   1-1-user-registration: done
   1-2-user-login: done
@@ -54,7 +52,7 @@ development_status:
   3-2-set-operating-hours-pricing-rules: done
   3-3-create-attendant-accounts: done
   epic-3-retrospective: done
-  epic-4: in-progress
+  epic-4: done
   4-1-driver-generates-check-in-qr: done
   4-2-attendant-scans-qr-for-check-in: done
   4-3-manual-license-plate-check-in: done
@@ -66,11 +64,13 @@ development_status:
   5-1-view-interactive-map-lots: backlog
   5-2-view-lot-details-availability: backlog
   5-3-driver-parking-history: backlog
+  5-4-en-route-lot-capacity-alert: backlog
   epic-5-retrospective: optional
   epic-6: backlog
   6-1-attendant-views-lot-occupancy-stats: backlog
   6-2-configure-announcements: backlog
   6-3-force-close-timeout-session: backlog
+  6-4-zero-trust-shift-handover: backlog
   epic-6-retrospective: optional
   epic-7: backlog
   7-1-driver-pre-books-parking-spot: backlog
@@ -83,12 +83,13 @@ development_status:
   8-3-operator-revenue-dashboard: backlog
   epic-8-retrospective: optional
   epic-9: backlog
-  9-1-app-routing-foundation-dual-theme: backlog
+  9-1-app-routing-foundation-dual-theme-system: backlog
   9-2-driver-workspace-shell: backlog
   9-3-attendant-workspace-shell: backlog
   9-4-management-workspace-shells: backlog
   9-5-admin-workspace-shell: backlog
   9-6-shared-ui-components-localization: backlog
+  9-7-media-storage-backend-infrastructure: backlog
   epic-9-retrospective: optional
   epic-10: backlog
   10-1-system-push-notifications: backlog
