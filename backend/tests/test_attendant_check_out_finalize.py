@@ -90,6 +90,12 @@ def _existing_payment(
     return payment
 
 
+def _no_pending_close_out_result() -> MagicMock:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    return result
+
+
 class TestAttendantCheckOutFinalize:
     @pytest.mark.asyncio
     async def test_finalizes_checkout_and_creates_payment_atomically(self, mock_db):
@@ -117,6 +123,7 @@ class TestAttendantCheckOutFinalize:
             side_effect=[
                 attendant_result,
                 lot_result,
+                _no_pending_close_out_result(),
                 session_result,
                 payment_lookup_result,
                 pricing_result,
@@ -172,7 +179,13 @@ class TestAttendantCheckOutFinalize:
         payment_lookup_result.scalars.return_value.all.return_value = [_existing_payment()]
 
         mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, session_result, payment_lookup_result]
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                session_result,
+                payment_lookup_result,
+            ]
         )
         mock_db.add = Mock()
         mock_db.commit = AsyncMock()
@@ -213,6 +226,7 @@ class TestAttendantCheckOutFinalize:
             side_effect=[
                 attendant_result,
                 lot_result,
+                _no_pending_close_out_result(),
                 session_result,
                 payment_lookup_result,
                 pricing_result,
@@ -262,6 +276,7 @@ class TestAttendantCheckOutFinalize:
             side_effect=[
                 attendant_result,
                 lot_result,
+                _no_pending_close_out_result(),
                 session_result,
                 payment_lookup_result,
                 pricing_result,

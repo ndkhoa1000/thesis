@@ -29,7 +29,7 @@ from ...models.enums import (
     VehicleTypeAll,
 )
 from ...models.sessions import ParkingSession, SessionEdit
-from ...services.shift_service import get_or_create_open_shift
+from ...services.shift_service import ensure_no_pending_final_shift_close_out, get_or_create_open_shift
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
 from ...schemas.session import (
@@ -517,6 +517,7 @@ async def attendant_force_close_timeout(
 ) -> AttendantForceCloseTimeoutRead:
     attendant = await _get_attendant_for_user(db, current_user)
     parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
+    await ensure_no_pending_final_shift_close_out(db, parking_lot.id)
     latest_config = await _get_latest_attendant_lot_capacity_config(db, parking_lot.id)
 
     session_result = await db.execute(
@@ -680,6 +681,7 @@ async def attendant_check_out_finalize(
 ) -> AttendantCheckOutFinalizeRead:
     attendant = await _get_attendant_for_user(db, current_user)
     parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
+    await ensure_no_pending_final_shift_close_out(db, parking_lot.id)
 
     session_result = await db.execute(
         select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1).with_for_update()
@@ -878,6 +880,7 @@ async def attendant_check_in_with_driver_qr(
 ) -> AttendantCheckInRead:
     attendant = await _get_attendant_for_user(db, current_user)
     parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
+    await ensure_no_pending_final_shift_close_out(db, parking_lot.id)
     token_payload = _decode_driver_check_in_token(payload.token)
 
     vehicle_result = await db.execute(select(Vehicle).where(Vehicle.id == token_payload["vehicle_id"]).limit(1))
@@ -947,9 +950,10 @@ async def attendant_check_in_walk_in_vehicle(
 ) -> AttendantCheckInRead:
     attendant = await _get_attendant_for_user(db, current_user)
     parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
+    await ensure_no_pending_final_shift_close_out(db, parking_lot.id)
 
     if plate_image is None:
-      raise BadRequestException("A plate photo is required for walk-in check-in")
+        raise BadRequestException("A plate photo is required for walk-in check-in")
 
     normalized_vehicle_type = _normalize_walk_in_vehicle_type(vehicle_type)
     plate_image_path = await _store_walk_in_image(plate_image)

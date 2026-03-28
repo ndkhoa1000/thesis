@@ -100,6 +100,11 @@ class ShiftStatus(str, enum.Enum):
     LOCKED = "LOCKED"
 
 
+class ShiftCloseOutStatus(str, enum.Enum):
+    REQUESTED = "REQUESTED"
+    COMPLETED = "COMPLETED"
+
+
 class PayableType(str, enum.Enum):
     SESSION = "SESSION"
     SUBSCRIPTION = "SUBSCRIPTION"
@@ -132,6 +137,7 @@ class NotificationType(str, enum.Enum):
     LOT_CLOSING = "LOT_CLOSING"
     SYSTEM_ALERT = "SYSTEM_ALERT"
     SHIFT_HANDOVER_DISCREPANCY = "SHIFT_HANDOVER_DISCREPANCY"
+    FINAL_SHIFT_CLOSE_OUT_READY = "FINAL_SHIFT_CLOSE_OUT_READY"
 
 
 class ReferenceType(str, enum.Enum):
@@ -140,3 +146,4 @@ class ReferenceType(str, enum.Enum):
     SUBSCRIPTION = "SUBSCRIPTION"
     LOT = "LOT"
     SHIFT_HANDOVER = "SHIFT_HANDOVER"
+    SHIFT_CLOSE_OUT = "SHIFT_CLOSE_OUT"

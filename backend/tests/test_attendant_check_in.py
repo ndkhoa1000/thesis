@@ -72,6 +72,12 @@ def _build_driver_token(*, driver_id: int = 9, vehicle_id: int = 22, expires_in_
     return jwt.encode(payload, SECRET_KEY.get_secret_value(), algorithm=ALGORITHM)
 
 
+def _no_pending_close_out_result() -> MagicMock:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    return result
+
+
 class TestAttendantCheckInWithDriverQr:
     @pytest.mark.asyncio
     async def test_creates_session_and_updates_availability(self, mock_db):
@@ -90,7 +96,13 @@ class TestAttendantCheckInWithDriverQr:
         active_session_result.scalar_one_or_none.return_value = None
 
         mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, vehicle_result, active_session_result]
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                vehicle_result,
+                active_session_result,
+            ]
         )
         created_sessions = []
         mock_db.add = Mock(side_effect=lambda instance: created_sessions.append(instance))
@@ -133,6 +145,7 @@ class TestAttendantCheckInWithDriverQr:
             side_effect=[
                 attendant_result,
                 lot_result,
+                _no_pending_close_out_result(),
                 vehicle_result,
                 active_session_result,
                 other_lot_result,
@@ -155,7 +168,9 @@ class TestAttendantCheckInWithDriverQr:
         lot_result = MagicMock()
         lot_result.scalar_one_or_none.return_value = _make_lot()
 
-        mock_db.execute = AsyncMock(side_effect=[attendant_result, lot_result])
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, _no_pending_close_out_result()]
+        )
 
         with pytest.raises(BadRequestException, match='Invalid QR code'):
             await attendant_check_in_with_driver_qr(

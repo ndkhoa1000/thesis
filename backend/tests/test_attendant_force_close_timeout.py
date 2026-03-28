@@ -49,6 +49,12 @@ def _make_config(total_capacity: int = 12) -> ParkingLotConfig:
     return config
 
 
+def _no_pending_close_out_result() -> MagicMock:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    return result
+
+
 def _make_session(
     *,
     session_id: int = 88,
@@ -124,7 +130,13 @@ class TestAttendantForceCloseTimeout:
         session_result.scalar_one_or_none.return_value = session
 
         mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, config_result, session_result]
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                config_result,
+                session_result,
+            ]
         )
         mock_db.add = Mock()
         mock_db.commit = AsyncMock()
@@ -172,7 +184,13 @@ class TestAttendantForceCloseTimeout:
         )
 
         mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, config_result, session_result]
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                config_result,
+                session_result,
+            ]
         )
         mock_db.add = Mock()
         mock_db.commit = AsyncMock()
@@ -207,7 +225,13 @@ class TestAttendantForceCloseTimeout:
         session_result.scalar_one_or_none.return_value = _make_session()
 
         mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, config_result, session_result]
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                config_result,
+                session_result,
+            ]
         )
         mock_db.add = Mock()
         mock_db.commit = AsyncMock()
@@ -240,7 +264,13 @@ class TestAttendantForceCloseTimeout:
         session_result.scalar_one_or_none.return_value = None
 
         mock_db.execute = AsyncMock(
-            side_effect=[attendant_result, lot_result, config_result, session_result]
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                config_result,
+                session_result,
+            ]
         )
         mock_db.add = Mock()
         mock_db.commit = AsyncMock()

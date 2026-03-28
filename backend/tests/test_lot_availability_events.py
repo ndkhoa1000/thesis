@@ -125,6 +125,12 @@ def _make_lease(lease_id: int = 12, parking_lot_id: int = 13, manager_id: int = 
     return lease
 
 
+def _no_pending_close_out_result() -> MagicMock:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    return result
+
+
 @pytest.mark.asyncio
 async def test_attendant_check_in_publishes_availability_event(mock_db):
     attendant_result = MagicMock()
@@ -141,7 +147,13 @@ async def test_attendant_check_in_publishes_availability_event(mock_db):
     active_session_result.scalar_one_or_none.return_value = None
 
     mock_db.execute = AsyncMock(
-        side_effect=[attendant_result, lot_result, vehicle_result, active_session_result]
+        side_effect=[
+            attendant_result,
+            lot_result,
+            _no_pending_close_out_result(),
+            vehicle_result,
+            active_session_result,
+        ]
     )
     mock_db.add = Mock()
     mock_db.commit = AsyncMock()
@@ -188,6 +200,7 @@ async def test_attendant_check_out_finalize_publishes_availability_event(mock_db
         side_effect=[
             attendant_result,
             lot_result,
+            _no_pending_close_out_result(),
             session_result,
             payment_lookup_result,
             pricing_result,

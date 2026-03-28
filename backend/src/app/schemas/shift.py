@@ -45,3 +45,33 @@ class OperatorShiftAlertRead(BaseModel):
     reference_id: int | None = None
     is_read: bool
     created_at: datetime
+
+
+class AttendantFinalShiftCloseOutRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    close_out_id: int
+    shift_id: int
+    parking_lot_id: int
+    expected_cash: float = Field(ge=0)
+    current_available: int = Field(ge=0)
+    active_session_count: int = Field(ge=0)
+    status: str
+    requested_at: datetime
+
+
+class OperatorFinalShiftCloseOutRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    close_out_id: int
+    shift_id: int
+    parking_lot_id: int
+    parking_lot_name: str
+    attendant_id: int
+    attendant_name: str
+    expected_cash: float = Field(ge=0)
+    current_available: int = Field(ge=0)
+    active_session_count: int = Field(ge=0)
+    status: str
+    requested_at: datetime
+    completed_at: datetime | None = None

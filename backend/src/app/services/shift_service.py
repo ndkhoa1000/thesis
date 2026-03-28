@@ -1,4 +1,4 @@
-"""Shift handover service helpers."""
+"""Shift handover and day-end close-out service helpers."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -15,13 +15,17 @@ from ..models.enums import (
     PaymentMethod,
     PaymentStatus,
     ReferenceType,
+    SessionStatus,
+    ShiftCloseOutStatus,
     ShiftStatus,
+    VehicleTypeAll,
 )
 from ..models.financials import Payment
 from ..models.leases import LotLease
 from ..models.notifications import Notification
+from ..models.parking import ParkingLot, ParkingLotConfig
 from ..models.sessions import ParkingSession
-from ..models.shifts import Shift
+from ..models.shifts import Shift, ShiftCloseOut
 from ..models.user import User
 from ..models.users import Attendant, Manager
 
@@ -195,6 +199,100 @@ async def get_operator_recipients_for_lot(
     return [(lease, manager, user) for lease, manager, user in result.all()]
 
 
+async def get_shift_close_out_by_shift(
+    db: AsyncSession,
+    shift_id: int,
+    *,
+    for_update: bool = False,
+) -> ShiftCloseOut | None:
+    query = select(ShiftCloseOut).where(ShiftCloseOut.shift_id == shift_id).limit(1)
+    if for_update:
+        query = query.with_for_update()
+    result = await db.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def get_shift_close_out_by_id(
+    db: AsyncSession,
+    close_out_id: int,
+    *,
+    for_update: bool = False,
+) -> ShiftCloseOut | None:
+    query = select(ShiftCloseOut).where(ShiftCloseOut.id == close_out_id).limit(1)
+    if for_update:
+        query = query.with_for_update()
+    result = await db.execute(query)
+    return result.scalar_one_or_none()
+
+
+async def count_active_sessions_for_lot(db: AsyncSession, parking_lot_id: int) -> int:
+    result = await db.execute(
+        select(func.count(ParkingSession.id)).where(
+            ParkingSession.parking_lot_id == parking_lot_id,
+            ParkingSession.status == SessionStatus.CHECKED_IN.value,
+        )
+    )
+    return int(result.scalar_one() or 0)
+
+
+async def get_latest_total_capacity(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> int | None:
+    result = await db.execute(
+        select(ParkingLotConfig)
+        .where(
+            ParkingLotConfig.parking_lot_id == parking_lot_id,
+            ParkingLotConfig.vehicle_type == VehicleTypeAll.ALL.value,
+        )
+        .order_by(ParkingLotConfig.created_at.desc(), ParkingLotConfig.id.desc())
+        .limit(1)
+    )
+    config = result.scalar_one_or_none()
+    if config is None:
+        return None
+    return max(config.total_capacity, 0)
+
+
+async def validate_lot_empty_for_final_close_out(
+    db: AsyncSession,
+    parking_lot: ParkingLot,
+) -> int:
+    active_session_count = await count_active_sessions_for_lot(db, parking_lot.id)
+    if active_session_count > 0:
+        raise BadRequestException(
+            f"Lot still has {active_session_count} active session(s). Resolve them before final shift close-out."
+        )
+
+    total_capacity = await get_latest_total_capacity(db, parking_lot.id)
+    if total_capacity is not None and parking_lot.current_available != total_capacity:
+        raise BadRequestException(
+            "Lot occupancy is out of sync. Reconcile capacity before requesting final shift close-out."
+        )
+    return active_session_count
+
+
+async def ensure_no_pending_final_shift_close_out(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> None:
+    result = await db.execute(
+        select(ShiftCloseOut)
+        .where(
+            ShiftCloseOut.parking_lot_id == parking_lot_id,
+            ShiftCloseOut.status == ShiftCloseOutStatus.REQUESTED.value,
+        )
+        .order_by(ShiftCloseOut.requested_at.desc(), ShiftCloseOut.id.desc())
+        .limit(1)
+    )
+    pending = result.scalar_one_or_none()
+    if pending is not None:
+        raise BadRequestException(
+            "Final shift close-out is pending operator confirmation. "
+            "Gate operations stay locked until the operator completes it."
+        )
+
+
 def build_shift_discrepancy_notification(
     *,
     user_id: int,
@@ -220,5 +318,31 @@ def build_shift_discrepancy_notification(
         notification_type=NotificationType.SHIFT_HANDOVER_DISCREPANCY.value,
         reference_type=ReferenceType.SHIFT_HANDOVER.value,
         reference_id=shift_id,
+        is_read=False,
+    )
+
+
+def build_final_shift_close_out_notification(
+    *,
+    user_id: int,
+    sender_id: int,
+    close_out_id: int,
+    lot_name: str,
+    attendant_name: str,
+    expected_cash: float,
+) -> Notification:
+    expected_label = f"{expected_cash:,.0f}".replace(",", ".")
+    return Notification(
+        user_id=user_id,
+        sender_id=sender_id,
+        title=f"Dong ca cuoi ngay tai {lot_name}",
+        message=(
+            f"{attendant_name} da gui dong ca cuoi ngay. "
+            f"Tien mat doi chieu: {expected_label} VND. "
+            "Operator can xac nhan ket thuc ngay van hanh."
+        ),
+        notification_type=NotificationType.FINAL_SHIFT_CLOSE_OUT_READY.value,
+        reference_type=ReferenceType.SHIFT_CLOSE_OUT.value,
+        reference_id=close_out_id,
         is_read=False,
     )

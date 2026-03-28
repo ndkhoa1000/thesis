@@ -51,6 +51,12 @@ def _make_upload(
     )
 
 
+def _no_pending_close_out_result() -> MagicMock:
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    return result
+
+
 class TestAttendantWalkInCheckIn:
     @pytest.mark.asyncio
     async def test_creates_walk_in_session_and_updates_availability(self, mock_db):
@@ -61,7 +67,9 @@ class TestAttendantWalkInCheckIn:
         lot_result = MagicMock()
         lot_result.scalar_one_or_none.return_value = lot
 
-        mock_db.execute = AsyncMock(side_effect=[attendant_result, lot_result])
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, _no_pending_close_out_result()]
+        )
         created_sessions = []
         mock_db.add = Mock(side_effect=lambda instance: created_sessions.append(instance))
         mock_db.commit = AsyncMock()
@@ -98,7 +106,9 @@ class TestAttendantWalkInCheckIn:
         lot_result = MagicMock()
         lot_result.scalar_one_or_none.return_value = _make_lot()
 
-        mock_db.execute = AsyncMock(side_effect=[attendant_result, lot_result])
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, _no_pending_close_out_result()]
+        )
 
         with pytest.raises(BadRequestException, match='plate photo'):
             await attendant_check_in_walk_in_vehicle(
@@ -118,7 +128,9 @@ class TestAttendantWalkInCheckIn:
         lot_result = MagicMock()
         lot_result.scalar_one_or_none.return_value = _make_lot()
 
-        mock_db.execute = AsyncMock(side_effect=[attendant_result, lot_result])
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, _no_pending_close_out_result()]
+        )
 
         with pytest.raises(BadRequestException, match='image'):
             await attendant_check_in_walk_in_vehicle(
@@ -138,7 +150,9 @@ class TestAttendantWalkInCheckIn:
         lot_result = MagicMock()
         lot_result.scalar_one_or_none.return_value = _make_lot(current_available=0)
 
-        mock_db.execute = AsyncMock(side_effect=[attendant_result, lot_result])
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, _no_pending_close_out_result()]
+        )
 
         with pytest.raises(BadRequestException, match='Lot is full'):
             await attendant_check_in_walk_in_vehicle(
