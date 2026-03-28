@@ -17,7 +17,7 @@ from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenExc
 from ...core.lot_availability import publish_lot_availability_update
 from ...core.security import ALGORITHM, SECRET_KEY
 from ...models.financials import Payment
-from ...models.parking import ParkingLot, Pricing
+from ...models.parking import ParkingLot, ParkingLotConfig, Pricing
 from ...models.enums import (
     PayableType,
     PaymentMethod,
@@ -32,6 +32,8 @@ from ...models.sessions import ParkingSession
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
 from ...schemas.session import (
+    AttendantOccupancySummaryRead,
+    AttendantOccupancyVehicleBreakdownRead,
     AttendantCheckInCreate,
     AttendantCheckInRead,
     AttendantCheckOutFinalizeCreate,
@@ -57,6 +59,22 @@ WALK_IN_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "walk_in_c
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+async def _get_latest_attendant_lot_capacity_config(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> ParkingLotConfig | None:
+    config_result = await db.execute(
+        select(ParkingLotConfig)
+        .where(
+            ParkingLotConfig.parking_lot_id == parking_lot_id,
+            ParkingLotConfig.vehicle_type == VehicleTypeAll.ALL.value,
+        )
+        .order_by(ParkingLotConfig.created_at.desc(), ParkingLotConfig.id.desc())
+        .limit(1)
+    )
+    return config_result.scalar_one_or_none()
 
 
 async def _get_driver_for_user(db: AsyncSession, current_user: dict[str, Any]) -> Driver:
@@ -370,6 +388,64 @@ async def get_driver_active_session(
         elapsed_minutes=elapsed_minutes,
         estimated_cost=_calculate_estimated_cost(active_session, pricing),
         pricing_mode=pricing.pricing_mode if pricing is not None else None,
+    )
+
+
+@router.get(
+    "/sessions/attendant-occupancy-summary",
+    response_model=AttendantOccupancySummaryRead,
+    status_code=200,
+)
+async def get_attendant_occupancy_summary(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> AttendantOccupancySummaryRead:
+    attendant = await _get_attendant_for_user(db, current_user)
+    parking_lot = await _get_attendant_lot(db, attendant)
+    latest_config = await _get_latest_attendant_lot_capacity_config(db, parking_lot.id)
+
+    breakdown_result = await db.execute(
+        select(ParkingSession.vehicle_type, func.count(ParkingSession.id))
+        .where(
+            ParkingSession.parking_lot_id == parking_lot.id,
+            ParkingSession.status == SessionStatus.CHECKED_IN.value,
+        )
+        .group_by(ParkingSession.vehicle_type)
+        .order_by(func.count(ParkingSession.id).desc(), ParkingSession.vehicle_type.asc())
+    )
+
+    vehicle_type_breakdown = [
+        AttendantOccupancyVehicleBreakdownRead(
+            vehicle_type=vehicle_type,
+            occupied_count=occupied_count,
+        )
+        for vehicle_type, occupied_count in breakdown_result.all()
+    ]
+
+    if latest_config is None:
+        return AttendantOccupancySummaryRead(
+            parking_lot_id=parking_lot.id,
+            parking_lot_name=parking_lot.name,
+            has_active_capacity_config=False,
+            total_capacity=None,
+            free_count=None,
+            occupied_count=None,
+            vehicle_type_breakdown=vehicle_type_breakdown,
+        )
+
+    total_capacity = max(latest_config.total_capacity, 0)
+    free_count = max(parking_lot.current_available, 0)
+    occupied_count = max(total_capacity - free_count, 0)
+
+    return AttendantOccupancySummaryRead(
+        parking_lot_id=parking_lot.id,
+        parking_lot_name=parking_lot.name,
+        has_active_capacity_config=True,
+        total_capacity=total_capacity,
+        free_count=free_count,
+        occupied_count=occupied_count,
+        vehicle_type_breakdown=vehicle_type_breakdown,
     )
 
 

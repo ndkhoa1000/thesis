@@ -1,5 +1,63 @@
 import 'package:dio/dio.dart';
 
+class AttendantOccupancyVehicleBreakdown {
+  const AttendantOccupancyVehicleBreakdown({
+    required this.vehicleType,
+    required this.occupiedCount,
+  });
+
+  final String vehicleType;
+  final int occupiedCount;
+
+  factory AttendantOccupancyVehicleBreakdown.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AttendantOccupancyVehicleBreakdown(
+      vehicleType: json['vehicle_type'] as String,
+      occupiedCount: json['occupied_count'] as int? ?? 0,
+    );
+  }
+}
+
+class AttendantOccupancySummary {
+  const AttendantOccupancySummary({
+    required this.parkingLotId,
+    required this.parkingLotName,
+    required this.hasActiveCapacityConfig,
+    required this.totalCapacity,
+    required this.freeCount,
+    required this.occupiedCount,
+    required this.vehicleTypeBreakdown,
+  });
+
+  final int parkingLotId;
+  final String parkingLotName;
+  final bool hasActiveCapacityConfig;
+  final int? totalCapacity;
+  final int? freeCount;
+  final int? occupiedCount;
+  final List<AttendantOccupancyVehicleBreakdown> vehicleTypeBreakdown;
+
+  factory AttendantOccupancySummary.fromJson(Map<String, dynamic> json) {
+    final rawBreakdown = json['vehicle_type_breakdown'];
+    return AttendantOccupancySummary(
+      parkingLotId: json['parking_lot_id'] as int,
+      parkingLotName: json['parking_lot_name'] as String,
+      hasActiveCapacityConfig:
+          json['has_active_capacity_config'] as bool? ?? false,
+      totalCapacity: json['total_capacity'] as int?,
+      freeCount: json['free_count'] as int?,
+      occupiedCount: json['occupied_count'] as int?,
+      vehicleTypeBreakdown: rawBreakdown is List
+          ? rawBreakdown
+                .whereType<Map<String, dynamic>>()
+                .map(AttendantOccupancyVehicleBreakdown.fromJson)
+                .toList(growable: false)
+          : const [],
+    );
+  }
+}
+
 class AttendantCheckInResult {
   const AttendantCheckInResult({
     required this.sessionId,
@@ -129,6 +187,8 @@ class AttendantCheckOutUndoResult {
 }
 
 abstract class AttendantCheckInService {
+  Future<AttendantOccupancySummary> getOccupancySummary();
+
   Future<AttendantCheckInResult> checkInDriver({required String token});
 
   Future<AttendantCheckInResult> checkInWalkIn({
@@ -178,6 +238,23 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
       throw AttendantCheckInException(invalidResponseMessage);
     } on TypeError {
       throw AttendantCheckInException(invalidResponseMessage);
+    }
+  }
+
+  @override
+  Future<AttendantOccupancySummary> getOccupancySummary() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/sessions/attendant-occupancy-summary',
+        options: _authOptions,
+      );
+      return _parseResponse(
+        response.data,
+        AttendantOccupancySummary.fromJson,
+        'Phan hoi thong ke bai xe tu may chu khong hop le.',
+      );
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
     }
   }
 

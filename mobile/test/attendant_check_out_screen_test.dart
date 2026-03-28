@@ -12,6 +12,28 @@ class FakeAttendantCheckOutService implements AttendantCheckInService {
   String? lastPreviewToken;
 
   @override
+  Future<AttendantOccupancySummary> getOccupancySummary() async {
+    return const AttendantOccupancySummary(
+      parkingLotId: 13,
+      parkingLotName: 'Bai xe Quan 1',
+      hasActiveCapacityConfig: true,
+      totalCapacity: 12,
+      freeCount: 4,
+      occupiedCount: 8,
+      vehicleTypeBreakdown: [
+        AttendantOccupancyVehicleBreakdown(
+          vehicleType: 'MOTORBIKE',
+          occupiedCount: 6,
+        ),
+        AttendantOccupancyVehicleBreakdown(
+          vehicleType: 'CAR',
+          occupiedCount: 2,
+        ),
+      ],
+    );
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     throw UnimplementedError();
   }

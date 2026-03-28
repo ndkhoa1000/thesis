@@ -67,7 +67,7 @@ development_status:
   5-4-en-route-lot-capacity-alert: done
   epic-5-retrospective: done
   epic-6: in-progress
-  6-1-attendant-views-lot-occupancy-stats: ready-for-dev
+  6-1-attendant-views-lot-occupancy-stats: review
   6-2-configure-announcements: ready-for-dev
   6-3-force-close-timeout-session: ready-for-dev
   6-4-zero-trust-shift-handover: ready-for-dev

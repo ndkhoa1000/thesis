@@ -1,6 +1,6 @@
 # Story 6.1: Attendant Views Lot Occupancy Stats
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -24,21 +24,21 @@ so that I know when we are full.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Expose attendant-scoped occupancy summary from the backend (AC: 1, 2, 3, 4)
-  - [ ] Add a read endpoint for the current attendant's assigned lot occupancy summary, preferably in the existing session/attendant operational surface rather than inventing a parallel dashboard API group.
-  - [ ] Derive `occupied_count` from `total_capacity - current_available` using the latest active `ParkingLotConfig`, and surface explicit "not configured" state when capacity is absent.
-  - [ ] Group active checked-in sessions by `vehicle_type` so the attendant can see occupied-session distribution without fabricating unsupported free-capacity-by-type numbers.
-  - [ ] Keep lot authorization strict so attendants can only read stats for their own assigned lot.
+- [x] Task 1: Expose attendant-scoped occupancy summary from the backend (AC: 1, 2, 3, 4)
+  - [x] Add a read endpoint for the current attendant's assigned lot occupancy summary, preferably in the existing session/attendant operational surface rather than inventing a parallel dashboard API group.
+  - [x] Derive `occupied_count` from `total_capacity - current_available` using the latest active `ParkingLotConfig`, and surface explicit "not configured" state when capacity is absent.
+  - [x] Group active checked-in sessions by `vehicle_type` so the attendant can see occupied-session distribution without fabricating unsupported free-capacity-by-type numbers.
+  - [x] Keep lot authorization strict so attendants can only read stats for their own assigned lot.
 
-- [ ] Task 2: Add an attendant-facing stats panel in the mobile app (AC: 1, 2, 3)
-  - [ ] Extend the existing attendant flow with a prominent occupancy card or header using large typography suitable for the attendant context.
-  - [ ] Present occupied, free, and total capacity values in a glanceable layout that does not interfere with the core scan workflow.
-  - [ ] Handle missing configuration and backend errors with explicit, non-misleading UI states.
+- [x] Task 2: Add an attendant-facing stats panel in the mobile app (AC: 1, 2, 3)
+  - [x] Extend the existing attendant flow with a prominent occupancy card or header using large typography suitable for the attendant context.
+  - [x] Present occupied, free, and total capacity values in a glanceable layout that does not interfere with the core scan workflow.
+  - [x] Handle missing configuration and backend errors with explicit, non-misleading UI states.
 
-- [ ] Task 3: Add focused regression coverage and verification (AC: 1, 2, 3)
-  - [ ] Add backend tests for occupancy summary calculation, attendant authorization, and missing-capacity handling.
-  - [ ] Add Flutter tests for the attendant stats presentation and empty/error states.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 3: Add focused regression coverage and verification (AC: 1, 2, 3)
+  - [x] Add backend tests for occupancy summary calculation, attendant authorization, and missing-capacity handling.
+  - [x] Add Flutter tests for the attendant stats presentation and empty/error states.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -118,10 +118,29 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Story context prepared for Epic 6 implementation.
-- Key guardrail: backend remains the single source of truth for occupancy values.
-- No `project-context.md` file was present in the repository at story creation time.
+- Added a new attendant-scoped backend summary contract that returns total capacity, free count, occupied count, missing-capacity state, and occupied-session breakdown by vehicle type for the assigned lot only.
+- Extended the attendant Flutter workspace with an occupancy summary panel, explicit missing-capacity and load-error handling, and summary refresh after check-in, walk-in check-in, checkout finalize, and checkout undo.
+- Refactored the attendant screen layout to remain scroll-safe under constrained widget-test viewports and made the checkout preview card internally scrollable to prevent overflow regressions.
+- Added focused backend and Flutter coverage for the new occupancy flow, then cleared the broader regression fallout from the new attendant service method across existing widget tests.
+- Validation passed with `cd backend && docker compose run --rm pytest`, `cd mobile && flutter test test/attendant_check_in_screen_test.dart test/attendant_check_out_screen_test.dart test/attendant_check_out_finalize_test.dart test/attendant_walk_in_check_in_test.dart`, and `cd mobile && flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/6-1-attendant-views-lot-occupancy-stats.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/schemas/session.py`
+- `backend/tests/test_attendant_occupancy_summary.py`
+- `backend/tests/test_lot_availability_events.py`
+- `mobile/lib/src/features/attendant_check_in/data/attendant_check_in_service.dart`
+- `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
+- `mobile/test/attendant_check_in_screen_test.dart`
+- `mobile/test/attendant_check_out_finalize_test.dart`
+- `mobile/test/attendant_check_out_screen_test.dart`
+- `mobile/test/attendant_walk_in_check_in_test.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-28: Created Story 6.1 implementation artifact for backend-owned attendant occupancy stats.
+- 2026-03-28: Implemented Story 6.1 with an attendant occupancy summary endpoint, mobile occupancy panel, scroll-safe attendant layout updates, and full backend/mobile regression validation.

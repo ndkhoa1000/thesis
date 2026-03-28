@@ -225,11 +225,24 @@ async def test_operator_lot_patch_publishes_availability_event(mock_db):
     parking_lot_result = MagicMock()
     parking_lot_result.scalar_one_or_none.return_value = lot
 
+    latest_config_result = MagicMock()
+    latest_config_result.scalar_one_or_none.return_value = None
+
+    latest_pricing_result = MagicMock()
+    latest_pricing_result.scalar_one_or_none.return_value = None
+
     occupied_result = MagicMock()
     occupied_result.scalar_one.return_value = 4
 
     mock_db.execute = AsyncMock(
-        side_effect=[manager_result, lease_result, parking_lot_result, occupied_result]
+        side_effect=[
+            manager_result,
+            lease_result,
+            parking_lot_result,
+            latest_config_result,
+            latest_pricing_result,
+            occupied_result,
+        ]
     )
     mock_db.add = Mock()
     mock_db.commit = AsyncMock()

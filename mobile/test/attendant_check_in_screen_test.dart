@@ -5,11 +5,44 @@ import 'package:parking_app/src/features/attendant_check_in/data/attendant_check
 import 'package:parking_app/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart';
 
 class FakeAttendantCheckInService implements AttendantCheckInService {
-  FakeAttendantCheckInService({this.result, this.errorMessage});
+  FakeAttendantCheckInService({
+    this.result,
+    this.errorMessage,
+    this.occupancySummary,
+    this.occupancyErrorMessage,
+  });
 
   final AttendantCheckInResult? result;
   final String? errorMessage;
+  final AttendantOccupancySummary? occupancySummary;
+  final String? occupancyErrorMessage;
   String? lastScannedToken;
+
+  @override
+  Future<AttendantOccupancySummary> getOccupancySummary() async {
+    if (occupancyErrorMessage != null) {
+      throw AttendantCheckInException(occupancyErrorMessage!);
+    }
+    return occupancySummary ??
+        const AttendantOccupancySummary(
+          parkingLotId: 13,
+          parkingLotName: 'Bai xe Quan 1',
+          hasActiveCapacityConfig: true,
+          totalCapacity: 12,
+          freeCount: 4,
+          occupiedCount: 8,
+          vehicleTypeBreakdown: [
+            AttendantOccupancyVehicleBreakdown(
+              vehicleType: 'MOTORBIKE',
+              occupiedCount: 6,
+            ),
+            AttendantOccupancyVehicleBreakdown(
+              vehicleType: 'CAR',
+              occupiedCount: 2,
+            ),
+          ],
+        );
+  }
 
   @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
@@ -95,6 +128,60 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Sẵn sàng quét xe vào bãi'), findsOneWidget);
+    expect(find.text('Bai xe Quan 1'), findsOneWidget);
+    expect(find.byKey(const ValueKey('occupancy-fact-Da gui')), findsOneWidget);
+    expect(find.text('8/12'), findsOneWidget);
+    expect(find.text('Xe máy: 6'), findsOneWidget);
+    expect(find.text('Ô tô: 2'), findsOneWidget);
+  });
+
+  testWidgets('renders missing-capacity occupancy state explicitly', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildSubject(
+        service: FakeAttendantCheckInService(
+          occupancySummary: const AttendantOccupancySummary(
+            parkingLotId: 13,
+            parkingLotName: 'Bai xe Chua Cau hinh',
+            hasActiveCapacityConfig: false,
+            totalCapacity: null,
+            freeCount: null,
+            occupiedCount: null,
+            vehicleTypeBreakdown: [
+              AttendantOccupancyVehicleBreakdown(
+                vehicleType: 'MOTORBIKE',
+                occupiedCount: 2,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Chua Cau hinh'), findsOneWidget);
+    expect(find.text('Chua cau hinh suc chua dang hoat dong'), findsOneWidget);
+    expect(find.text('Xe máy: 2'), findsOneWidget);
+  });
+
+  testWidgets('renders occupancy load errors without breaking scanner flow', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildSubject(
+        service: FakeAttendantCheckInService(
+          occupancyErrorMessage: 'Khong the tai thong ke bai xe.',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Khong the tai thong ke bai xe.'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('fake-attendant-scan-button')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('renders success feedback after scan', (tester) async {

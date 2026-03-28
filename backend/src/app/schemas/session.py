@@ -59,6 +59,25 @@ class DriverParkingHistoryItemRead(BaseModel):
     payment_method: str | None = None
 
 
+class AttendantOccupancyVehicleBreakdownRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    vehicle_type: str
+    occupied_count: int = Field(ge=0)
+
+
+class AttendantOccupancySummaryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    parking_lot_id: int
+    parking_lot_name: str
+    has_active_capacity_config: bool
+    total_capacity: int | None = None
+    free_count: int | None = Field(default=None, ge=0)
+    occupied_count: int | None = Field(default=None, ge=0)
+    vehicle_type_breakdown: list[AttendantOccupancyVehicleBreakdownRead] = []
+
+
 class AttendantCheckOutPreviewCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

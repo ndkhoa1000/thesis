@@ -14,6 +14,24 @@ class FakeAttendantWalkInService implements AttendantCheckInService {
   String? lastOverviewImagePath;
 
   @override
+  Future<AttendantOccupancySummary> getOccupancySummary() async {
+    return const AttendantOccupancySummary(
+      parkingLotId: 13,
+      parkingLotName: 'Bai xe Quan 1',
+      hasActiveCapacityConfig: true,
+      totalCapacity: 12,
+      freeCount: 4,
+      occupiedCount: 8,
+      vehicleTypeBreakdown: [
+        AttendantOccupancyVehicleBreakdown(
+          vehicleType: 'MOTORBIKE',
+          occupiedCount: 6,
+        ),
+      ],
+    );
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     throw UnimplementedError();
   }
@@ -82,6 +100,7 @@ void main() {
     required FakeAttendantWalkInService service,
     Future<String?> Function()? captureOverviewImage,
     Future<String?> Function()? capturePlateImage,
+    bool startInWalkInMode = false,
   }) {
     return MaterialApp(
       home: AttendantCheckInScreen(
@@ -89,6 +108,7 @@ void main() {
         scannerBuilder: _fakeScanner,
         captureOverviewImage: captureOverviewImage ?? captureOverview,
         capturePlateImage: capturePlateImage ?? capturePlate,
+        startInWalkInMode: startInWalkInMode,
       ),
     );
   }
@@ -112,14 +132,29 @@ void main() {
     await tester.pumpWidget(buildSubject(service: service));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Xe vang lai'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('walk-in-entry-button')),
+    );
+    final walkInEntryButton = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('walk-in-entry-button')),
+    );
+    walkInEntryButton.onPressed!.call();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Chup anh toan canh'));
+    await tester.ensureVisible(
+      find.widgetWithText(FilledButton, 'Chup anh toan canh'),
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Chup anh toan canh'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Chup anh bien so'));
+    await tester.ensureVisible(
+      find.widgetWithText(FilledButton, 'Chup anh bien so'),
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Chup anh bien so'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tao phien walk-in'));
+    await tester.ensureVisible(
+      find.widgetWithText(FilledButton, 'Tao phien walk-in'),
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Tao phien walk-in'));
     await tester.pumpAndSettle();
 
     expect(service.lastVehicleType, 'MOTORBIKE');
@@ -129,13 +164,18 @@ void main() {
   });
 
   testWidgets('shows validation when plate photo is missing', (tester) async {
+    final service = FakeAttendantWalkInService();
+
     await tester.pumpWidget(
-      buildSubject(service: FakeAttendantWalkInService()),
+      buildSubject(service: service, startInWalkInMode: true),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Xe vang lai'));
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Tao phien walk-in'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('Tao phien walk-in'));
     await tester.pumpAndSettle();
 
