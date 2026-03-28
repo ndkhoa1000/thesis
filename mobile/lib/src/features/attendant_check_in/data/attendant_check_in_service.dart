@@ -315,6 +315,43 @@ class AttendantShiftHandoverFinalizeResult {
   }
 }
 
+class AttendantFinalShiftCloseOutResult {
+  const AttendantFinalShiftCloseOutResult({
+    required this.closeOutId,
+    required this.shiftId,
+    required this.parkingLotId,
+    required this.expectedCash,
+    required this.currentAvailable,
+    required this.activeSessionCount,
+    required this.status,
+    required this.requestedAt,
+  });
+
+  final int closeOutId;
+  final int shiftId;
+  final int parkingLotId;
+  final double expectedCash;
+  final int currentAvailable;
+  final int activeSessionCount;
+  final String status;
+  final DateTime requestedAt;
+
+  factory AttendantFinalShiftCloseOutResult.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AttendantFinalShiftCloseOutResult(
+      closeOutId: json['close_out_id'] as int,
+      shiftId: json['shift_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      expectedCash: (json['expected_cash'] as num).toDouble(),
+      currentAvailable: json['current_available'] as int? ?? 0,
+      activeSessionCount: json['active_session_count'] as int? ?? 0,
+      status: json['status'] as String,
+      requestedAt: DateTime.parse(json['requested_at'] as String),
+    );
+  }
+}
+
 abstract class AttendantCheckInService {
   Future<AttendantOccupancySummary> getOccupancySummary();
 
@@ -350,6 +387,10 @@ abstract class AttendantCheckInService {
     required double actualCash,
     String? discrepancyReason,
   });
+
+  Future<AttendantFinalShiftCloseOutResult> requestFinalShiftCloseOut() async {
+    throw UnimplementedError();
+  }
 
   Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId});
 }
@@ -435,6 +476,23 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         response.data,
         AttendantShiftHandoverStartResult.fromJson,
         'Phan hoi tao QR giao ca khong hop le.',
+      );
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantFinalShiftCloseOutResult> requestFinalShiftCloseOut() async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/shifts/attendant-final-close-out/request',
+        options: _authOptions,
+      );
+      return _parseResponse(
+        response.data,
+        AttendantFinalShiftCloseOutResult.fromJson,
+        'Phan hoi dong ca cuoi ngay khong hop le.',
       );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));

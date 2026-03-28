@@ -224,10 +224,69 @@ class OperatorShiftAlert {
   }
 }
 
+class OperatorFinalShiftCloseOutDetail {
+  const OperatorFinalShiftCloseOutDetail({
+    required this.closeOutId,
+    required this.shiftId,
+    required this.parkingLotId,
+    required this.parkingLotName,
+    required this.attendantId,
+    required this.attendantName,
+    required this.expectedCash,
+    required this.currentAvailable,
+    required this.activeSessionCount,
+    required this.status,
+    required this.requestedAt,
+    this.completedAt,
+  });
+
+  final int closeOutId;
+  final int shiftId;
+  final int parkingLotId;
+  final String parkingLotName;
+  final int attendantId;
+  final String attendantName;
+  final double expectedCash;
+  final int currentAvailable;
+  final int activeSessionCount;
+  final String status;
+  final DateTime requestedAt;
+  final DateTime? completedAt;
+
+  factory OperatorFinalShiftCloseOutDetail.fromJson(Map<String, dynamic> json) {
+    return OperatorFinalShiftCloseOutDetail(
+      closeOutId: json['close_out_id'] as int,
+      shiftId: json['shift_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      parkingLotName: json['parking_lot_name'] as String,
+      attendantId: json['attendant_id'] as int,
+      attendantName: json['attendant_name'] as String,
+      expectedCash: (json['expected_cash'] as num).toDouble(),
+      currentAvailable: json['current_available'] as int? ?? 0,
+      activeSessionCount: json['active_session_count'] as int? ?? 0,
+      status: json['status'] as String,
+      requestedAt: DateTime.parse(json['requested_at'] as String),
+      completedAt: _parseDateTime(json['completed_at']),
+    );
+  }
+}
+
 abstract class OperatorLotManagementService {
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots();
 
   Future<List<OperatorShiftAlert>> getShiftHandoverAlerts();
+
+  Future<OperatorFinalShiftCloseOutDetail> getFinalShiftCloseOutDetail({
+    required int closeOutId,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  Future<OperatorFinalShiftCloseOutDetail> completeFinalShiftCloseOut({
+    required int closeOutId,
+  }) async {
+    throw UnimplementedError();
+  }
 
   Future<List<OperatorLotAnnouncement>> getLotAnnouncements({
     required int parkingLotId,
@@ -337,6 +396,48 @@ class BackendOperatorLotManagementService
           .whereType<Map<String, dynamic>>()
           .map(OperatorShiftAlert.fromJson)
           .toList(growable: false);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<OperatorFinalShiftCloseOutDetail> getFinalShiftCloseOutDetail({
+    required int closeOutId,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/shifts/operator-final-close-outs/$closeOutId',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const OperatorLotManagementException(
+          'Phan hoi chi tiet dong ca cuoi ngay khong hop le.',
+        );
+      }
+      return OperatorFinalShiftCloseOutDetail.fromJson(raw);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<OperatorFinalShiftCloseOutDetail> completeFinalShiftCloseOut({
+    required int closeOutId,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/shifts/operator-final-close-outs/$closeOutId/complete',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const OperatorLotManagementException(
+          'Phan hoi hoan tat dong ca cuoi ngay khong hop le.',
+        );
+      }
+      return OperatorFinalShiftCloseOutDetail.fromJson(raw);
     } on DioException catch (error) {
       throw OperatorLotManagementException(_extractMessage(error));
     }

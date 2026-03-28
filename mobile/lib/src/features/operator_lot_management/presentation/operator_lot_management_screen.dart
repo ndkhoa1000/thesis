@@ -376,6 +376,20 @@ class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
     return '$day/$month ${hour}:$minute';
   }
 
+  Future<void> _openFinalShiftCloseOut(int closeOutId) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _OperatorFinalShiftCloseOutSheet(
+        closeOutId: closeOutId,
+        lotManagementService: widget.lotManagementService,
+      ),
+    );
+    if (mounted) {
+      _reload();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -387,12 +401,12 @@ class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Canh bao giao ca',
+                'Canh bao giao ca va dong ca',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                'Su co chenh lech tien mat duoc luu trong he thong va hien thi tai day de operator xu ly.',
+                'Operator nhan canh bao chenh lech giao ca va yeu cau dong ca cuoi ngay tai day.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -435,7 +449,7 @@ class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
                     if (alerts.isEmpty) {
                       return const Center(
                         child: Text(
-                          'Chua co canh bao giao ca nao.',
+                          'Chua co canh bao giao ca hoac dong ca nao.',
                           textAlign: TextAlign.center,
                         ),
                       );
@@ -446,8 +460,13 @@ class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final alert = alerts[index];
+                        final isFinalCloseOut =
+                            alert.referenceType == 'SHIFT_CLOSE_OUT' &&
+                            alert.referenceId != null;
                         return Card(
-                          color: const Color(0xFFFFF3E0),
+                          color: isFinalCloseOut
+                              ? const Color(0xFFE3F2FD)
+                              : const Color(0xFFFFF3E0),
                           child: Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
@@ -473,6 +492,24 @@ class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
                                   const SizedBox(height: 8),
                                   Text(alert.message!),
                                 ],
+                                if (isFinalCloseOut) ...[
+                                  const SizedBox(height: 12),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: FilledButton.tonalIcon(
+                                      key: ValueKey(
+                                        'final-shift-close-out-alert-action-${alert.id}',
+                                      ),
+                                      onPressed: () => _openFinalShiftCloseOut(
+                                        alert.referenceId!,
+                                      ),
+                                      icon: const Icon(Icons.task_alt_outlined),
+                                      label: const Text(
+                                        'Xem va hoan tat dong ca',
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -483,6 +520,165 @@ class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OperatorFinalShiftCloseOutSheet extends StatefulWidget {
+  const _OperatorFinalShiftCloseOutSheet({
+    required this.closeOutId,
+    required this.lotManagementService,
+  });
+
+  final int closeOutId;
+  final OperatorLotManagementService lotManagementService;
+
+  @override
+  State<_OperatorFinalShiftCloseOutSheet> createState() =>
+      _OperatorFinalShiftCloseOutSheetState();
+}
+
+class _OperatorFinalShiftCloseOutSheetState
+    extends State<_OperatorFinalShiftCloseOutSheet> {
+  late Future<OperatorFinalShiftCloseOutDetail> _detailFuture;
+  bool _isCompleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    setState(() {
+      _detailFuture = widget.lotManagementService.getFinalShiftCloseOutDetail(
+        closeOutId: widget.closeOutId,
+      );
+    });
+  }
+
+  String _formatMoney(double amount) {
+    final normalized = amount == amount.roundToDouble()
+        ? amount.round().toString()
+        : amount.toStringAsFixed(2);
+    final buffer = StringBuffer();
+    for (var index = 0; index < normalized.length; index += 1) {
+      final remaining = normalized.length - index;
+      buffer.write(normalized[index]);
+      if (remaining > 1 && remaining % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+    return '${buffer.toString()} VND';
+  }
+
+  Future<void> _complete() async {
+    setState(() {
+      _isCompleting = true;
+    });
+    try {
+      final result = await widget.lotManagementService
+          .completeFinalShiftCloseOut(closeOutId: widget.closeOutId);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Da hoan tat dong ca cuoi ngay cho ${result.parkingLotName}.',
+          ),
+        ),
+      );
+      Navigator.of(context).pop();
+    } on OperatorLotManagementException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+      );
+      setState(() {
+        _isCompleting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.75,
+          child: FutureBuilder<OperatorFinalShiftCloseOutDetail>(
+            future: _detailFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return _OperatorLotErrorState(
+                  message: snapshot.error.toString(),
+                  onRetry: _reload,
+                );
+              }
+
+              final detail = snapshot.data!;
+              final isCompleted = detail.status == 'COMPLETED';
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dong ca cuoi ngay',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  _InfoRow(label: 'Bai xe', value: detail.parkingLotName),
+                  _InfoRow(label: 'Nhan vien', value: detail.attendantName),
+                  _InfoRow(
+                    label: 'Tien mat doi chieu',
+                    value: _formatMoney(detail.expectedCash),
+                  ),
+                  _InfoRow(
+                    label: 'Cho trong snapshot',
+                    value: '${detail.currentAvailable} cho',
+                  ),
+                  _InfoRow(
+                    label: 'Active sessions',
+                    value: '${detail.activeSessionCount}',
+                  ),
+                  _InfoRow(label: 'Trang thai', value: detail.status),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const ValueKey(
+                        'complete-final-shift-close-out-button',
+                      ),
+                      onPressed: isCompleted || _isCompleting
+                          ? null
+                          : _complete,
+                      icon: const Icon(Icons.verified_outlined),
+                      label: Text(
+                        isCompleted
+                            ? 'Da hoan tat dong ca'
+                            : _isCompleting
+                            ? 'Dang hoan tat...'
+                            : 'Operator xac nhan dong ca',
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

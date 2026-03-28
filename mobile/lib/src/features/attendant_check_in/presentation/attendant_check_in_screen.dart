@@ -1222,9 +1222,11 @@ class _ShiftHandoverSheet extends StatefulWidget {
 class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
   final _actualCashController = TextEditingController();
   bool _isPreparing = false;
+  bool _isCloseOutSubmitting = false;
   bool _isSubmitting = false;
   String? _errorMessage;
   String? _detectedToken;
+  AttendantFinalShiftCloseOutResult? _closeOutResult;
   AttendantShiftHandoverStartResult? _startResult;
   AttendantShiftHandoverFinalizeResult? _finalizeResult;
 
@@ -1270,6 +1272,35 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
       setState(() {
         _errorMessage = error.message;
         _isPreparing = false;
+      });
+    }
+  }
+
+  Future<void> _requestFinalShiftCloseOut() async {
+    if (_isCloseOutSubmitting) {
+      return;
+    }
+    setState(() {
+      _isCloseOutSubmitting = true;
+      _errorMessage = null;
+    });
+    try {
+      final result = await widget.attendantCheckInService
+          .requestFinalShiftCloseOut();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _closeOutResult = result;
+        _isCloseOutSubmitting = false;
+      });
+    } on AttendantCheckInException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = error.message;
+        _isCloseOutSubmitting = false;
       });
     }
   }
@@ -1371,10 +1402,54 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
                 Text('Ban giao ca', style: panelTheme.textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text(
-                  'Quy trinh giao ca zero-trust yeu cau Shift QR va doi chieu tien mat truoc khi khoa ca.',
+                  'Khu vuc quan tri ca truc tach rieng giao ca QR va dong ca cuoi ngay.',
                   style: panelTheme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dong ca cuoi ngay',
+                          style: panelTheme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Chi dung cho ca cuoi cung trong ngay. He thong se khoa ca, doi chieu tien mat va gui operator xac nhan ket thuc ngay van hanh.',
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          key: const ValueKey(
+                            'request-final-shift-close-out-button',
+                          ),
+                          onPressed: _isCloseOutSubmitting
+                              ? null
+                              : _requestFinalShiftCloseOut,
+                          icon: const Icon(Icons.nightlight_round),
+                          label: Text(
+                            _isCloseOutSubmitting
+                                ? 'Dang gui dong ca...'
+                                : 'Gui dong ca cuoi ngay',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_closeOutResult != null) ...[
+                  const SizedBox(height: 16),
+                  _FeedbackCard(
+                    title: 'Da gui dong ca cuoi ngay',
+                    message:
+                        'Tien mat doi chieu ${widget.formatCurrency(_closeOutResult!.expectedCash)}\nDang cho operator xac nhan ket thuc ngay van hanh.',
+                    color: const Color(0xFF102A43),
+                    foregroundColor: const Color(0xFFDCEEFB),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

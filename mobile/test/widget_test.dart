@@ -143,6 +143,11 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }
 
   @override
+  Future<AttendantFinalShiftCloseOutResult> requestFinalShiftCloseOut() async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<List<AttendantActiveSession>> getActiveSessions() async {
     return const [];
   }
@@ -603,6 +608,20 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   @override
   Future<List<OperatorShiftAlert>> getShiftHandoverAlerts() async {
     return const [];
+  }
+
+  @override
+  Future<OperatorFinalShiftCloseOutDetail> getFinalShiftCloseOutDetail({
+    required int closeOutId,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<OperatorFinalShiftCloseOutDetail> completeFinalShiftCloseOut({
+    required int closeOutId,
+  }) async {
+    throw UnimplementedError();
   }
 
   @override

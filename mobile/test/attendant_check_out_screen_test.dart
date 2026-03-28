@@ -107,6 +107,11 @@ class FakeAttendantCheckOutService implements AttendantCheckInService {
   }
 
   @override
+  Future<AttendantFinalShiftCloseOutResult> requestFinalShiftCloseOut() async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AttendantCheckOutUndoResult> undoCheckOut({
     required int sessionId,
   }) async {
