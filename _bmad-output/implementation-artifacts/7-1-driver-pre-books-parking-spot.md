@@ -1,6 +1,6 @@
 # Story 7.1: Driver Pre-Books Parking Spot
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -30,26 +30,26 @@ so that my spot is guaranteed upon arrival.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement backend booking create/cancel/payment contracts (AC: 1, 2, 3, 4, 6)
-  - [ ] Extend `backend/src/app/api/v1/bookings.py` with Driver-scoped create, cancel, and active-booking read endpoints using the existing auth dependency model.
-  - [ ] Add a focused booking schema module if needed and keep booking/payment response contracts typed instead of using generic dict payloads.
-  - [ ] Create the booking, payment, and capacity hold in one transaction; cancellation must restore capacity in the same transaction and reject already expired/cancelled bookings cleanly.
-  - [ ] Enforce duplicate-booking, full-lot, and concurrent-last-spot rejection using row-level locking or equivalent transactional protection.
+- [x] Task 1: Implement backend booking create/cancel/payment contracts (AC: 1, 2, 3, 4, 6)
+  - [x] Extend `backend/src/app/api/v1/bookings.py` with Driver-scoped create, cancel, and active-booking read endpoints using the existing auth dependency model.
+  - [x] Add a focused booking schema module if needed and keep booking/payment response contracts typed instead of using generic dict payloads.
+  - [x] Create the booking, payment, and capacity hold in one transaction; cancellation must restore capacity in the same transaction and reject already expired/cancelled bookings cleanly.
+  - [x] Enforce duplicate-booking, full-lot, and concurrent-last-spot rejection using row-level locking or equivalent transactional protection.
 
-- [ ] Task 2: Add Driver booking confirmation and lot-details entry flow (AC: 1, 5, 6)
-  - [ ] Add a Driver booking service layer in Flutter for create, cancel, and active-booking retrieval.
-  - [ ] Add a booking CTA from the existing lot-details experience instead of creating a disconnected Driver screen first.
-  - [ ] Surface a Driver-visible booking confirmation artifact and active-booking state without duplicating the existing check-in QR feature structure unnecessarily.
+- [x] Task 2: Add Driver booking confirmation and lot-details entry flow (AC: 1, 5, 6)
+  - [x] Add a Driver booking service layer in Flutter for create, cancel, and active-booking retrieval.
+  - [x] Add a booking CTA from the existing lot-details experience instead of creating a disconnected Driver screen first.
+  - [x] Surface a Driver-visible booking confirmation artifact and active-booking state without duplicating the existing check-in QR feature structure unnecessarily.
 
-- [ ] Task 3: Reuse canonical availability publication and payment semantics (AC: 2, 3, 4)
-  - [ ] Publish lot-availability updates from the same backend-owned mutation boundary already used by session and lot-capacity changes.
-  - [ ] Reuse `Payment` with `payable_type = BOOKING`; do not add a booking-only payment ledger.
-  - [ ] Keep the simulated-online MVP behavior backend-driven and consistent with the project's existing payment scope.
+- [x] Task 3: Reuse canonical availability publication and payment semantics (AC: 2, 3, 4)
+  - [x] Publish lot-availability updates from the same backend-owned mutation boundary already used by session and lot-capacity changes.
+  - [x] Reuse `Payment` with `payable_type = BOOKING`; do not add a booking-only payment ledger.
+  - [x] Keep the simulated-online MVP behavior backend-driven and consistent with the project's existing payment scope.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Add backend tests for successful booking creation, duplicate booking rejection, full-lot rejection, cancellation, payment linkage, and atomic availability changes.
-  - [ ] Add Flutter tests for booking CTA visibility, booking confirmation rendering, cancellation success, and Driver-facing error handling.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Add backend tests for successful booking creation, duplicate booking rejection, full-lot rejection, cancellation, payment linkage, and atomic availability changes.
+  - [x] Add Flutter tests for booking CTA visibility, booking confirmation rendering, cancellation success, and Driver-facing error handling.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -148,13 +148,24 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story creation anchored on Epic 7 planning, PRD booking journey/edge cases, architecture booking-expiration rules, tech-design transaction guidance, Epic 5 realtime availability work, and Epic 6 retrospective preparation guidance.
+- Implemented backend driver booking lifecycle endpoints with typed schemas, signed booking confirmation tokens, simulated-online booking payments, duplicate-booking protection, and transactional capacity hold/cancel behavior.
+- Integrated booking entry directly into the lot-details bottom sheet with vehicle selection, backend-backed confirmation QR rendering, cancellation, and manage-vehicle fallback.
+- Added backend unit coverage in `tests/test_bookings.py` and Flutter widget coverage in `mobile/test/lot_details_booking_test.dart`; preserved existing discovery tests by wiring new booking dependencies into `mobile/test/map_discovery_screen_test.dart`.
+- Verification completed: `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test`, `cd backend && . .venv/bin/activate && ruff check src/app/api/v1/bookings.py src/app/schemas/booking.py tests/test_bookings.py`, and targeted `flutter analyze` on Story 7.1 files all passed.
 
 ### File List
 
-- `_bmad-output/implementation-artifacts/7-1-driver-pre-books-parking-spot.md`
+- `backend/src/app/api/v1/bookings.py`
+- `backend/src/app/schemas/booking.py`
+- `backend/tests/test_bookings.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/features/driver_booking/data/driver_booking_service.dart`
+- `mobile/lib/src/features/lot_details/presentation/lot_details_sheet.dart`
+- `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
+- `mobile/test/lot_details_booking_test.dart`
+- `mobile/test/map_discovery_screen_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 7.1 implementation artifact for Driver-side booking creation, cancellation, payment linkage, and confirmation guidance.
+- 2026-03-28: Implemented Story 7.1 booking backend/mobile flow, added booking regression tests, and completed full backend plus Flutter regression verification.

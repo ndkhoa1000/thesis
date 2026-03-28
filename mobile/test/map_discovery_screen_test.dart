@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:parking_app/src/features/driver_booking/data/driver_booking_service.dart';
 import 'package:parking_app/src/features/lot_details/data/lot_details_service.dart';
 import 'package:parking_app/src/features/map_discovery/data/map_discovery_service.dart';
 import 'package:parking_app/src/features/map_discovery/presentation/map_discovery_screen.dart';
+import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
 
 class FakeMapDiscoveryService implements MapDiscoveryService {
   FakeMapDiscoveryService({
@@ -50,10 +52,61 @@ class FakeLotDetailsService implements LotDetailsService {
   }
 }
 
+class FakeDriverBookingService implements DriverBookingService {
+  DriverBooking? activeBooking;
+
+  @override
+  Future<DriverBookingCancellation> cancelBooking({
+    required int bookingId,
+  }) async {
+    activeBooking = null;
+    return const DriverBookingCancellation(
+      bookingId: 1,
+      status: 'CANCELLED',
+      currentAvailable: 0,
+    );
+  }
+
+  @override
+  Future<DriverBooking> createBooking({
+    required int parkingLotId,
+    required int vehicleId,
+  }) async {
+    throw const DriverBookingException('unused in map discovery tests');
+  }
+
+  @override
+  Future<DriverBooking?> getActiveBooking({required int parkingLotId}) async {
+    return activeBooking;
+  }
+}
+
+class FakeVehicleService implements VehicleService {
+  @override
+  Future<Vehicle> createVehicle({
+    required String licensePlate,
+    required String vehicleType,
+  }) async {
+    return const Vehicle(
+      id: 1,
+      licensePlate: '59A-12345',
+      vehicleType: 'MOTORBIKE',
+    );
+  }
+
+  @override
+  Future<void> deleteVehicle(int vehicleId) async {}
+
+  @override
+  Future<List<Vehicle>> listVehicles() async => const [];
+}
+
 void main() {
   Widget buildSubject({
     required MapDiscoveryService mapDiscoveryService,
     required LotDetailsService lotDetailsService,
+    required DriverBookingService driverBookingService,
+    required VehicleService vehicleService,
     required MapLocationPermissionService locationPermissionService,
     required DriverMapCanvasBuilder mapCanvasBuilder,
   }) {
@@ -61,6 +114,8 @@ void main() {
       home: MapDiscoveryScreen(
         mapDiscoveryService: mapDiscoveryService,
         lotDetailsService: lotDetailsService,
+        driverBookingService: driverBookingService,
+        vehicleService: vehicleService,
         locationPermissionService: locationPermissionService,
         mapCanvasBuilder: mapCanvasBuilder,
         onOpenDriverCheckIn: () async {},
@@ -74,6 +129,7 @@ void main() {
   testWidgets('loads active lots and enables clustered marker rendering', (
     tester,
   ) async {
+    final bookingService = FakeDriverBookingService();
     final service = FakeMapDiscoveryService(
       lots: const [
         MapDiscoveryLotSummary(
@@ -135,6 +191,8 @@ void main() {
       buildSubject(
         mapDiscoveryService: service,
         lotDetailsService: lotDetailsService,
+        driverBookingService: bookingService,
+        vehicleService: FakeVehicleService(),
         locationPermissionService: FakeLocationPermissionService(true),
         mapCanvasBuilder: (context, viewData) {
           if (viewData.lots.isEmpty) {
@@ -167,6 +225,8 @@ void main() {
       buildSubject(
         mapDiscoveryService: FakeMapDiscoveryService(lots: const []),
         lotDetailsService: FakeLotDetailsService(detailsById: const {}),
+        driverBookingService: FakeDriverBookingService(),
+        vehicleService: FakeVehicleService(),
         locationPermissionService: FakeLocationPermissionService(false),
         mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
       ),
@@ -182,6 +242,7 @@ void main() {
   testWidgets('opens backend-backed lot details from the discovery rail', (
     tester,
   ) async {
+    final bookingService = FakeDriverBookingService();
     final lotDetailsService = FakeLotDetailsService(
       detailsById: {
         1: DriverLotDetail(
@@ -225,6 +286,8 @@ void main() {
           ],
         ),
         lotDetailsService: lotDetailsService,
+        driverBookingService: bookingService,
+        vehicleService: FakeVehicleService(),
         locationPermissionService: FakeLocationPermissionService(true),
         mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
       ),
@@ -246,6 +309,7 @@ void main() {
   testWidgets('renders active lot announcements inside the details sheet', (
     tester,
   ) async {
+    final bookingService = FakeDriverBookingService();
     final lotDetailsService = FakeLotDetailsService(
       detailsById: {
         1: DriverLotDetail(
@@ -292,6 +356,8 @@ void main() {
           ],
         ),
         lotDetailsService: lotDetailsService,
+        driverBookingService: bookingService,
+        vehicleService: FakeVehicleService(),
         locationPermissionService: FakeLocationPermissionService(true),
         mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
       ),
@@ -349,6 +415,8 @@ void main() {
             ],
           ),
           lotDetailsService: lotDetailsService,
+          driverBookingService: FakeDriverBookingService(),
+          vehicleService: FakeVehicleService(),
           locationPermissionService: FakeLocationPermissionService(true),
           mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
         ),
@@ -386,6 +454,8 @@ void main() {
             availabilityStream: controller.stream,
           ),
           lotDetailsService: FakeLotDetailsService(detailsById: const {}),
+          driverBookingService: FakeDriverBookingService(),
+          vehicleService: FakeVehicleService(),
           locationPermissionService: FakeLocationPermissionService(true),
           mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
         ),

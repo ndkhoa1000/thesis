@@ -10,6 +10,7 @@ import 'src/features/admin_approvals/data/admin_approvals_service.dart';
 import 'src/features/admin_approvals/presentation/admin_approvals_screen.dart';
 import 'src/features/attendant_check_in/data/attendant_check_in_service.dart';
 import 'src/features/attendant_check_in/presentation/attendant_check_in_screen.dart';
+import 'src/features/driver_booking/data/driver_booking_service.dart';
 import 'src/features/driver_check_in/data/driver_check_in_service.dart';
 import 'src/features/driver_check_in/presentation/driver_check_in_screen.dart';
 import 'src/features/lot_owner_application/data/lot_owner_application_service.dart';
@@ -41,6 +42,8 @@ typedef OperatorLotManagementServiceFactory =
     OperatorLotManagementService Function(String accessToken);
 typedef DriverCheckInServiceFactory =
     DriverCheckInService Function(String accessToken);
+typedef DriverBookingServiceFactory =
+    DriverBookingService Function(String accessToken);
 typedef AttendantCheckInServiceFactory =
     AttendantCheckInService Function(String accessToken);
 typedef MapDiscoveryServiceFactory =
@@ -104,6 +107,14 @@ OperatorLotManagementService defaultOperatorLotManagementServiceFactory(
 DriverCheckInService defaultDriverCheckInServiceFactory(String accessToken) {
   final apiClient = ApiClient();
   return BackendDriverCheckInService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+DriverBookingService defaultDriverBookingServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendDriverBookingService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -266,6 +277,7 @@ class MyApp extends StatelessWidget {
     super.key,
     required this.authService,
     this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
+    this.driverBookingServiceFactory = defaultDriverBookingServiceFactory,
     this.mapDiscoveryServiceFactory = defaultMapDiscoveryServiceFactory,
     this.lotDetailsServiceFactory = defaultLotDetailsServiceFactory,
     this.parkingHistoryServiceFactory = defaultParkingHistoryServiceFactory,
@@ -276,6 +288,7 @@ class MyApp extends StatelessWidget {
 
   final AuthService authService;
   final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
+  final DriverBookingServiceFactory driverBookingServiceFactory;
   final MapDiscoveryServiceFactory mapDiscoveryServiceFactory;
   final LotDetailsServiceFactory lotDetailsServiceFactory;
   final ParkingHistoryServiceFactory parkingHistoryServiceFactory;
@@ -299,6 +312,7 @@ class MyApp extends StatelessWidget {
               onSignOut: onSignOut,
               onSessionUpdated: onSessionUpdated,
               attendantCheckInServiceFactory: attendantCheckInServiceFactory,
+              driverBookingServiceFactory: driverBookingServiceFactory,
               mapDiscoveryServiceFactory: mapDiscoveryServiceFactory,
               lotDetailsServiceFactory: lotDetailsServiceFactory,
               parkingHistoryServiceFactory: parkingHistoryServiceFactory,
@@ -326,6 +340,7 @@ class AuthenticatedHome extends StatelessWidget {
     this.operatorLotManagementServiceFactory =
         defaultOperatorLotManagementServiceFactory,
     this.driverCheckInServiceFactory = defaultDriverCheckInServiceFactory,
+    this.driverBookingServiceFactory = defaultDriverBookingServiceFactory,
     this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
     this.mapDiscoveryServiceFactory = defaultMapDiscoveryServiceFactory,
     this.lotDetailsServiceFactory = defaultLotDetailsServiceFactory,
@@ -346,6 +361,7 @@ class AuthenticatedHome extends StatelessWidget {
   final ParkingLotServiceFactory parkingLotServiceFactory;
   final OperatorLotManagementServiceFactory operatorLotManagementServiceFactory;
   final DriverCheckInServiceFactory driverCheckInServiceFactory;
+  final DriverBookingServiceFactory driverBookingServiceFactory;
   final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
   final MapDiscoveryServiceFactory mapDiscoveryServiceFactory;
   final LotDetailsServiceFactory lotDetailsServiceFactory;
@@ -437,6 +453,8 @@ class AuthenticatedHome extends StatelessWidget {
     return MapDiscoveryScreen(
       mapDiscoveryService: mapDiscoveryServiceFactory(session.accessToken),
       lotDetailsService: lotDetailsServiceFactory(session.accessToken),
+      driverBookingService: driverBookingServiceFactory(session.accessToken),
+      vehicleService: vehicleServiceFactory(session.accessToken),
       onOpenParkingHistory: () => openParkingHistory(
         context,
         session,

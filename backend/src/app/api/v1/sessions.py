@@ -12,6 +12,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
+from ...api.v1.bookings import decode_booking_token
 from ...core.db.database import async_get_db
 from ...core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
 from ...core.lot_availability import publish_lot_availability_update
@@ -19,6 +20,7 @@ from ...core.security import ALGORITHM, SECRET_KEY
 from ...models.financials import Payment
 from ...models.parking import ParkingLot, ParkingLotConfig, Pricing
 from ...models.enums import (
+    BookingStatus,
     PayableType,
     PaymentMethod,
     PaymentStatus,
@@ -28,7 +30,7 @@ from ...models.enums import (
     VehicleType,
     VehicleTypeAll,
 )
-from ...models.sessions import ParkingSession, SessionEdit
+from ...models.sessions import Booking, ParkingSession, SessionEdit
 from ...services.shift_service import ensure_no_pending_final_shift_close_out, get_or_create_open_shift
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
@@ -177,6 +179,99 @@ def _decode_driver_check_in_token(token: str) -> dict[str, Any]:
         raise BadRequestException("Invalid QR code. Please try again.")
 
     return payload
+
+
+def _decode_attendant_check_in_token(token: str) -> tuple[str, dict[str, Any]]:
+    try:
+        return ("driver", _decode_driver_check_in_token(token))
+    except BadRequestException:
+        try:
+            return ("booking", decode_booking_token(token, allow_expired=True))
+        except BadRequestException as exc:
+            raise BadRequestException("Invalid QR code. Please try again.") from exc
+
+
+async def _create_session_from_booking(
+    db: AsyncSession,
+    *,
+    parking_lot: ParkingLot,
+    attendant: Attendant,
+    booking_payload: dict[str, Any],
+) -> AttendantCheckInRead:
+    booking_result = await db.execute(
+        select(Booking)
+        .where(Booking.id == booking_payload["booking_id"])
+        .limit(1)
+        .with_for_update()
+    )
+    booking = booking_result.scalar_one_or_none()
+    if booking is None:
+        raise BadRequestException("Booking not found")
+
+    if booking.parking_lot_id != parking_lot.id or booking.parking_lot_id != booking_payload["parking_lot_id"]:
+        raise BadRequestException("This booking belongs to a different parking lot")
+
+    if booking.driver_id != booking_payload["driver_id"] or booking.vehicle_id != booking_payload["vehicle_id"]:
+        raise BadRequestException("Invalid booking confirmation. Please refresh and try again.")
+
+    if booking.status == BookingStatus.CANCELLED.value:
+        raise BadRequestException("Booking has been cancelled.")
+    if booking.status == BookingStatus.CONSUMED.value:
+        raise BadRequestException("Booking has already been used for check-in.")
+    if booking.status == BookingStatus.EXPIRED.value:
+        raise BadRequestException("Booking expired. You can proceed with regular check-in if spots are available.")
+    if booking.status != BookingStatus.CONFIRMED.value:
+        raise BadRequestException("Booking is not eligible for gate conversion.")
+
+    if booking.expiration_time is not None and booking.expiration_time <= _utcnow():
+        raise BadRequestException("Booking expired. You can proceed with regular check-in if spots are available.")
+
+    vehicle_result = await db.execute(select(Vehicle).where(Vehicle.id == booking.vehicle_id).limit(1))
+    vehicle = vehicle_result.scalar_one_or_none()
+    if vehicle is None or vehicle.driver_id != booking.driver_id:
+        raise BadRequestException("Invalid booking confirmation. Please refresh and try again.")
+
+    active_session_result = await db.execute(
+        select(ParkingSession)
+        .where(
+            ParkingSession.driver_id == booking.driver_id,
+            ParkingSession.status == SessionStatus.CHECKED_IN.value,
+        )
+        .limit(1)
+    )
+    active_session = active_session_result.scalar_one_or_none()
+    if active_session is not None:
+        if active_session.parking_lot_id == parking_lot.id:
+            raise BadRequestException("Driver already has an active session at this lot")
+
+        other_lot_result = await db.execute(
+            select(ParkingLot).where(ParkingLot.id == active_session.parking_lot_id).limit(1)
+        )
+        other_lot = other_lot_result.scalar_one_or_none()
+        other_lot_name = other_lot.name if other_lot is not None else "another lot"
+        raise BadRequestException(f"Driver has an active session at {other_lot_name}")
+
+    created_session = ParkingSession(
+        parking_lot_id=parking_lot.id,
+        license_plate=vehicle.license_plate,
+        driver_id=booking.driver_id,
+        booking_id=booking.id,
+        attendant_checkin_id=attendant.id,
+        vehicle_type=vehicle.vehicle_type,
+    )
+    booking.status = BookingStatus.CONSUMED.value
+    db.add(created_session)
+    await db.commit()
+    await db.refresh(created_session)
+
+    return AttendantCheckInRead(
+        session_id=created_session.id,
+        parking_lot_id=parking_lot.id,
+        current_available=parking_lot.current_available,
+        license_plate=created_session.license_plate,
+        vehicle_type=created_session.vehicle_type,
+        checked_in_at=created_session.checkin_time,
+    )
 
 
 def _decode_driver_check_out_token(token: str) -> dict[str, Any]:
@@ -881,7 +976,15 @@ async def attendant_check_in_with_driver_qr(
     attendant = await _get_attendant_for_user(db, current_user)
     parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
     await ensure_no_pending_final_shift_close_out(db, parking_lot.id)
-    token_payload = _decode_driver_check_in_token(payload.token)
+    token_kind, token_payload = _decode_attendant_check_in_token(payload.token)
+
+    if token_kind == "booking":
+        return await _create_session_from_booking(
+            db,
+            parking_lot=parking_lot,
+            attendant=attendant,
+            booking_payload=token_payload,
+        )
 
     vehicle_result = await db.execute(select(Vehicle).where(Vehicle.id == token_payload["vehicle_id"]).limit(1))
     vehicle = vehicle_result.scalar_one_or_none()

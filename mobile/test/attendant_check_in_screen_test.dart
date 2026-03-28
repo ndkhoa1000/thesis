@@ -138,12 +138,29 @@ Widget _fakeScanner(
   );
 }
 
+AttendantScannerBuilder _scannerWithToken(String token) {
+  return (
+    BuildContext context,
+    Future<void> Function(String detectedToken) onDetect,
+    bool isBusy,
+  ) {
+    return FilledButton(
+      key: const ValueKey('fake-attendant-scan-button'),
+      onPressed: isBusy ? null : () => onDetect(token),
+      child: const Text('Giả lập quét QR'),
+    );
+  };
+}
+
 void main() {
-  Widget buildSubject({required AttendantCheckInService service}) {
+  Widget buildSubject({
+    required AttendantCheckInService service,
+    AttendantScannerBuilder scannerBuilder = _fakeScanner,
+  }) {
     return MaterialApp(
       home: AttendantCheckInScreen(
         attendantCheckInService: service,
-        scannerBuilder: _fakeScanner,
+        scannerBuilder: scannerBuilder,
       ),
     );
   }
@@ -254,5 +271,64 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Invalid QR code. Please try again.'), findsOneWidget);
+  });
+
+  testWidgets('reuses the same scanner-first flow for booking QR success', (
+    tester,
+  ) async {
+    final service = FakeAttendantCheckInService(
+      result: AttendantCheckInResult(
+        sessionId: 777,
+        parkingLotId: 13,
+        currentAvailable: 4,
+        licensePlate: '59A-12345',
+        vehicleType: 'MOTORBIKE',
+        checkedInAt: DateTime(2026, 3, 28, 9, 30),
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildSubject(
+        service: service,
+        scannerBuilder: _scannerWithToken('booking-check-in-token'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('fake-attendant-scan-button')));
+    await tester.pumpAndSettle();
+
+    expect(service.lastScannedToken, 'booking-check-in-token');
+    expect(find.text('Check-in thành công'), findsOneWidget);
+    expect(find.textContaining('59A-12345'), findsOneWidget);
+  });
+
+  testWidgets('shows expired-booking guidance while keeping scanner available', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildSubject(
+        service: FakeAttendantCheckInService(
+          errorMessage:
+              'Booking expired. You can proceed with regular check-in if spots are available.',
+        ),
+        scannerBuilder: _scannerWithToken('expired-booking-token'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('fake-attendant-scan-button')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Booking expired. You can proceed with regular check-in if spots are available.',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('fake-attendant-scan-button')),
+      findsOneWidget,
+    );
   });
 }

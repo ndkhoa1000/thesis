@@ -1,6 +1,6 @@
 # Story 7.2: Attendant Scans Pre-Booked Check-In
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that their booking converts to an active parking session.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Implement backend booking-to-session conversion contract (AC: 1, 2, 3, 4)
-  - [ ] Extend the booking/session backend so an Attendant can submit a booking confirmation token and convert it to a `ParkingSession` for the assigned lot.
-  - [ ] Link the created session back to `ParkingSession.booking_id` and prevent duplicate conversion of the same booking.
-  - [ ] Reject expired, cancelled, already-consumed, malformed, or cross-lot booking tokens without leaving partial state.
+- [x] Task 1: Implement backend booking-to-session conversion contract (AC: 1, 2, 3, 4)
+  - [x] Extend the booking/session backend so an Attendant can submit a booking confirmation token and convert it to a `ParkingSession` for the assigned lot.
+  - [x] Link the created session back to `ParkingSession.booking_id` and prevent duplicate conversion of the same booking.
+  - [x] Reject expired, cancelled, already-consumed, malformed, or cross-lot booking tokens without leaving partial state.
 
-- [ ] Task 2: Reuse existing attendant scanner flow and QR validation patterns (AC: 1, 4, 5)
-  - [ ] Extend the attendant Flutter service and scanner workflow so the existing gate flow can process booking confirmation payloads.
-  - [ ] Keep the UX scanner-first and gate-safe, with fast success/error feedback consistent with the Attendant operational experience.
-  - [ ] Preserve the fallback path: if a booking has expired, the attendant should still be able to proceed with the regular check-in flow outside this failed booking conversion.
+- [x] Task 2: Reuse existing attendant scanner flow and QR validation patterns (AC: 1, 4, 5)
+  - [x] Extend the attendant Flutter service and scanner workflow so the existing gate flow can process booking confirmation payloads.
+  - [x] Keep the UX scanner-first and gate-safe, with fast success/error feedback consistent with the Attendant operational experience.
+  - [x] Preserve the fallback path: if a booking has expired, the attendant should still be able to proceed with the regular check-in flow outside this failed booking conversion.
 
-- [ ] Task 3: Protect capacity and lifecycle integrity (AC: 2, 3)
-  - [ ] Ensure booking conversion does not decrement availability again because the spot was already held at booking-create time.
-  - [ ] If a new consumed/checked-in booking status is introduced, update enums, schemas, tests, and mobile contracts consistently.
-  - [ ] Publish any necessary post-conversion availability or session state updates only if they reflect authoritative state changes rather than duplicating the original hold event.
+- [x] Task 3: Protect capacity and lifecycle integrity (AC: 2, 3)
+  - [x] Ensure booking conversion does not decrement availability again because the spot was already held at booking-create time.
+  - [x] If a new consumed/checked-in booking status is introduced, update enums, schemas, tests, and mobile contracts consistently.
+  - [x] Publish any necessary post-conversion availability or session state updates only if they reflect authoritative state changes rather than duplicating the original hold event.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for successful conversion, duplicate-consumption rejection, expired/cancelled booking rejection, cross-lot rejection, and no double-decrement of `current_available`.
-  - [ ] Add Flutter tests for booking QR success, booking QR rejection, and continued use of the existing scanner-first attendant surface.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for successful conversion, duplicate-consumption rejection, expired/cancelled booking rejection, cross-lot rejection, and no double-decrement of `current_available`.
+  - [x] Add Flutter tests for booking QR success, booking QR rejection, and continued use of the existing scanner-first attendant surface.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -143,13 +143,21 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story creation anchored on Epic 7 planning, PRD booking edge cases, existing QR/session stories, backend booking model shape, and Epic 6 guidance about reusing capacity/session invariants.
+- Extended the existing attendant QR check-in endpoint to accept booking confirmation tokens and convert valid bookings into linked active parking sessions.
+- Introduced explicit booking consumption handling so converted bookings cannot be reused and booking-held capacity is not decremented twice.
+- Kept the scanner-first mobile gate flow unchanged and added widget coverage for booking QR success plus expired-booking fallback guidance.
+- Verified the story with focused Flutter and backend tests plus related attendant/availability backend regressions.
 
 ### File List
 
+- `backend/src/app/api/v1/bookings.py`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/models/enums.py`
+- `backend/tests/test_attendant_booking_check_in.py`
+- `mobile/test/attendant_check_in_screen_test.dart`
 - `_bmad-output/implementation-artifacts/7-2-attendant-scans-pre-booked-check-in.md`
 
 ### Change Log
 
+- 2026-03-28: Implemented Story 7.2 by extending attendant QR check-in to consume booking confirmation tokens, preserving held capacity, and adding backend/mobile regression coverage.
 - 2026-03-28: Created Story 7.2 implementation artifact for attendant-side booking QR conversion into active parking sessions.

@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../driver_booking/data/driver_booking_service.dart';
 import '../../lot_details/data/lot_details_service.dart';
 import '../../lot_details/presentation/lot_details_sheet.dart';
+import '../../vehicles/data/vehicle_service.dart';
 import '../data/map_discovery_service.dart';
 
 typedef DriverMapCanvasBuilder =
@@ -65,6 +67,8 @@ class MapDiscoveryScreen extends StatefulWidget {
     super.key,
     required this.mapDiscoveryService,
     required this.lotDetailsService,
+    required this.driverBookingService,
+    required this.vehicleService,
     required this.onOpenDriverCheckIn,
     required this.onOpenParkingHistory,
     required this.onOpenVehicles,
@@ -77,6 +81,8 @@ class MapDiscoveryScreen extends StatefulWidget {
 
   final MapDiscoveryService mapDiscoveryService;
   final LotDetailsService lotDetailsService;
+  final DriverBookingService driverBookingService;
+  final VehicleService vehicleService;
   final Future<void> Function() onOpenDriverCheckIn;
   final Future<void> Function() onOpenParkingHistory;
   final Future<void> Function() onOpenVehicles;
@@ -111,7 +117,7 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
     super.initState();
     _availabilitySubscription = widget.mapDiscoveryService
         .watchAvailability()
-        .listen(_handleAvailabilityUpdate, onError: (_, __) {});
+        .listen(_handleAvailabilityUpdate, onError: (error, stackTrace) {});
     _bootstrap();
   }
 
@@ -160,6 +166,9 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
         lotId: lot.id,
         lotName: lot.name,
         lotDetailsService: widget.lotDetailsService,
+        driverBookingService: widget.driverBookingService,
+        vehicleService: widget.vehicleService,
+        onManageVehicles: widget.onOpenVehicles,
       ),
     );
   }

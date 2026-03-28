@@ -84,6 +84,7 @@ class SubscriptionStatus(str, enum.Enum):
 class BookingStatus(str, enum.Enum):
     PENDING = "PENDING"
     CONFIRMED = "CONFIRMED"
+    CONSUMED = "CONSUMED"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
 
