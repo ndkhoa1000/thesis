@@ -59,9 +59,9 @@ development_status:
   4-2-attendant-scans-qr-for-check-in: done
   4-3-manual-license-plate-check-in: done
   4-4-driver-generates-check-out-qr: done
-  4-5-attendant-scans-qr-for-check-out-calculates-fee: review
-  4-6-record-payment-finalize-session: review
-  epic-4-retrospective: optional
+  4-5-attendant-scans-qr-for-check-out-calculates-fee: done
+  4-6-record-payment-finalize-session: done
+  epic-4-retrospective: done
   epic-5: backlog
   5-1-view-interactive-map-lots: backlog
   5-2-view-lot-details-availability: backlog

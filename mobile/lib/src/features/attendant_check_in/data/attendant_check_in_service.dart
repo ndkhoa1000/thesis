@@ -144,7 +144,7 @@ abstract class AttendantCheckInService {
   Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
     required int sessionId,
     required String paymentMethod,
-    double? quotedFinalFee,
+    required double quotedFinalFee,
   });
 
   Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId});
@@ -163,6 +163,24 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
   Options get _authOptions =>
       Options(headers: {'Authorization': 'Bearer $_accessToken'});
 
+  T _parseResponse<T>(
+    dynamic raw,
+    T Function(Map<String, dynamic> json) parser,
+    String invalidResponseMessage,
+  ) {
+    if (raw is! Map<String, dynamic>) {
+      throw AttendantCheckInException(invalidResponseMessage);
+    }
+
+    try {
+      return parser(raw);
+    } on FormatException {
+      throw AttendantCheckInException(invalidResponseMessage);
+    } on TypeError {
+      throw AttendantCheckInException(invalidResponseMessage);
+    }
+  }
+
   @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     try {
@@ -171,13 +189,11 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         data: {'token': token},
         options: _authOptions,
       );
-      final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
-        throw const AttendantCheckInException(
-          'Phản hồi check-in từ máy chủ không hợp lệ.',
-        );
-      }
-      return AttendantCheckInResult.fromJson(raw);
+      return _parseResponse(
+        response.data,
+        AttendantCheckInResult.fromJson,
+        'Phản hồi check-in từ máy chủ không hợp lệ.',
+      );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }
@@ -208,13 +224,11 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         data: formData,
         options: _authOptions,
       );
-      final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
-        throw const AttendantCheckInException(
-          'Phan hoi walk-in check-in tu may chu khong hop le.',
-        );
-      }
-      return AttendantCheckInResult.fromJson(raw);
+      return _parseResponse(
+        response.data,
+        AttendantCheckInResult.fromJson,
+        'Phan hoi walk-in check-in tu may chu khong hop le.',
+      );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }
@@ -230,13 +244,11 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         data: {'token': token},
         options: _authOptions,
       );
-      final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
-        throw const AttendantCheckInException(
-          'Phan hoi check-out tu may chu khong hop le.',
-        );
-      }
-      return AttendantCheckOutPreviewResult.fromJson(raw);
+      return _parseResponse(
+        response.data,
+        AttendantCheckOutPreviewResult.fromJson,
+        'Phan hoi check-out tu may chu khong hop le.',
+      );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }
@@ -246,7 +258,7 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
   Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
     required int sessionId,
     required String paymentMethod,
-    double? quotedFinalFee,
+    required double quotedFinalFee,
   }) async {
     try {
       final response = await _dio.post<dynamic>(
@@ -254,17 +266,15 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         data: {
           'session_id': sessionId,
           'payment_method': paymentMethod,
-          if (quotedFinalFee != null) 'quoted_final_fee': quotedFinalFee,
+          'quoted_final_fee': quotedFinalFee,
         },
         options: _authOptions,
       );
-      final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
-        throw const AttendantCheckInException(
-          'Phan hoi finalize checkout tu may chu khong hop le.',
-        );
-      }
-      return AttendantCheckOutFinalizeResult.fromJson(raw);
+      return _parseResponse(
+        response.data,
+        AttendantCheckOutFinalizeResult.fromJson,
+        'Phan hoi finalize checkout tu may chu khong hop le.',
+      );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }
@@ -280,13 +290,11 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         data: {'session_id': sessionId},
         options: _authOptions,
       );
-      final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
-        throw const AttendantCheckInException(
-          'Phan hoi undo checkout tu may chu khong hop le.',
-        );
-      }
-      return AttendantCheckOutUndoResult.fromJson(raw);
+      return _parseResponse(
+        response.data,
+        AttendantCheckOutUndoResult.fromJson,
+        'Phan hoi undo checkout tu may chu khong hop le.',
+      );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }

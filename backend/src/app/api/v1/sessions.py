@@ -84,8 +84,16 @@ async def _get_attendant_for_user(db: AsyncSession, current_user: dict[str, Any]
     return attendant
 
 
-async def _get_attendant_lot(db: AsyncSession, attendant: Attendant) -> ParkingLot:
-    parking_lot_result = await db.execute(select(ParkingLot).where(ParkingLot.id == attendant.parking_lot_id).limit(1))
+async def _get_attendant_lot(
+    db: AsyncSession,
+    attendant: Attendant,
+    *,
+    for_update: bool = False,
+) -> ParkingLot:
+    parking_lot_query = select(ParkingLot).where(ParkingLot.id == attendant.parking_lot_id).limit(1)
+    if for_update:
+        parking_lot_query = parking_lot_query.with_for_update()
+    parking_lot_result = await db.execute(parking_lot_query)
     parking_lot = parking_lot_result.scalar_one_or_none()
     if parking_lot is None:
         raise NotFoundException("Assigned parking lot not found")
@@ -388,10 +396,10 @@ async def attendant_check_out_finalize(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> AttendantCheckOutFinalizeRead:
     attendant = await _get_attendant_for_user(db, current_user)
-    parking_lot = await _get_attendant_lot(db, attendant)
+    parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
 
     session_result = await db.execute(
-        select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1)
+        select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1).with_for_update()
     )
     session = session_result.scalar_one_or_none()
     if session is None:
@@ -415,7 +423,7 @@ async def attendant_check_out_finalize(
         raise BadRequestException("No active pricing found for this parking session.")
 
     final_fee = _calculate_estimated_cost(session, pricing)
-    if payload.quoted_final_fee is not None and abs(payload.quoted_final_fee - final_fee) > 0.009:
+    if abs(payload.quoted_final_fee - final_fee) > 0.009:
         raise BadRequestException("Checkout preview is stale. Please rescan and confirm again.")
 
     checked_out_at = _utcnow()
@@ -472,10 +480,10 @@ async def attendant_check_out_undo(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> AttendantCheckOutUndoRead:
     attendant = await _get_attendant_for_user(db, current_user)
-    parking_lot = await _get_attendant_lot(db, attendant)
+    parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
 
     session_result = await db.execute(
-        select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1)
+        select(ParkingSession).where(ParkingSession.id == payload.session_id).limit(1).with_for_update()
     )
     session = session_result.scalar_one_or_none()
     if session is None:
@@ -571,7 +579,7 @@ async def attendant_check_in_with_driver_qr(
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> AttendantCheckInRead:
     attendant = await _get_attendant_for_user(db, current_user)
-    parking_lot = await _get_attendant_lot(db, attendant)
+    parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
     token_payload = _decode_driver_check_in_token(payload.token)
 
     vehicle_result = await db.execute(select(Vehicle).where(Vehicle.id == token_payload["vehicle_id"]).limit(1))
@@ -634,7 +642,7 @@ async def attendant_check_in_walk_in_vehicle(
     overview_image: Annotated[UploadFile | None, File()] = None,
 ) -> AttendantCheckInRead:
     attendant = await _get_attendant_for_user(db, current_user)
-    parking_lot = await _get_attendant_lot(db, attendant)
+    parking_lot = await _get_attendant_lot(db, attendant, for_update=True)
 
     if plate_image is None:
       raise BadRequestException("A plate photo is required for walk-in check-in")

@@ -1,6 +1,6 @@
 # Story 4.6: Record Payment & Finalize Session
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -114,6 +114,7 @@ GPT-5.4
 - Added a narrowly scoped `POST /sessions/attendant-check-out-undo` recovery path for the 3-second attendant undo affordance, reverting the just-finalized checkout back to an active session and marking the provisional payment as failed.
 - Reworked the attendant checkout screen into a full-screen swipe settlement zone with cash-left / online-right gestures, success reset to standby, and the non-blocking undo toast.
 - Added focused backend and Flutter coverage for settlement + undo behavior, then validated with the full backend suite (`130 passed`) and full Flutter suite (`46 passed`).
+- Applied review hardening after implementation: settlement now requires a preview fee proof, locks the target session and lot rows during finalize/undo to avoid concurrent write drift, and shields mobile response parsing from malformed timestamp payloads.
 
 ### File List
 
@@ -134,3 +135,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 4.6 implementation artifact with settlement-boundary guardrails, atomic finalization requirements, and gesture-first UX constraints.
 - 2026-03-28: Implemented Story 4.6 backend settlement + bounded undo, added swipe-to-resolve attendant checkout UX, and validated with full backend/Flutter regression suites.
+- 2026-03-28: Applied post-review hardening for settlement concurrency, mandatory stale-preview validation, safer mobile response parsing, and cleaned generated test artifacts.

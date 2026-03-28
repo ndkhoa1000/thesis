@@ -53,7 +53,7 @@ class FakeAttendantCheckOutFinalizeService implements AttendantCheckInService {
   Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
     required int sessionId,
     required String paymentMethod,
-    double? quotedFinalFee,
+    required double quotedFinalFee,
   }) async {
     paymentMethods.add(paymentMethod);
     return finalizeResult ??
@@ -63,7 +63,7 @@ class FakeAttendantCheckOutFinalizeService implements AttendantCheckInService {
           parkingLotName: 'Bai xe Quan 1',
           licensePlate: '30A-99999',
           vehicleType: 'CAR',
-          finalFee: quotedFinalFee ?? 45000,
+          finalFee: quotedFinalFee,
           paymentMethod: paymentMethod,
           checkedOutAt: DateTime(2026, 3, 28, 10, 20),
           currentAvailable: 8,

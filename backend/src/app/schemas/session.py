@@ -69,7 +69,7 @@ class AttendantCheckOutFinalizeCreate(BaseModel):
 
     session_id: int = Field(gt=0)
     payment_method: str = Field(pattern="^(CASH|ONLINE)$")
-    quoted_final_fee: float | None = Field(default=None, ge=0)
+    quoted_final_fee: float = Field(ge=0)
 
 
 class AttendantCheckOutFinalizeRead(BaseModel):

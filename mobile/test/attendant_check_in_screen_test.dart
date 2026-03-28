@@ -48,7 +48,7 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   Future<AttendantCheckOutFinalizeResult> finalizeCheckOut({
     required int sessionId,
     required String paymentMethod,
-    double? quotedFinalFee,
+    required double quotedFinalFee,
   }) async {
     throw UnimplementedError();
   }
