@@ -60,12 +60,12 @@ development_status:
   4-5-attendant-scans-qr-for-check-out-calculates-fee: done
   4-6-record-payment-finalize-session: done
   epic-4-retrospective: done
-  epic-5: in-progress
+  epic-5: done
   5-1-view-interactive-map-lots: done
   5-2-view-lot-details-availability: done
   5-3-driver-parking-history: done
   5-4-en-route-lot-capacity-alert: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
   epic-6: backlog
   6-1-attendant-views-lot-occupancy-stats: backlog
   6-2-configure-announcements: backlog

@@ -622,7 +622,7 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
       currentAvailable: totalCapacity > current.occupiedCount
           ? totalCapacity - current.occupiedCount
           : 0,
-        status: isFirstTimeSetupLot ? 'APPROVED' : current.status,
+      status: isFirstTimeSetupLot ? 'APPROVED' : current.status,
       occupiedCount: current.occupiedCount,
       totalCapacity: totalCapacity,
       openingTime: openingTime,
@@ -2095,64 +2095,65 @@ void main() {
     expect(find.text('0 xe'), findsOneWidget);
   });
 
-  testWidgets('Operator first-time setup lot reopens after successful configuration', (
-    WidgetTester tester,
-  ) async {
-    final lotManagementService = FakeOperatorLotManagementService(
-      initialLots: const [
-        OperatorManagedParkingLot(
-          id: 30,
-          leaseId: 14,
-          lotOwnerId: 5,
-          name: 'Bai xe Thiet Lap',
-          address: '45 Le Loi, Quan 1',
-          latitude: 10.7729,
-          longitude: 106.6983,
-          currentAvailable: 0,
-          status: 'CLOSED',
-          occupiedCount: 0,
+  testWidgets(
+    'Operator first-time setup lot reopens after successful configuration',
+    (WidgetTester tester) async {
+      final lotManagementService = FakeOperatorLotManagementService(
+        initialLots: const [
+          OperatorManagedParkingLot(
+            id: 30,
+            leaseId: 14,
+            lotOwnerId: 5,
+            name: 'Bai xe Thiet Lap',
+            address: '45 Le Loi, Quan 1',
+            latitude: 10.7729,
+            longitude: 106.6983,
+            currentAvailable: 0,
+            status: 'CLOSED',
+            occupiedCount: 0,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OperatorLotManagementScreen(
+            lotManagementService: lotManagementService,
+            onSignOut: () async {},
+          ),
         ),
-      ],
-    );
+      );
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: OperatorLotManagementScreen(
-          lotManagementService: lotManagementService,
-          onSignOut: () async {},
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      expect(find.text('Đang tạm dừng'), findsOneWidget);
 
-    expect(find.text('Đang tạm dừng'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Thiết lập sức chứa'));
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Thiết lập sức chứa'));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Tổng sức chứa tối đa'),
+        '12',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Giờ mở cửa (HH:mm)'),
+        '07:00',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Giờ đóng cửa (HH:mm)'),
+        '22:30',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Mức giá hiện hành (VND)'),
+        '12000',
+      );
+      final saveButton = find.widgetWithText(FilledButton, 'Lưu cấu hình');
+      await tester.ensureVisible(saveButton);
+      await tester.tap(saveButton);
+      await tester.pump();
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Tổng sức chứa tối đa'),
-      '12',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Giờ mở cửa (HH:mm)'),
-      '07:00',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Giờ đóng cửa (HH:mm)'),
-      '22:30',
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Mức giá hiện hành (VND)'),
-      '12000',
-    );
-    final saveButton = find.widgetWithText(FilledButton, 'Lưu cấu hình');
-    await tester.ensureVisible(saveButton);
-    await tester.tap(saveButton);
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    expect(find.text('Đang vận hành'), findsOneWidget);
-    expect(find.text('12 xe'), findsOneWidget);
-  });
+      expect(find.text('Đang vận hành'), findsOneWidget);
+      expect(find.text('12 xe'), findsOneWidget);
+    },
+  );
 }
