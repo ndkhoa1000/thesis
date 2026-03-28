@@ -327,6 +327,8 @@ N/A
 **Goal:** Drivers can find parking lots and view parking history.
 **FRs covered:** FR1, FR2, FR3, FR25, FR26
 
+> **Readiness Note (post Epic 4 closure):** Epic 5 should replace the current mock driver map with backend-backed lot discovery, continue using `ParkingLot.current_available` as the canonical availability signal, treat historical occupancy trends as server-owned read models with honest empty states when data is insufficient, and keep en-route fullness alerts as temporary in-app messaging rather than push notifications.
+
 #### Story 5.1: View Interactive Map & Lots
 **As a** Driver,
 **I want** to see active parking lots on a map with clear capacity indicators,
@@ -350,6 +352,7 @@ N/A
 * **When** the details open
 * **Then** I see price, hours, and available spots.
 * **And (UX)** I can view a "Historical Peak Hours" chart to anticipate if the lot will fill up by my estimated arrival time.
+* **And (Edge Case)** if historical occupancy data is insufficient, the UI shows an honest empty state instead of inventing trend values.
 
 #### Story 5.3: Driver Parking History
 **As a** Driver,
@@ -359,7 +362,7 @@ N/A
 **Acceptance Criteria:**
 * **Given** I am on my Profile
 * **When** I view History
-* **Then** I see a list of my COMPLETED sessions.
+* **Then** I see a list of my COMPLETED sessions with lot, duration, and settled amount.
 
 #### Story 5.4: En-route Lot Capacity Alert
 **As a** Driver,
@@ -371,6 +374,7 @@ N/A
 * **When** the lot capacity reaches 100% while I am en-route
 * **Then** I receive a temporary UI alert indicating the lot has recently filled up.
 * **And (UX)** the system does NOT force an auto-reroute, respecting my navigation autonomy.
+* **And (Scope)** this remains an in-app advisory alert, not the push-notification flow deferred to a later epic.
 
 ### Epic 6: Advanced Session Management
 **Goal:** Attendants can view real-time lot stats and operators post announcements.
