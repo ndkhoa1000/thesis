@@ -63,6 +63,7 @@ class MapDiscoveryScreen extends StatefulWidget {
     required this.mapDiscoveryService,
     required this.lotDetailsService,
     required this.onOpenDriverCheckIn,
+    required this.onOpenParkingHistory,
     required this.onOpenVehicles,
     required this.onSignOut,
     this.onOpenLotOwnerApplication,
@@ -74,6 +75,7 @@ class MapDiscoveryScreen extends StatefulWidget {
   final MapDiscoveryService mapDiscoveryService;
   final LotDetailsService lotDetailsService;
   final Future<void> Function() onOpenDriverCheckIn;
+  final Future<void> Function() onOpenParkingHistory;
   final Future<void> Function() onOpenVehicles;
   final Future<void> Function() onSignOut;
   final VoidCallback? onOpenLotOwnerApplication;
@@ -159,6 +161,11 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
       appBar: AppBar(
         title: const Text('Bản đồ bãi xe'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined),
+            tooltip: 'Lịch sử gửi xe',
+            onPressed: widget.onOpenParkingHistory,
+          ),
           IconButton(
             icon: const Icon(Icons.qr_code_2_outlined),
             tooltip: 'Mã check-in',

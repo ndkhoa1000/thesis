@@ -17,6 +17,8 @@ import 'src/features/lot_owner_application/presentation/lot_owner_application_sc
 import 'src/features/lot_details/data/lot_details_service.dart';
 import 'src/features/map_discovery/data/map_discovery_service.dart';
 import 'src/features/map_discovery/presentation/map_discovery_screen.dart';
+import 'src/features/parking_history/data/parking_history_service.dart';
+import 'src/features/parking_history/presentation/parking_history_screen.dart';
 import 'src/features/operator_application/data/operator_application_service.dart';
 import 'src/features/operator_application/presentation/operator_application_screen.dart';
 import 'src/features/operator_lot_management/data/operator_lot_management_service.dart';
@@ -45,6 +47,8 @@ typedef MapDiscoveryServiceFactory =
     MapDiscoveryService Function(String accessToken);
 typedef LotDetailsServiceFactory =
     LotDetailsService Function(String accessToken);
+typedef ParkingHistoryServiceFactory =
+    ParkingHistoryService Function(String accessToken);
 
 VehicleService defaultVehicleServiceFactory(String accessToken) {
   final apiClient = ApiClient();
@@ -131,6 +135,14 @@ LotDetailsService defaultLotDetailsServiceFactory(String accessToken) {
   );
 }
 
+ParkingHistoryService defaultParkingHistoryServiceFactory(String accessToken) {
+  final apiClient = ApiClient();
+  return BackendParkingHistoryService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
 Future<void> openVehicleManagement(
   BuildContext context,
   AuthSession session, {
@@ -163,6 +175,24 @@ Future<void> openDriverCheckIn(
           context,
           session,
           vehicleServiceFactory: vehicleServiceFactory,
+        ),
+      ),
+    ),
+  );
+}
+
+Future<void> openParkingHistory(
+  BuildContext context,
+  AuthSession session, {
+  ParkingHistoryServiceFactory parkingHistoryServiceFactory =
+      defaultParkingHistoryServiceFactory,
+}) {
+  return Navigator.push(
+    context,
+    MaterialPageRoute<void>(
+      builder: (_) => ParkingHistoryScreen(
+        parkingHistoryService: parkingHistoryServiceFactory(
+          session.accessToken,
         ),
       ),
     ),
@@ -238,6 +268,7 @@ class MyApp extends StatelessWidget {
     this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
     this.mapDiscoveryServiceFactory = defaultMapDiscoveryServiceFactory,
     this.lotDetailsServiceFactory = defaultLotDetailsServiceFactory,
+    this.parkingHistoryServiceFactory = defaultParkingHistoryServiceFactory,
     this.mapLocationPermissionService =
         const DeviceMapLocationPermissionService(),
     this.attendantScannerBuilder = defaultAttendantScannerBuilder,
@@ -247,6 +278,7 @@ class MyApp extends StatelessWidget {
   final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
   final MapDiscoveryServiceFactory mapDiscoveryServiceFactory;
   final LotDetailsServiceFactory lotDetailsServiceFactory;
+  final ParkingHistoryServiceFactory parkingHistoryServiceFactory;
   final MapLocationPermissionService mapLocationPermissionService;
   final AttendantScannerBuilder attendantScannerBuilder;
 
@@ -269,6 +301,7 @@ class MyApp extends StatelessWidget {
               attendantCheckInServiceFactory: attendantCheckInServiceFactory,
               mapDiscoveryServiceFactory: mapDiscoveryServiceFactory,
               lotDetailsServiceFactory: lotDetailsServiceFactory,
+              parkingHistoryServiceFactory: parkingHistoryServiceFactory,
               mapLocationPermissionService: mapLocationPermissionService,
               attendantScannerBuilder: attendantScannerBuilder,
             ),
@@ -296,6 +329,7 @@ class AuthenticatedHome extends StatelessWidget {
     this.attendantCheckInServiceFactory = defaultAttendantCheckInServiceFactory,
     this.mapDiscoveryServiceFactory = defaultMapDiscoveryServiceFactory,
     this.lotDetailsServiceFactory = defaultLotDetailsServiceFactory,
+    this.parkingHistoryServiceFactory = defaultParkingHistoryServiceFactory,
     this.mapLocationPermissionService =
         const DeviceMapLocationPermissionService(),
     this.attendantScannerBuilder = defaultAttendantScannerBuilder,
@@ -315,6 +349,7 @@ class AuthenticatedHome extends StatelessWidget {
   final AttendantCheckInServiceFactory attendantCheckInServiceFactory;
   final MapDiscoveryServiceFactory mapDiscoveryServiceFactory;
   final LotDetailsServiceFactory lotDetailsServiceFactory;
+  final ParkingHistoryServiceFactory parkingHistoryServiceFactory;
   final MapLocationPermissionService mapLocationPermissionService;
   final AttendantScannerBuilder attendantScannerBuilder;
 
@@ -402,6 +437,11 @@ class AuthenticatedHome extends StatelessWidget {
     return MapDiscoveryScreen(
       mapDiscoveryService: mapDiscoveryServiceFactory(session.accessToken),
       lotDetailsService: lotDetailsServiceFactory(session.accessToken),
+      onOpenParkingHistory: () => openParkingHistory(
+        context,
+        session,
+        parkingHistoryServiceFactory: parkingHistoryServiceFactory,
+      ),
       locationPermissionService: mapLocationPermissionService,
       mapCanvasBuilder: mapCanvasBuilder,
       onOpenDriverCheckIn: () => openDriverCheckIn(

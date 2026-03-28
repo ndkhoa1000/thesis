@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from jose import JWTError, jwt
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...api.dependencies import get_current_user
@@ -43,6 +43,7 @@ from ...schemas.session import (
     DriverCheckInTokenCreate,
     DriverCheckInTokenRead,
     DriverCheckOutTokenRead,
+    DriverParkingHistoryItemRead,
 )
 from ...schemas.vehicle import VehicleRead
 
@@ -249,6 +250,13 @@ def _calculate_estimated_cost(session: ParkingSession, pricing: Pricing | None) 
     return amount
 
 
+def _calculate_session_duration_minutes(session: ParkingSession) -> int:
+    if session.checkout_time is None:
+        return 0
+    elapsed_seconds = max((session.checkout_time - session.checkin_time).total_seconds(), 0)
+    return int(elapsed_seconds // 60)
+
+
 async def _store_walk_in_image(upload: UploadFile) -> str:
     content_type = upload.content_type or ""
     if not content_type.startswith("image/"):
@@ -273,6 +281,61 @@ async def list_sessions(
 ) -> dict[str, str]:
     # Scaffold: full implementation in feature epics
     return {"message": "sessions endpoint scaffold"}
+
+
+@router.get("/sessions/driver-history", response_model=list[DriverParkingHistoryItemRead], status_code=200)
+async def list_driver_parking_history(
+    request: Request,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> list[DriverParkingHistoryItemRead]:
+    driver = await _get_driver_for_user(db, current_user)
+
+    latest_payment_subquery = (
+        select(
+            Payment.payable_id.label("session_id"),
+            func.max(Payment.id).label("payment_id"),
+        )
+        .where(
+            Payment.payable_type == PayableType.SESSION.value,
+            Payment.payment_status == PaymentStatus.COMPLETED.value,
+        )
+        .group_by(Payment.payable_id)
+        .subquery()
+    )
+
+    history_result = await db.execute(
+        select(ParkingSession, ParkingLot, Payment)
+        .join(ParkingLot, ParkingSession.parking_lot_id == ParkingLot.id)
+        .outerjoin(
+            latest_payment_subquery,
+            latest_payment_subquery.c.session_id == ParkingSession.id,
+        )
+        .outerjoin(Payment, Payment.id == latest_payment_subquery.c.payment_id)
+        .where(
+            ParkingSession.driver_id == driver.id,
+            ParkingSession.status == SessionStatus.CHECKED_OUT.value,
+        )
+        .order_by(ParkingSession.checkout_time.desc(), ParkingSession.id.desc())
+    )
+
+    items: list[DriverParkingHistoryItemRead] = []
+    for session, parking_lot, payment in history_result.all():
+        items.append(
+            DriverParkingHistoryItemRead(
+                session_id=session.id,
+                parking_lot_id=parking_lot.id,
+                parking_lot_name=parking_lot.name,
+                license_plate=session.license_plate,
+                vehicle_type=session.vehicle_type,
+                checked_in_at=session.checkin_time,
+                checked_out_at=session.checkout_time,
+                duration_minutes=_calculate_session_duration_minutes(session),
+                amount_paid=float(payment.final_amount) if payment is not None else None,
+                payment_method=payment.payment_method if payment is not None else None,
+            )
+        )
+    return items
 
 
 @router.get("/sessions/driver-active-session", response_model=DriverActiveSessionRead, status_code=200)

@@ -14,6 +14,8 @@ import 'package:parking_app/src/features/lot_owner_application/presentation/lot_
 import 'package:parking_app/src/features/lot_details/data/lot_details_service.dart';
 import 'package:parking_app/src/features/map_discovery/data/map_discovery_service.dart';
 import 'package:parking_app/src/features/map_discovery/presentation/map_discovery_screen.dart';
+import 'package:parking_app/src/features/parking_history/data/parking_history_service.dart';
+import 'package:parking_app/src/features/parking_history/presentation/parking_history_screen.dart';
 import 'package:parking_app/src/features/operator_application/data/operator_application_service.dart';
 import 'package:parking_app/src/features/operator_application/presentation/operator_application_screen.dart';
 import 'package:parking_app/src/features/operator_lot_management/data/operator_lot_management_service.dart';
@@ -200,6 +202,15 @@ class FakeLotDetailsService implements LotDetailsService {
       ),
     );
   }
+}
+
+class FakeParkingHistoryService implements ParkingHistoryService {
+  FakeParkingHistoryService({this.entries = const []});
+
+  final List<DriverParkingHistoryEntry> entries;
+
+  @override
+  Future<List<DriverParkingHistoryEntry>> fetchHistory() async => entries;
 }
 
 class FakeMapLocationPermissionService implements MapLocationPermissionService {
@@ -635,6 +646,7 @@ void main() {
         authService: FakeAuthService(),
         mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
         lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+        parkingHistoryServiceFactory: (_) => FakeParkingHistoryService(),
         mapLocationPermissionService: const FakeMapLocationPermissionService(
           true,
         ),
@@ -659,6 +671,7 @@ void main() {
         authService: authService,
         mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
         lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+        parkingHistoryServiceFactory: (_) => FakeParkingHistoryService(),
         mapLocationPermissionService: const FakeMapLocationPermissionService(
           true,
         ),
@@ -1029,6 +1042,7 @@ void main() {
             vehicleServiceFactory: (_) => vehicleService,
             mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
             lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+            parkingHistoryServiceFactory: (_) => FakeParkingHistoryService(),
             mapLocationPermissionService:
                 const FakeMapLocationPermissionService(true),
           ),
@@ -1038,9 +1052,22 @@ void main() {
 
       expect(find.textContaining('chế độ fallback'), findsOneWidget);
       expect(find.byTooltip('Xe của tôi'), findsOneWidget);
+      expect(find.byTooltip('Lịch sử gửi xe'), findsOneWidget);
       expect(find.byTooltip('Chủ bãi'), findsOneWidget);
       expect(find.byTooltip('Operator'), findsOneWidget);
       expect(find.byTooltip('Đăng xuất'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Lịch sử gửi xe'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ParkingHistoryScreen), findsOneWidget);
+      expect(
+        find.textContaining('Chưa có lượt gửi xe đã hoàn tất'),
+        findsOneWidget,
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('Xe của tôi'));
       await tester.pumpAndSettle();
@@ -1049,6 +1076,42 @@ void main() {
       expect(find.text('59A-12345'), findsOneWidget);
     },
   );
+
+  testWidgets('Parking history screen renders completed sessions', (
+    WidgetTester tester,
+  ) async {
+    final parkingHistoryService = FakeParkingHistoryService(
+      entries: [
+        DriverParkingHistoryEntry(
+          sessionId: 101,
+          parkingLotId: 13,
+          parkingLotName: 'Bai xe Nguyen Hue',
+          licensePlate: '59A-88888',
+          vehicleType: 'CAR',
+          checkedInAt: DateTime(2026, 3, 28, 8, 0),
+          checkedOutAt: DateTime(2026, 3, 28, 9, 30),
+          durationMinutes: 90,
+          amountPaid: 25000,
+          paymentMethod: 'CASH',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ParkingHistoryScreen(
+          parkingHistoryService: parkingHistoryService,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
+    expect(find.text('59A-88888'), findsOneWidget);
+    expect(find.text('1 giờ 30 phút'), findsOneWidget);
+    expect(find.text('25000 VND'), findsOneWidget);
+    expect(find.text('Tiền mặt'), findsOneWidget);
+  });
 
   testWidgets('Vehicle screen lets driver add and remove a plate', (
     WidgetTester tester,

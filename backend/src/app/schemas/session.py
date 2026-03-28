@@ -44,6 +44,21 @@ class DriverCheckOutTokenRead(BaseModel):
     license_plate: str
 
 
+class DriverParkingHistoryItemRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    session_id: int
+    parking_lot_id: int
+    parking_lot_name: str
+    license_plate: str
+    vehicle_type: str
+    checked_in_at: datetime
+    checked_out_at: datetime
+    duration_minutes: int = Field(ge=0)
+    amount_paid: float | None = None
+    payment_method: str | None = None
+
+
 class AttendantCheckOutPreviewCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

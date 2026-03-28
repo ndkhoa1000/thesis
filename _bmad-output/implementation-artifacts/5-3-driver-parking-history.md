@@ -1,6 +1,6 @@
 # Story 5.3: Driver Parking History
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,20 +23,20 @@ so that I can track my expenses.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add a driver parking-history backend contract (AC: 1)
-  - [ ] Extend `backend/src/app/api/v1/sessions.py` with a driver-only history endpoint such as `GET /sessions/driver-history`.
-  - [ ] Join `ParkingSession` with its linked `Payment` records so the response exposes the settled amount and payment method for completed sessions.
-  - [ ] Enforce authenticated driver scoping and return sessions in reverse chronological order.
+- [x] Task 1: Add a driver parking-history backend contract (AC: 1)
+  - [x] Extend `backend/src/app/api/v1/sessions.py` with a driver-only history endpoint such as `GET /sessions/driver-history`.
+  - [x] Join `ParkingSession` with its linked `Payment` records so the response exposes the settled amount and payment method for completed sessions.
+  - [x] Enforce authenticated driver scoping and return sessions in reverse chronological order.
 
-- [ ] Task 2: Build the mobile parking-history surface (AC: 1)
-  - [ ] Add a dedicated `parking_history` feature module with a typed service, DTOs, and a driver-facing list screen.
-  - [ ] Integrate the feature into the driver profile/workspace navigation without coupling it to attendant or operator routes.
-  - [ ] Render a clean empty state when no completed sessions exist yet.
+- [x] Task 2: Build the mobile parking-history surface (AC: 1)
+  - [x] Add a dedicated `parking_history` feature module with a typed service, DTOs, and a driver-facing list screen.
+  - [x] Integrate the feature into the driver profile/workspace navigation without coupling it to attendant or operator routes.
+  - [x] Render a clean empty state when no completed sessions exist yet.
 
-- [ ] Task 3: Add focused regression coverage (AC: 1)
-  - [ ] Add backend tests for driver-only scoping, ordering, empty history, and payment/session linkage.
-  - [ ] Add Flutter tests for history loading, item rendering, and empty-state behavior.
-  - [ ] Verify backend in Docker and Flutter locally after wiring the flow.
+- [x] Task 3: Add focused regression coverage (AC: 1)
+  - [x] Add backend tests for driver-only scoping, ordering, empty history, and payment/session linkage.
+  - [x] Add Flutter tests for history loading, item rendering, and empty-state behavior.
+  - [x] Verify backend in Docker and Flutter locally after wiring the flow.
 
 ## Dev Notes
 
@@ -106,13 +106,25 @@ GPT-5.4
 ### Completion Notes List
 
 - Story created to consume the authoritative session/payment state produced by Epic 4 rather than inventing a separate driver expense ledger.
-- Current codebase anchor: there is no driver-history endpoint yet, so this story must extend the sessions domain cleanly on both backend and Flutter.
+- Implemented `GET /sessions/driver-history` with driver scoping, reverse chronological ordering, and latest completed payment linkage per session.
+- Added a dedicated Flutter `parking_history` feature and surfaced it from the driver map workspace as a first-class navigation action.
+- Verified Android demo data can be seeded through Docker Compose with `cd backend && docker compose run --rm pytest python -m src.scripts.seed_android_demo_data`.
+- Validation passed with backend Docker pytest and Flutter widget tests.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/5-3-driver-parking-history.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/schemas/session.py`
+- `backend/tests/test_driver_parking_history.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
+- `mobile/lib/src/features/parking_history/data/parking_history_service.dart`
+- `mobile/lib/src/features/parking_history/presentation/parking_history_screen.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 5.3 implementation artifact for driver-scoped completed-session history backed by authoritative payment/session data.
+- 2026-03-28: Implemented Story 5.3 with a backend driver-history endpoint, Flutter parking-history feature, driver workspace navigation entry point, and focused backend/mobile validation.
