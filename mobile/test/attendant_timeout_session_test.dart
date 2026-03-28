@@ -50,6 +50,11 @@ class FakeAttendantTimeoutService implements AttendantCheckInService {
   }
 
   @override
+  Future<AttendantShiftHandoverStartResult> prepareShiftHandover() async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     throw UnimplementedError();
   }
@@ -97,6 +102,15 @@ class FakeAttendantTimeoutService implements AttendantCheckInService {
       status: 'TIMEOUT',
       reason: reason,
     );
+  }
+
+  @override
+  Future<AttendantShiftHandoverFinalizeResult> finalizeShiftHandover({
+    required String token,
+    required double actualCash,
+    String? discrepancyReason,
+  }) async {
+    throw UnimplementedError();
   }
 
   @override

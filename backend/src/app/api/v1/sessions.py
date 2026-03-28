@@ -29,6 +29,7 @@ from ...models.enums import (
     VehicleTypeAll,
 )
 from ...models.sessions import ParkingSession, SessionEdit
+from ...services.shift_service import get_or_create_open_shift
 from ...models.users import Attendant, Driver
 from ...models.vehicles import Vehicle
 from ...schemas.session import (
@@ -700,6 +701,9 @@ async def attendant_check_out_finalize(
     pricing = await _get_latest_pricing(db, parking_lot.id, session.vehicle_type)
     if pricing is None:
         raise BadRequestException("No active pricing found for this parking session.")
+
+    if payload.payment_method == PaymentMethod.CASH.value:
+        await get_or_create_open_shift(db, attendant)
 
     final_fee = _calculate_estimated_cost(session, pricing)
     if abs(payload.quoted_final_fee - final_fee) > 0.009:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../data/attendant_check_in_service.dart';
 
@@ -389,6 +390,18 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
     );
   }
 
+  Future<void> _openShiftHandover() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ShiftHandoverSheet(
+        attendantCheckInService: widget.attendantCheckInService,
+        scannerBuilder: widget.scannerBuilder,
+        formatCurrency: _formatCurrency,
+      ),
+    );
+  }
+
   void _selectScannerFlow(_AttendantScannerFlow flow) {
     if (_isBusy) return;
     setState(() {
@@ -457,6 +470,12 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
                 : 'Quét mã check-in',
           ),
           actions: [
+            IconButton(
+              key: const ValueKey('shift-handover-button'),
+              icon: const Icon(Icons.qr_code_2_outlined),
+              tooltip: 'Ban giao ca',
+              onPressed: _openShiftHandover,
+            ),
             IconButton(
               key: const ValueKey('active-session-management-button'),
               icon: const Icon(Icons.fact_check_outlined),
@@ -1177,6 +1196,438 @@ class _ForceCloseTimeoutFormSheetState
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShiftHandoverSheet extends StatefulWidget {
+  const _ShiftHandoverSheet({
+    required this.attendantCheckInService,
+    required this.scannerBuilder,
+    required this.formatCurrency,
+  });
+
+  final AttendantCheckInService attendantCheckInService;
+  final AttendantScannerBuilder scannerBuilder;
+  final String Function(double amount) formatCurrency;
+
+  @override
+  State<_ShiftHandoverSheet> createState() => _ShiftHandoverSheetState();
+}
+
+class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
+  final _actualCashController = TextEditingController();
+  bool _isPreparing = false;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+  String? _detectedToken;
+  AttendantShiftHandoverStartResult? _startResult;
+  AttendantShiftHandoverFinalizeResult? _finalizeResult;
+
+  @override
+  void dispose() {
+    _actualCashController.dispose();
+    super.dispose();
+  }
+
+  double? _parseActualCash() {
+    final digitsOnly = _actualCashController.text.replaceAll(
+      RegExp(r'[^0-9.]'),
+      '',
+    );
+    if (digitsOnly.isEmpty) {
+      return null;
+    }
+    return double.tryParse(digitsOnly);
+  }
+
+  Future<void> _prepareHandover() async {
+    if (_isPreparing) {
+      return;
+    }
+    setState(() {
+      _isPreparing = true;
+      _errorMessage = null;
+    });
+    try {
+      final result = await widget.attendantCheckInService
+          .prepareShiftHandover();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _startResult = result;
+        _isPreparing = false;
+      });
+    } on AttendantCheckInException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = error.message;
+        _isPreparing = false;
+      });
+    }
+  }
+
+  Future<void> _handleTokenDetected(String token) async {
+    if (_isSubmitting) {
+      return;
+    }
+    setState(() {
+      _detectedToken = token;
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _submitHandover({String? discrepancyReason}) async {
+    final token = _detectedToken;
+    final actualCash = _parseActualCash();
+    if (token == null || token.isEmpty) {
+      setState(() {
+        _errorMessage = 'Can quet Shift QR truoc khi nhan ca.';
+      });
+      return;
+    }
+    if (actualCash == null) {
+      setState(() {
+        _errorMessage = 'Can nhap so tien mat da kiem dem.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await widget.attendantCheckInService.finalizeShiftHandover(
+        token: token,
+        actualCash: actualCash,
+        discrepancyReason: discrepancyReason,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _finalizeResult = result;
+        _isSubmitting = false;
+      });
+    } on AttendantCheckInException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      if (error.message.contains('Discrepancy reason is required')) {
+        final rationale = await showGeneralDialog<String>(
+          context: context,
+          barrierDismissible: false,
+          barrierLabel: 'Bao cao chenh lech giao ca',
+          pageBuilder: (context, _, _) => _ShiftDiscrepancyDialog(
+            actualCash: actualCash,
+            onSubmit: (value) => Navigator.of(context).pop(value),
+          ),
+        );
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _isSubmitting = false;
+        });
+        if (rationale != null && rationale.trim().isNotEmpty) {
+          await _submitHandover(discrepancyReason: rationale.trim());
+        }
+        return;
+      }
+
+      setState(() {
+        _errorMessage = error.message;
+        _isSubmitting = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final panelTheme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.92,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Ban giao ca', style: panelTheme.textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text(
+                  'Quy trinh giao ca zero-trust yeu cau Shift QR va doi chieu tien mat truoc khi khoa ca.',
+                  style: panelTheme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Attendant ban giao',
+                          style: panelTheme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Ket thuc ca hien tai, khoa tong tien mat ky vong va tao QR de nhan vien tiep ca quet.',
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          key: const ValueKey(
+                            'generate-shift-handover-qr-button',
+                          ),
+                          onPressed: _isPreparing ? null : _prepareHandover,
+                          icon: const Icon(Icons.qr_code_2),
+                          label: Text(
+                            _isPreparing ? 'Dang tao QR...' : 'Tao QR giao ca',
+                          ),
+                        ),
+                        if (_startResult != null) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Tien mat ky vong: ${widget.formatCurrency(_startResult!.expectedCash)}',
+                            style: panelTheme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: QrImageView(
+                              key: const ValueKey('shift-handover-qr'),
+                              data: _startResult!.token,
+                              version: QrVersions.auto,
+                              size: 210,
+                              backgroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Attendant nhan ca',
+                          style: panelTheme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Quet Shift QR, kiem dem tien mat thuc te va hoan tat nhan ca. Neu lech, he thong buoc phai bao cao ly do.',
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 180,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: panelTheme.colorScheme.primary,
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: widget.scannerBuilder(
+                                context,
+                                _handleTokenDetected,
+                                _isSubmitting,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (_detectedToken != null)
+                          const Chip(label: Text('Da quet Shift QR')),
+                        const SizedBox(height: 12),
+                        TextField(
+                          key: const ValueKey(
+                            'shift-handover-actual-cash-field',
+                          ),
+                          controller: _actualCashController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Tien mat thuc te (VND)',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          key: const ValueKey('finalize-shift-handover-button'),
+                          onPressed: _isSubmitting ? null : _submitHandover,
+                          icon: const Icon(Icons.lock_clock_outlined),
+                          label: Text(
+                            _isSubmitting
+                                ? 'Dang khoa ca...'
+                                : 'Hoan tat giao ca',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  _FeedbackCard(
+                    title: 'Ban giao ca that bai',
+                    message: _errorMessage!,
+                    color: panelTheme.colorScheme.errorContainer,
+                    foregroundColor: panelTheme.colorScheme.onErrorContainer,
+                  ),
+                ],
+                if (_finalizeResult != null) ...[
+                  const SizedBox(height: 16),
+                  _FeedbackCard(
+                    title: _finalizeResult!.discrepancyFlagged
+                        ? 'Da khoa ca va bao cao chenh lech'
+                        : 'Ban giao ca thanh cong',
+                    message:
+                        'Expected ${widget.formatCurrency(_finalizeResult!.expectedCash)}\nActual ${widget.formatCurrency(_finalizeResult!.actualCash)}',
+                    color: _finalizeResult!.discrepancyFlagged
+                        ? const Color(0xFF4A1A00)
+                        : const Color(0xFF003B1F),
+                    foregroundColor: _finalizeResult!.discrepancyFlagged
+                        ? const Color(0xFFFFD180)
+                        : const Color(0xFFB9F6CA),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShiftDiscrepancyDialog extends StatefulWidget {
+  const _ShiftDiscrepancyDialog({
+    required this.actualCash,
+    required this.onSubmit,
+  });
+
+  final double actualCash;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  State<_ShiftDiscrepancyDialog> createState() =>
+      _ShiftDiscrepancyDialogState();
+}
+
+class _ShiftDiscrepancyDialogState extends State<_ShiftDiscrepancyDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Material(
+        color: const Color(0xFF220909),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFFFB300),
+                    size: 56,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Bao cao chenh lech giao ca',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'He thong phat hien chenh lech tien mat. Ban khong the dong man hinh nay neu chua nhap ly do va gui bao cao.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'So tien kiem dem: ${widget.actualCash.toStringAsFixed(0)} VND',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: const Color(0xFFFFD180),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    key: const ValueKey('shift-discrepancy-reason-field'),
+                    controller: _reasonController,
+                    minLines: 4,
+                    maxLines: 6,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: 'Ly do chenh lech bat buoc',
+                    ),
+                    validator: (value) {
+                      final trimmed = (value ?? '').trim();
+                      if (trimmed.isEmpty) {
+                        return 'Ly do chenh lech la bat buoc';
+                      }
+                      if (trimmed.length < 5) {
+                        return 'Ly do chenh lech phai co it nhat 5 ky tu';
+                      }
+                      return null;
+                    },
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      key: const ValueKey('submit-shift-discrepancy-button'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFD84315),
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () {
+                        if (_formKey.currentState?.validate() != true) {
+                          return;
+                        }
+                        widget.onSubmit(_reasonController.text.trim());
+                      },
+                      child: const Text('Gui bao cao va khoa ca'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

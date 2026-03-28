@@ -189,8 +189,45 @@ class OperatorLotAnnouncement {
   }
 }
 
+class OperatorShiftAlert {
+  const OperatorShiftAlert({
+    required this.id,
+    required this.title,
+    required this.notificationType,
+    required this.isRead,
+    required this.createdAt,
+    this.message,
+    this.referenceType,
+    this.referenceId,
+  });
+
+  final int id;
+  final String title;
+  final String? message;
+  final String notificationType;
+  final String? referenceType;
+  final int? referenceId;
+  final bool isRead;
+  final DateTime createdAt;
+
+  factory OperatorShiftAlert.fromJson(Map<String, dynamic> json) {
+    return OperatorShiftAlert(
+      id: json['id'] as int,
+      title: json['title'] as String,
+      message: json['message'] as String?,
+      notificationType: json['notification_type'] as String,
+      referenceType: json['reference_type'] as String?,
+      referenceId: json['reference_id'] as int?,
+      isRead: json['is_read'] as bool? ?? false,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+}
+
 abstract class OperatorLotManagementService {
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots();
+
+  Future<List<OperatorShiftAlert>> getShiftHandoverAlerts();
 
   Future<List<OperatorLotAnnouncement>> getLotAnnouncements({
     required int parkingLotId,
@@ -277,6 +314,28 @@ class BackendOperatorLotManagementService
       return raw
           .whereType<Map<String, dynamic>>()
           .map(OperatorManagedParkingLot.fromJson)
+          .toList(growable: false);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<List<OperatorShiftAlert>> getShiftHandoverAlerts() async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/shifts/operator-alerts',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! List) {
+        throw const OperatorLotManagementException(
+          'Phan hoi danh sach canh bao giao ca khong hop le.',
+        );
+      }
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(OperatorShiftAlert.fromJson)
           .toList(growable: false);
     } on DioException catch (error) {
       throw OperatorLotManagementException(_extractMessage(error));

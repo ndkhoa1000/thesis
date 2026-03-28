@@ -110,6 +110,9 @@ class TestAttendantCheckOutFinalize:
         pricing_result = MagicMock()
         pricing_result.scalars.return_value.all.return_value = [_make_pricing()]
 
+        open_shift_result = MagicMock()
+        open_shift_result.scalar_one_or_none.return_value = None
+
         mock_db.execute = AsyncMock(
             side_effect=[
                 attendant_result,
@@ -117,6 +120,7 @@ class TestAttendantCheckOutFinalize:
                 session_result,
                 payment_lookup_result,
                 pricing_result,
+                open_shift_result,
             ]
         )
         mock_db.add = Mock()
@@ -251,6 +255,9 @@ class TestAttendantCheckOutFinalize:
         pricing_result = MagicMock()
         pricing_result.scalars.return_value.all.return_value = [_make_pricing()]
 
+        open_shift_result = MagicMock()
+        open_shift_result.scalar_one_or_none.return_value = None
+
         mock_db.execute = AsyncMock(
             side_effect=[
                 attendant_result,
@@ -258,6 +265,7 @@ class TestAttendantCheckOutFinalize:
                 session_result,
                 payment_lookup_result,
                 pricing_result,
+                open_shift_result,
             ]
         )
         mock_db.add = Mock()

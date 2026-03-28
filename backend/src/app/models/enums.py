@@ -94,6 +94,12 @@ class SessionStatus(str, enum.Enum):
     TIMEOUT = "TIMEOUT"
 
 
+class ShiftStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    HANDOVER_PENDING = "HANDOVER_PENDING"
+    LOCKED = "LOCKED"
+
+
 class PayableType(str, enum.Enum):
     SESSION = "SESSION"
     SUBSCRIPTION = "SUBSCRIPTION"
@@ -125,6 +131,7 @@ class NotificationType(str, enum.Enum):
     PAYMENT_SUCCESS = "PAYMENT_SUCCESS"
     LOT_CLOSING = "LOT_CLOSING"
     SYSTEM_ALERT = "SYSTEM_ALERT"
+    SHIFT_HANDOVER_DISCREPANCY = "SHIFT_HANDOVER_DISCREPANCY"
 
 
 class ReferenceType(str, enum.Enum):
@@ -132,3 +139,4 @@ class ReferenceType(str, enum.Enum):
     SESSION = "SESSION"
     SUBSCRIPTION = "SUBSCRIPTION"
     LOT = "LOT"
+    SHIFT_HANDOVER = "SHIFT_HANDOVER"

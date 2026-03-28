@@ -250,10 +250,77 @@ class AttendantForceCloseTimeoutResult {
   }
 }
 
+class AttendantShiftHandoverStartResult {
+  const AttendantShiftHandoverStartResult({
+    required this.shiftId,
+    required this.parkingLotId,
+    required this.expectedCash,
+    required this.token,
+    required this.expiresAt,
+    required this.expiresInSeconds,
+  });
+
+  final int shiftId;
+  final int parkingLotId;
+  final double expectedCash;
+  final String token;
+  final DateTime expiresAt;
+  final int expiresInSeconds;
+
+  factory AttendantShiftHandoverStartResult.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AttendantShiftHandoverStartResult(
+      shiftId: json['shift_id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      expectedCash: (json['expected_cash'] as num).toDouble(),
+      token: json['token'] as String,
+      expiresAt: DateTime.parse(json['expires_at'] as String),
+      expiresInSeconds: json['expires_in_seconds'] as int,
+    );
+  }
+}
+
+class AttendantShiftHandoverFinalizeResult {
+  const AttendantShiftHandoverFinalizeResult({
+    required this.handoverId,
+    required this.outgoingShiftId,
+    required this.incomingShiftId,
+    required this.expectedCash,
+    required this.actualCash,
+    required this.discrepancyFlagged,
+    required this.completedAt,
+  });
+
+  final int handoverId;
+  final int outgoingShiftId;
+  final int incomingShiftId;
+  final double expectedCash;
+  final double actualCash;
+  final bool discrepancyFlagged;
+  final DateTime completedAt;
+
+  factory AttendantShiftHandoverFinalizeResult.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    return AttendantShiftHandoverFinalizeResult(
+      handoverId: json['handover_id'] as int,
+      outgoingShiftId: json['outgoing_shift_id'] as int,
+      incomingShiftId: json['incoming_shift_id'] as int,
+      expectedCash: (json['expected_cash'] as num).toDouble(),
+      actualCash: (json['actual_cash'] as num).toDouble(),
+      discrepancyFlagged: json['discrepancy_flagged'] as bool? ?? false,
+      completedAt: DateTime.parse(json['completed_at'] as String),
+    );
+  }
+}
+
 abstract class AttendantCheckInService {
   Future<AttendantOccupancySummary> getOccupancySummary();
 
   Future<List<AttendantActiveSession>> getActiveSessions();
+
+  Future<AttendantShiftHandoverStartResult> prepareShiftHandover();
 
   Future<AttendantCheckInResult> checkInDriver({required String token});
 
@@ -276,6 +343,12 @@ abstract class AttendantCheckInService {
   Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
     required int sessionId,
     required String reason,
+  });
+
+  Future<AttendantShiftHandoverFinalizeResult> finalizeShiftHandover({
+    required String token,
+    required double actualCash,
+    String? discrepancyReason,
   });
 
   Future<AttendantCheckOutUndoResult> undoCheckOut({required int sessionId});
@@ -346,6 +419,23 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
           .whereType<Map<String, dynamic>>()
           .map(AttendantActiveSession.fromJson)
           .toList(growable: false);
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantShiftHandoverStartResult> prepareShiftHandover() async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/shifts/attendant-handover/start',
+        options: _authOptions,
+      );
+      return _parseResponse(
+        response.data,
+        AttendantShiftHandoverStartResult.fromJson,
+        'Phan hoi tao QR giao ca khong hop le.',
+      );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));
     }
@@ -465,6 +555,32 @@ class BackendAttendantCheckInService implements AttendantCheckInService {
         response.data,
         AttendantForceCloseTimeoutResult.fromJson,
         'Phan hoi timeout phien tu may chu khong hop le.',
+      );
+    } on DioException catch (error) {
+      throw AttendantCheckInException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<AttendantShiftHandoverFinalizeResult> finalizeShiftHandover({
+    required String token,
+    required double actualCash,
+    String? discrepancyReason,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/shifts/attendant-handover/finalize',
+        data: {
+          'token': token,
+          'actual_cash': actualCash,
+          'discrepancy_reason': discrepancyReason,
+        },
+        options: _authOptions,
+      );
+      return _parseResponse(
+        response.data,
+        AttendantShiftHandoverFinalizeResult.fromJson,
+        'Phan hoi hoan tat giao ca khong hop le.',
       );
     } on DioException catch (error) {
       throw AttendantCheckInException(_extractMessage(error));

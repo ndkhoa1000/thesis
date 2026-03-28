@@ -1,6 +1,6 @@
 # Story 6.4: Zero-Trust Shift Handover
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -26,26 +26,26 @@ so that financial accountability is strictly enforced.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add backend shift and handover domain support (AC: 1, 2, 3, 4)
-  - [ ] Introduce `Shift` and `ShiftHandover` persistence plus the minimum service layer needed to compute `expected_cash`, issue a Shift QR payload, and record handover completion.
-  - [ ] Lock the outgoing shift after successful handover to prevent post-handover cash drift.
-  - [ ] Persist discrepancy details, including actual cash and rationale, when the incoming attendant reports a mismatch.
+- [x] Task 1: Add backend shift and handover domain support (AC: 1, 2, 3, 4)
+  - [x] Introduce `Shift` and `ShiftHandover` persistence plus the minimum service layer needed to compute `expected_cash`, issue a Shift QR payload, and record handover completion.
+  - [x] Lock the outgoing shift after successful handover to prevent post-handover cash drift.
+  - [x] Persist discrepancy details, including actual cash and rationale, when the incoming attendant reports a mismatch.
 
-- [ ] Task 2: Add shift handover endpoints and operator alert creation (AC: 1, 2, 3, 4)
-  - [ ] Create a shift-handover API surface consistent with the architecture's `/shifts/*` direction.
-  - [ ] Reuse the existing notification domain for operator alert creation when discrepancies occur.
-  - [ ] Keep authentication and lot assignment strict for both outgoing and incoming attendants.
-  - [ ] Expose a minimum operator-facing read path for discrepancy alerts if no existing notification feed already surfaces `Notification` records.
+- [x] Task 2: Add shift handover endpoints and operator alert creation (AC: 1, 2, 3, 4)
+  - [x] Create a shift-handover API surface consistent with the architecture's `/shifts/*` direction.
+  - [x] Reuse the existing notification domain for operator alert creation when discrepancies occur.
+  - [x] Keep authentication and lot assignment strict for both outgoing and incoming attendants.
+  - [x] Expose a minimum operator-facing read path for discrepancy alerts if no existing notification feed already surfaces `Notification` records.
 
-- [ ] Task 3: Implement the mobile QR handover flow for attendants (AC: 1, 2, 3)
-  - [ ] Add an outgoing flow that ends the current shift and displays the Shift QR.
-  - [ ] Add an incoming flow that scans the Shift QR, collects the counted cash amount, and finalizes handover.
-  - [ ] Use a hard-blocking, high-contrast discrepancy screen that cannot be dismissed without submitting the required rationale.
+- [x] Task 3: Implement the mobile QR handover flow for attendants (AC: 1, 2, 3)
+  - [x] Add an outgoing flow that ends the current shift and displays the Shift QR.
+  - [x] Add an incoming flow that scans the Shift QR, collects the counted cash amount, and finalizes handover.
+  - [x] Use a hard-blocking, high-contrast discrepancy screen that cannot be dismissed without submitting the required rationale.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4)
-  - [ ] Add backend tests for expected-cash calculation, shift locking, discrepancy persistence, and operator alert creation.
-  - [ ] Add Flutter tests for QR handover happy path and hard-blocking discrepancy UX behavior.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4)
+  - [x] Add backend tests for expected-cash calculation, shift locking, discrepancy persistence, and operator alert creation.
+  - [x] Add Flutter tests for QR handover happy path and hard-blocking discrepancy UX behavior.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -129,10 +129,41 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Story context prepared for Epic 6 implementation.
-- Key guardrail: discrepancy alerting should use the existing notification domain, not new push infrastructure.
-- No `project-context.md` file was present in the repository at story creation time.
+- Added a dedicated shift domain with `Shift`, `ShiftHandover`, `ShiftStatus`, and a `shift_service.py` helper layer to calculate expected cash from completed cash session payments, sign shift handover QR payloads, and enforce outgoing-shift locking.
+- Implemented `/shifts/attendant-handover/start`, `/shifts/attendant-handover/finalize`, and `/shifts/operator-alerts` with strict attendant/operator authorization, lot scoping, discrepancy rationale enforcement, and reuse of the existing `Notification` domain for operator discrepancy alerts.
+- Extended the attendant mobile workspace with an app-bar driven shift handover sheet that generates Shift QR payloads, scans incoming handover QR tokens, captures actual cash, and forces a non-dismissible discrepancy rationale flow before completion.
+- Added an operator-facing in-app discrepancy alert surface to the existing lot-management screen instead of introducing a new push-notification channel.
+- Validation passed with `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/shift_handover_test.dart test/attendant_check_in_screen_test.dart test/attendant_check_out_screen_test.dart test/attendant_check_out_finalize_test.dart test/attendant_walk_in_check_in_test.dart test/attendant_timeout_session_test.dart test/widget_test.dart`, and `cd mobile && flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/6-4-zero-trust-shift-handover.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/__init__.py`
+- `backend/src/app/api/v1/sessions.py`
+- `backend/src/app/api/v1/shifts.py`
+- `backend/src/app/models/__init__.py`
+- `backend/src/app/models/enums.py`
+- `backend/src/app/models/shifts.py`
+- `backend/src/app/schemas/shift.py`
+- `backend/src/app/services/__init__.py`
+- `backend/src/app/services/shift_service.py`
+- `backend/tests/test_attendant_check_out_finalize.py`
+- `backend/tests/test_lot_availability_events.py`
+- `backend/tests/test_shift_handover.py`
+- `mobile/lib/src/features/attendant_check_in/data/attendant_check_in_service.dart`
+- `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
+- `mobile/lib/src/features/operator_lot_management/data/operator_lot_management_service.dart`
+- `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
+- `mobile/test/attendant_check_in_screen_test.dart`
+- `mobile/test/attendant_check_out_finalize_test.dart`
+- `mobile/test/attendant_check_out_screen_test.dart`
+- `mobile/test/attendant_timeout_session_test.dart`
+- `mobile/test/attendant_walk_in_check_in_test.dart`
+- `mobile/test/shift_handover_test.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-28: Created Story 6.4 implementation artifact for zero-trust attendant shift handover.
+- 2026-03-28: Implemented Story 6.4 with backend shift/handover domain support, signed QR handover APIs, hard-blocking discrepancy UX, operator alert visibility, and full backend/mobile regression validation.

@@ -50,6 +50,11 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }
 
   @override
+  Future<AttendantShiftHandoverStartResult> prepareShiftHandover() async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     lastScannedToken = token;
     if (errorMessage != null) {
@@ -95,6 +100,15 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
     required int sessionId,
     required String reason,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AttendantShiftHandoverFinalizeResult> finalizeShiftHandover({
+    required String token,
+    required double actualCash,
+    String? discrepancyReason,
   }) async {
     throw UnimplementedError();
   }

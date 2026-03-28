@@ -15,6 +15,7 @@ from .lots import router as lots_router
 from .sessions import router as sessions_router
 from .bookings import router as bookings_router
 from .payments import router as payments_router
+from .shifts import router as shifts_router
 
 router = APIRouter(prefix="/v1")
 router.include_router(auth_router)
@@ -32,3 +33,4 @@ router.include_router(lots_router)
 router.include_router(sessions_router)
 router.include_router(bookings_router)
 router.include_router(payments_router)
+router.include_router(shifts_router)

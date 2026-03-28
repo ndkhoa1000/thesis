@@ -70,7 +70,7 @@ development_status:
   6-1-attendant-views-lot-occupancy-stats: review
   6-2-configure-announcements: review
   6-3-force-close-timeout-session: review
-  6-4-zero-trust-shift-handover: ready-for-dev
+  6-4-zero-trust-shift-handover: review
   epic-6-retrospective: optional
   epic-7: backlog
   7-1-driver-pre-books-parking-spot: backlog

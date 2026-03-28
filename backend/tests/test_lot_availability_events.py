@@ -181,6 +181,9 @@ async def test_attendant_check_out_finalize_publishes_availability_event(mock_db
     pricing_result = MagicMock()
     pricing_result.scalars.return_value.all.return_value = [_make_pricing()]
 
+    open_shift_result = MagicMock()
+    open_shift_result.scalar_one_or_none.return_value = None
+
     mock_db.execute = AsyncMock(
         side_effect=[
             attendant_result,
@@ -188,6 +191,7 @@ async def test_attendant_check_out_finalize_publishes_availability_event(mock_db
             session_result,
             payment_lookup_result,
             pricing_result,
+            open_shift_result,
         ]
     )
     mock_db.add = Mock()

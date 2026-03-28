@@ -140,12 +140,28 @@ class _OperatorLotManagementScreenState
     );
   }
 
+  Future<void> _openShiftAlerts() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _OperatorShiftAlertSheet(
+        lotManagementService: widget.lotManagementService,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Điều hành bãi xe'),
         actions: [
+          IconButton(
+            key: const ValueKey('operator-shift-alerts-button'),
+            icon: const Icon(Icons.notifications_active_outlined),
+            tooltip: 'Canh bao giao ca',
+            onPressed: _openShiftAlerts,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Làm mới danh sách',
@@ -312,6 +328,154 @@ class _ManagedLotCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OperatorShiftAlertSheet extends StatefulWidget {
+  const _OperatorShiftAlertSheet({required this.lotManagementService});
+
+  final OperatorLotManagementService lotManagementService;
+
+  @override
+  State<_OperatorShiftAlertSheet> createState() =>
+      _OperatorShiftAlertSheetState();
+}
+
+class _OperatorShiftAlertSheetState extends State<_OperatorShiftAlertSheet> {
+  late Future<List<OperatorShiftAlert>> _alertsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    setState(() {
+      _alertsFuture = widget.lotManagementService.getShiftHandoverAlerts();
+    });
+  }
+
+  String _formatAlertDateTime(DateTime value) {
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month ${hour}:$minute';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Canh bao giao ca',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Su co chenh lech tien mat duoc luu trong he thong va hien thi tai day de operator xu ly.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: _reload,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Lam moi canh bao'),
+                ),
+              ),
+              Expanded(
+                child: FutureBuilder<List<OperatorShiftAlert>>(
+                  future: _alertsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              snapshot.error.toString(),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: _reload,
+                              child: const Text('Thu lai'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    final alerts =
+                        snapshot.data ?? const <OperatorShiftAlert>[];
+                    if (alerts.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Chua co canh bao giao ca nao.',
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      itemCount: alerts.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final alert = alerts[index];
+                        return Card(
+                          color: const Color(0xFFFFF3E0),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        alert.title,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                    ),
+                                    Text(_formatAlertDateTime(alert.createdAt)),
+                                  ],
+                                ),
+                                if ((alert.message ?? '').isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(alert.message!),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -20,6 +20,7 @@ from .enums import (
     PricingMode,
     ReferenceType,
     SessionStatus,
+    ShiftStatus,
     SlotType,
     SubscriptionStatus,
     SubscriptionType,
@@ -32,5 +33,6 @@ from .parking import ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLot
 from .leases import LeaseContract, LotLease
 from .vehicles import Subscription, SubscriptionLot, Vehicle
 from .sessions import Booking, ParkingSession, SessionEdit
+from .shifts import Shift, ShiftHandover
 from .financials import Invoice, Payment
 from .notifications import Notification, ParkingLotAnnouncement

@@ -148,6 +148,11 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   }
 
   @override
+  Future<AttendantShiftHandoverStartResult> prepareShiftHandover() async {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<AttendantCheckInResult> checkInDriver({required String token}) async {
     if (errorMessage != null) {
       throw AttendantCheckInException(errorMessage!);
@@ -193,6 +198,15 @@ class FakeAttendantCheckInService implements AttendantCheckInService {
   Future<AttendantForceCloseTimeoutResult> forceCloseTimeout({
     required int sessionId,
     required String reason,
+  }) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AttendantShiftHandoverFinalizeResult> finalizeShiftHandover({
+    required String token,
+    required double actualCash,
+    String? discrepancyReason,
   }) async {
     throw UnimplementedError();
   }
@@ -584,6 +598,11 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   @override
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots() async {
     return List<OperatorManagedParkingLot>.from(_parkingLots);
+  }
+
+  @override
+  Future<List<OperatorShiftAlert>> getShiftHandoverAlerts() async {
+    return const [];
   }
 
   @override
