@@ -1,6 +1,6 @@
 # Story 7.2: Attendant Scans Pre-Booked Check-In
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -161,3 +161,4 @@ GPT-5.4
 
 - 2026-03-28: Implemented Story 7.2 by extending attendant QR check-in to consume booking confirmation tokens, preserving held capacity, and adding backend/mobile regression coverage.
 - 2026-03-28: Created Story 7.2 implementation artifact for attendant-side booking QR conversion into active parking sessions.
+- 2026-03-28: Closed Epic 7 review follow-up by rechecking booking expiry at the session-conversion boundary and revalidated focused plus full backend regressions.

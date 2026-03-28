@@ -313,4 +313,50 @@ void main() {
     expect(find.byKey(const ValueKey('bookLot:1')), findsOneWidget);
     expect(find.byType(QrImageView), findsNothing);
   });
+
+  testWidgets(
+    'falls back to an available vehicle when expired booking vehicle no longer exists',
+    (tester) async {
+      final bookingService = FakeDriverBookingService(
+        activeBooking: DriverBooking(
+          bookingId: 62,
+          parkingLotId: 1,
+          parkingLotName: 'Bãi xe Lê Lợi',
+          status: 'EXPIRED',
+          bookingTime: DateTime(2026, 3, 28, 9, 0),
+          expectedArrival: DateTime(2026, 3, 28, 9, 30),
+          expirationTime: DateTime(2026, 3, 28, 9, 30),
+          expiresInSeconds: 0,
+          currentAvailable: 5,
+          token: '',
+          vehicle: const Vehicle(
+            id: 99,
+            licensePlate: '99A-99999',
+            vehicleType: 'CAR',
+          ),
+          payment: const DriverBookingPayment(
+            paymentId: 88,
+            amount: 8000,
+            finalAmount: 8000,
+            paymentMethod: 'ONLINE',
+            paymentStatus: 'COMPLETED',
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildSubject(
+          bookingService: bookingService,
+          vehicleService: FakeVehicleService(const [
+            Vehicle(id: 7, licensePlate: '59A-12345', vehicleType: 'MOTORBIKE'),
+          ]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Booking đã hết hạn'), findsOneWidget);
+      expect(find.byKey(const ValueKey('bookingVehicle:1')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

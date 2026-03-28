@@ -244,3 +244,44 @@ class TestAttendantBookingCheckIn:
                 _attendant_user(),
                 mock_db,
             )
+
+    @pytest.mark.asyncio
+    async def test_rechecks_expiration_before_commit_to_block_just_expired_booking(self, mock_db):
+        attendant_result = MagicMock()
+        attendant_result.scalar_one_or_none.return_value = _make_attendant()
+
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = _make_lot()
+
+        booking = _make_booking(expires_in_minutes=1)
+        booking_result = MagicMock()
+        booking_result.scalar_one_or_none.return_value = booking
+
+        vehicle_result = MagicMock()
+        vehicle_result.scalar_one_or_none.return_value = _make_vehicle()
+
+        active_session_result = MagicMock()
+        active_session_result.scalar_one_or_none.return_value = None
+
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                attendant_result,
+                lot_result,
+                _no_pending_close_out_result(),
+                booking_result,
+                vehicle_result,
+                active_session_result,
+            ]
+        )
+
+        first_now = datetime.now(UTC)
+        second_now = booking.expiration_time + timedelta(seconds=1)
+
+        with patch("src.app.api.v1.sessions._utcnow", side_effect=[first_now, second_now]):
+            with pytest.raises(BadRequestException, match="regular check-in"):
+                await attendant_check_in_with_driver_qr(
+                    Mock(),
+                    AttendantCheckInCreate(token=_build_booking_token(expires_in_minutes=5)),
+                    _attendant_user(),
+                    mock_db,
+                )

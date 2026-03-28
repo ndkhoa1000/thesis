@@ -1,6 +1,6 @@
 # Story 7.3: Auto-Expire No-Show Bookings
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -165,3 +165,4 @@ GPT-5.4
 
 - 2026-03-28: Implemented Story 7.3 with ARQ-backed booking expiration, exact-once capacity restoration, expired-state booking reads, and driver lot-details expired-booking UI coverage.
 - 2026-03-28: Created Story 7.3 implementation artifact for backend-managed automatic expiration of no-show bookings.
+- 2026-03-28: Closed Epic 7 review follow-up by hardening expired-booking rebook vehicle selection against stale client state and revalidating focused Flutter regressions.

@@ -73,10 +73,10 @@ development_status:
   6-4-zero-trust-shift-handover: done
   6-5-close-final-shift-of-day: done
   epic-6-retrospective: done
-  epic-7: in-progress
-  7-1-driver-pre-books-parking-spot: review
-  7-2-attendant-scans-pre-booked-check-in: review
-  7-3-auto-expire-no-show-bookings: review
+  epic-7: done
+  7-1-driver-pre-books-parking-spot: done
+  7-2-attendant-scans-pre-booked-check-in: done
+  7-3-auto-expire-no-show-bookings: done
   epic-7-retrospective: optional
   epic-8: in-progress
   8-1-create-lease-contract: ready-for-dev

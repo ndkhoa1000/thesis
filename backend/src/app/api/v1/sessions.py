@@ -251,6 +251,9 @@ async def _create_session_from_booking(
         other_lot_name = other_lot.name if other_lot is not None else "another lot"
         raise BadRequestException(f"Driver has an active session at {other_lot_name}")
 
+    if booking.expiration_time is not None and booking.expiration_time <= _utcnow():
+        raise BadRequestException("Booking expired. You can proceed with regular check-in if spots are available.")
+
     created_session = ParkingSession(
         parking_lot_id=parking_lot.id,
         license_plate=vehicle.license_plate,

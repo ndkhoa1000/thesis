@@ -1,6 +1,6 @@
 # Story 7.1: Driver Pre-Books Parking Spot
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -169,3 +169,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 7.1 implementation artifact for Driver-side booking creation, cancellation, payment linkage, and confirmation guidance.
 - 2026-03-28: Implemented Story 7.1 booking backend/mobile flow, added booking regression tests, and completed full backend plus Flutter regression verification.
+- 2026-03-28: Closed Epic 7 review follow-up by preventing stale historical bookings from resurfacing in the active-booking read contract and revalidated the full backend regression suite.

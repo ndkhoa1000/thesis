@@ -7,7 +7,7 @@ import pytest
 from jose import jwt
 
 from src.app.api.v1.bookings import cancel_driver_booking, create_driver_booking, get_driver_active_booking
-from src.app.core.exceptions.http_exceptions import BadRequestException
+from src.app.core.exceptions.http_exceptions import BadRequestException, NotFoundException
 from src.app.core.security import ALGORITHM, SECRET_KEY
 from src.app.models.financials import Payment
 from src.app.models.parking import ParkingLot, Pricing
@@ -283,6 +283,23 @@ class TestDriverBookings:
             previous_current_available=1,
             source="driver_booking_expired_on_read",
         )
+
+    @pytest.mark.asyncio
+    async def test_does_not_surface_older_expired_booking_when_latest_booking_is_cancelled(self, mock_db):
+        driver_result = MagicMock()
+        driver_result.scalar_one_or_none.return_value = _make_driver()
+
+        latest_booking = _make_booking(booking_id=99, status="CANCELLED")
+        lot = _make_lot(current_available=4)
+        vehicle = _make_vehicle()
+
+        booking_result = MagicMock()
+        booking_result.first.return_value = (latest_booking, lot, vehicle)
+
+        mock_db.execute = AsyncMock(side_effect=[driver_result, booking_result])
+
+        with pytest.raises(NotFoundException, match="No active booking found"):
+            await get_driver_active_booking(Mock(), _driver_user(), mock_db, 14)
 
     @pytest.mark.asyncio
     async def test_cancel_booking_restores_capacity_exactly_once(self, mock_db):

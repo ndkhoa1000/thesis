@@ -60,6 +60,18 @@ class _LotDetailsSheetState extends State<LotDetailsSheet> {
   String? _bookingErrorMessage;
   int? _selectedVehicleId;
 
+  int? _resolveSelectedVehicleId(
+    List<Vehicle> vehicles,
+    DriverBooking? activeBooking,
+  ) {
+    final bookingVehicleId = activeBooking?.vehicle.id;
+    if (bookingVehicleId != null &&
+        vehicles.any((vehicle) => vehicle.id == bookingVehicleId)) {
+      return bookingVehicleId;
+    }
+    return vehicles.isEmpty ? null : vehicles.first.id;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -88,9 +100,7 @@ class _LotDetailsSheetState extends State<LotDetailsSheet> {
         _detail = detail;
         _vehicles = vehicles;
         _activeBooking = activeBooking;
-        _selectedVehicleId =
-            activeBooking?.vehicle.id ??
-            (vehicles.isEmpty ? null : vehicles.first.id);
+        _selectedVehicleId = _resolveSelectedVehicleId(vehicles, activeBooking);
         _isLoading = false;
       });
     } on LotDetailsException catch (error) {

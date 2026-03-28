@@ -214,7 +214,6 @@ async def get_driver_active_booking(
         .where(
             Booking.driver_id == driver.id,
             Booking.parking_lot_id == parking_lot_id,
-            Booking.status.in_([BookingStatus.CONFIRMED.value, BookingStatus.EXPIRED.value]),
         )
         .order_by(Booking.id.desc())
         .limit(1)
@@ -225,6 +224,13 @@ async def get_driver_active_booking(
         raise NotFoundException("No active booking found")
 
     booking, parking_lot, vehicle = row
+    if booking.status in {
+        BookingStatus.CANCELLED.value,
+        BookingStatus.CONSUMED.value,
+        BookingStatus.PENDING.value,
+    }:
+        raise NotFoundException("No active booking found")
+
     if (
         booking.status == BookingStatus.CONFIRMED.value
         and booking.expiration_time is not None
