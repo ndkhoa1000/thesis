@@ -18,6 +18,7 @@ from src.app.api.v1.lots import (
 from src.app.core.exceptions.http_exceptions import BadRequestException, ForbiddenException, NotFoundException
 from src.app.models.enums import LeaseStatus, ParkingLotStatus, PricingMode
 from src.app.models.leases import LotLease
+from src.app.models.notifications import ParkingLotAnnouncement
 from src.app.models.parking import ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLotTag, Pricing
 from src.app.models.user import User
 from src.app.models.users import LotOwner, Manager
@@ -150,6 +151,24 @@ def _parking_lot_tag(parking_lot_id: int = 7, tag_name: str = "co-mai-che") -> P
     return tag
 
 
+def _announcement(
+    announcement_id: int = 31,
+    parking_lot_id: int = 7,
+    title: str = "Thong bao gio cao diem",
+) -> ParkingLotAnnouncement:
+    announcement = MagicMock(spec=ParkingLotAnnouncement)
+    announcement.id = announcement_id
+    announcement.parking_lot_id = parking_lot_id
+    announcement.posted_by = 4
+    announcement.title = title
+    announcement.content = "Nen vao bai som hon 15 phut."
+    announcement.announcement_type = "TRAFFIC_ALERT"
+    announcement.visible_from = datetime.now(UTC)
+    announcement.visible_until = None
+    announcement.created_at = datetime.now(UTC)
+    return announcement
+
+
 class TestPublicParkingLots:
     def test_read_schema_supports_orm_objects(self):
         parking_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
@@ -208,6 +227,8 @@ class TestPublicParkingLots:
         features_result.scalars.return_value.all.return_value = [
             _parking_lot_feature(feature_type="CAMERA"),
         ]
+        announcements_result = MagicMock()
+        announcements_result.scalars.return_value.all.return_value = []
         peak_hours_result = MagicMock()
         peak_hours_result.all.return_value = [(8, 3), (18, 5)]
         mock_db.execute = AsyncMock(
@@ -217,6 +238,7 @@ class TestPublicParkingLots:
                 pricing_result,
                 tags_result,
                 features_result,
+                announcements_result,
                 peak_hours_result,
             ]
         )
@@ -230,6 +252,7 @@ class TestPublicParkingLots:
         assert result.price_amount == 5000
         assert result.tag_labels == ["trung-tam", "co-mai-che"]
         assert result.feature_labels == ["CAMERA"]
+        assert result.announcements == []
         assert result.peak_hours.status == "READY"
         assert result.peak_hours.total_sessions == 8
         assert result.peak_hours.points[0].hour == 8
@@ -249,6 +272,8 @@ class TestPublicParkingLots:
         tags_result.scalars.return_value.all.return_value = []
         features_result = MagicMock()
         features_result.scalars.return_value.all.return_value = []
+        announcements_result = MagicMock()
+        announcements_result.scalars.return_value.all.return_value = []
         peak_hours_result = MagicMock()
         peak_hours_result.all.return_value = [(9, 1)]
         mock_db.execute = AsyncMock(
@@ -258,6 +283,7 @@ class TestPublicParkingLots:
                 pricing_result,
                 tags_result,
                 features_result,
+                announcements_result,
                 peak_hours_result,
             ]
         )
@@ -286,6 +312,8 @@ class TestPublicParkingLots:
         tags_result.scalars.return_value.all.return_value = []
         features_result = MagicMock()
         features_result.scalars.return_value.all.return_value = []
+        announcements_result = MagicMock()
+        announcements_result.scalars.return_value.all.return_value = []
         peak_hours_result = MagicMock()
         peak_hours_result.all.return_value = [(8, 3)]
         mock_db.execute = AsyncMock(
@@ -295,6 +323,7 @@ class TestPublicParkingLots:
                 pricing_result,
                 tags_result,
                 features_result,
+                announcements_result,
                 peak_hours_result,
             ]
         )
@@ -311,6 +340,43 @@ class TestPublicParkingLots:
         assert "effective_to" in str(pricing_query)
         assert result.total_capacity == 20
         assert result.price_amount == 12000
+
+    @pytest.mark.asyncio
+    async def test_read_public_lot_detail_returns_only_active_announcements(self, mock_db):
+        approved_lot = _parking_lot(status=ParkingLotStatus.APPROVED.value)
+
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = approved_lot
+        config_result = MagicMock()
+        config_result.scalar_one_or_none.return_value = _parking_lot_config()
+        pricing_result = MagicMock()
+        pricing_result.scalar_one_or_none.return_value = _pricing()
+        tags_result = MagicMock()
+        tags_result.scalars.return_value.all.return_value = []
+        features_result = MagicMock()
+        features_result.scalars.return_value.all.return_value = []
+        announcements_result = MagicMock()
+        announcements_result.scalars.return_value.all.return_value = [
+            _announcement(title="Thong bao dang hien thi"),
+        ]
+        peak_hours_result = MagicMock()
+        peak_hours_result.all.return_value = [(8, 3)]
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                lot_result,
+                config_result,
+                pricing_result,
+                tags_result,
+                features_result,
+                announcements_result,
+                peak_hours_result,
+            ]
+        )
+
+        result = await read_public_lot_detail(Mock(), approved_lot.id, mock_db)
+
+        assert len(result.announcements) == 1
+        assert result.announcements[0].title == "Thong bao dang hien thi"
 
     @pytest.mark.asyncio
     async def test_read_public_lot_detail_rejects_missing_or_inaccessible_lot(self, mock_db):

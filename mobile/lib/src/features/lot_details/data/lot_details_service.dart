@@ -1,5 +1,12 @@
 import 'package:dio/dio.dart';
 
+DateTime? _parseDateTime(dynamic value) {
+  if (value is! String || value.isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(value);
+}
+
 String? _normalizeTime(dynamic value) {
   if (value is! String || value.isEmpty) {
     return null;
@@ -54,6 +61,35 @@ class LotHistoricalTrend {
   }
 }
 
+class DriverLotAnnouncement {
+  const DriverLotAnnouncement({
+    required this.id,
+    required this.title,
+    required this.announcementType,
+    required this.visibleFrom,
+    this.content,
+    this.visibleUntil,
+  });
+
+  final int id;
+  final String title;
+  final String? content;
+  final String announcementType;
+  final DateTime visibleFrom;
+  final DateTime? visibleUntil;
+
+  factory DriverLotAnnouncement.fromJson(Map<String, dynamic> json) {
+    return DriverLotAnnouncement(
+      id: json['id'] as int,
+      title: json['title'] as String,
+      content: json['content'] as String?,
+      announcementType: json['announcement_type'] as String? ?? 'GENERAL',
+      visibleFrom: DateTime.parse(json['visible_from'] as String),
+      visibleUntil: _parseDateTime(json['visible_until']),
+    );
+  }
+}
+
 class DriverLotDetail {
   const DriverLotDetail({
     required this.id,
@@ -64,6 +100,7 @@ class DriverLotDetail {
     required this.currentAvailable,
     required this.status,
     required this.peakHours,
+    this.announcements = const [],
     this.description,
     this.coverImage,
     this.totalCapacity,
@@ -91,6 +128,7 @@ class DriverLotDetail {
   final double? priceAmount;
   final List<String> featureLabels;
   final List<String> tagLabels;
+  final List<DriverLotAnnouncement> announcements;
   final LotHistoricalTrend peakHours;
 
   bool get isFull => currentAvailable <= 0;
@@ -150,6 +188,10 @@ class DriverLotDetail {
           .toList(growable: false),
       tagLabels: (json['tag_labels'] as List<dynamic>? ?? const [])
           .whereType<String>()
+          .toList(growable: false),
+      announcements: (json['announcements'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(DriverLotAnnouncement.fromJson)
           .toList(growable: false),
       peakHours: LotHistoricalTrend.fromJson(
         json['peak_hours'] as Map<String, dynamic>? ?? const {},

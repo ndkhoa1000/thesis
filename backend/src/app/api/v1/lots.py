@@ -28,6 +28,7 @@ from ...models.enums import (
     VehicleTypeAll,
 )
 from ...models.leases import LotLease
+from ...models.notifications import ParkingLotAnnouncement
 from ...models.parking import (
     ParkingLot,
     ParkingLotConfig,
@@ -40,8 +41,11 @@ from ...models.user import User
 from ...models.users import Attendant, LotOwner, Manager
 from ...schemas.parking_lot import (
     AvailableOperatorRead,
+    OperatorManagedAnnouncementCreate,
+    OperatorManagedAnnouncementUpdate,
     OperatorManagedAttendantCreate,
     OperatorManagedAttendantRead,
+    ParkingLotAnnouncementRead,
     OperatorManagedParkingLotRead,
     OperatorManagedParkingLotUpdate,
     ParkingLotAdminRead,
@@ -206,6 +210,60 @@ async def _get_active_lease_for_manager(
         .limit(1)
     )
     return lease_result.scalar_one_or_none()
+
+
+async def _get_operator_lot_announcement(
+    db: AsyncSession,
+    parking_lot_id: int,
+    announcement_id: int,
+) -> ParkingLotAnnouncement | None:
+    announcement_result = await db.execute(
+        select(ParkingLotAnnouncement)
+        .where(
+            ParkingLotAnnouncement.id == announcement_id,
+            ParkingLotAnnouncement.parking_lot_id == parking_lot_id,
+        )
+        .limit(1)
+    )
+    return announcement_result.scalar_one_or_none()
+
+
+async def _get_operator_lot_announcements(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> list[ParkingLotAnnouncement]:
+    announcement_result = await db.execute(
+        select(ParkingLotAnnouncement)
+        .where(ParkingLotAnnouncement.parking_lot_id == parking_lot_id)
+        .order_by(
+            ParkingLotAnnouncement.visible_from.desc(),
+            ParkingLotAnnouncement.id.desc(),
+        )
+    )
+    return list(announcement_result.scalars().all())
+
+
+async def _get_driver_visible_announcements(
+    db: AsyncSession,
+    parking_lot_id: int,
+) -> list[ParkingLotAnnouncement]:
+    now = _utcnow()
+    announcement_result = await db.execute(
+        select(ParkingLotAnnouncement)
+        .where(
+            ParkingLotAnnouncement.parking_lot_id == parking_lot_id,
+            ParkingLotAnnouncement.visible_from <= now,
+            or_(
+                ParkingLotAnnouncement.visible_until.is_(None),
+                ParkingLotAnnouncement.visible_until >= now,
+            ),
+        )
+        .order_by(
+            ParkingLotAnnouncement.visible_from.desc(),
+            ParkingLotAnnouncement.id.desc(),
+        )
+    )
+    return list(announcement_result.scalars().all())
 
 
 def _build_admin_read(
@@ -489,6 +547,7 @@ def _build_driver_detail_read(
     latest_pricing: Pricing | None,
     features: list[ParkingLotFeature],
     tags: list[ParkingLotTag],
+    announcements: list[ParkingLotAnnouncement],
     peak_hours: ParkingLotPeakHoursRead,
 ) -> ParkingLotDriverDetailRead:
     return ParkingLotDriverDetailRead.model_validate(
@@ -509,6 +568,7 @@ def _build_driver_detail_read(
             "price_amount": float(latest_pricing.price_amount) if latest_pricing else None,
             "feature_labels": [feature.feature_type for feature in features],
             "tag_labels": [tag.tag_name for tag in tags],
+            "announcements": announcements,
             "peak_hours": peak_hours,
         }
     )
@@ -582,6 +642,7 @@ async def read_public_lot_detail(
     latest_pricing = await _get_latest_pricing(db, parking_lot_id)
     tags = await _get_parking_lot_tags(db, parking_lot_id)
     features = await _get_enabled_parking_lot_features(db, parking_lot_id)
+    announcements = await _get_driver_visible_announcements(db, parking_lot_id)
     peak_hours = _build_peak_hours_read(await _get_peak_hour_rows(db, parking_lot_id))
 
     return _build_driver_detail_read(
@@ -590,6 +651,7 @@ async def read_public_lot_detail(
         latest_pricing,
         features,
         tags,
+        announcements,
         peak_hours,
     )
 
@@ -801,6 +863,90 @@ async def patch_operator_parking_lot(
         pricing.pricing_mode,
         float(pricing.price_amount),
     )
+
+
+@router.get(
+    "/operator/parking-lots/{parking_lot_id}/announcements",
+    response_model=list[ParkingLotAnnouncementRead],
+)
+async def read_operator_lot_announcements(
+    request: Request,
+    parking_lot_id: int,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> list[ParkingLotAnnouncementRead]:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    return [
+        ParkingLotAnnouncementRead.model_validate(announcement)
+        for announcement in await _get_operator_lot_announcements(db, parking_lot_id)
+    ]
+
+
+@router.post(
+    "/operator/parking-lots/{parking_lot_id}/announcements",
+    response_model=ParkingLotAnnouncementRead,
+    status_code=201,
+)
+async def create_operator_lot_announcement(
+    request: Request,
+    parking_lot_id: int,
+    payload: OperatorManagedAnnouncementCreate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ParkingLotAnnouncementRead:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    announcement = ParkingLotAnnouncement(
+        parking_lot_id=parking_lot_id,
+        posted_by=manager.id,
+        title=payload.title,
+        content=payload.content,
+        announcement_type=payload.announcement_type.value,
+        visible_from=payload.visible_from,
+        visible_until=payload.visible_until,
+    )
+    db.add(announcement)
+    await db.commit()
+    await db.refresh(announcement)
+    return ParkingLotAnnouncementRead.model_validate(announcement)
+
+
+@router.patch(
+    "/operator/parking-lots/{parking_lot_id}/announcements/{announcement_id}",
+    response_model=ParkingLotAnnouncementRead,
+)
+async def patch_operator_lot_announcement(
+    request: Request,
+    parking_lot_id: int,
+    announcement_id: int,
+    payload: OperatorManagedAnnouncementUpdate,
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(async_get_db)],
+) -> ParkingLotAnnouncementRead:
+    manager = await _require_manager_profile(db, current_user)
+    lease = await _get_active_lease_for_manager(db, manager.id, parking_lot_id)
+    if lease is None:
+        raise NotFoundException("Managed parking lot not found")
+
+    announcement = await _get_operator_lot_announcement(db, parking_lot_id, announcement_id)
+    if announcement is None:
+        raise NotFoundException("Announcement not found")
+
+    announcement.title = payload.title
+    announcement.content = payload.content
+    announcement.announcement_type = payload.announcement_type.value
+    announcement.visible_from = payload.visible_from
+    announcement.visible_until = payload.visible_until
+    await db.commit()
+    await db.refresh(announcement)
+    return ParkingLotAnnouncementRead.model_validate(announcement)
 
 
 @router.get(

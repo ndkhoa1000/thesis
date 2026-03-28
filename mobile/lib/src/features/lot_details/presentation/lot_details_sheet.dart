@@ -4,6 +4,27 @@ import 'package:flutter/material.dart';
 
 import '../data/lot_details_service.dart';
 
+String _announcementWindowLabel(DriverLotAnnouncement announcement) {
+  final start = announcement.visibleFrom.toLocal();
+  final startDate =
+      '${start.day.toString().padLeft(2, '0')}/${start.month.toString().padLeft(2, '0')} ${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+  if (announcement.visibleUntil == null) {
+    return 'Hiển thị từ $startDate';
+  }
+  final end = announcement.visibleUntil!.toLocal();
+  final endDate =
+      '${end.day.toString().padLeft(2, '0')}/${end.month.toString().padLeft(2, '0')} ${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
+  return '$startDate - $endDate';
+}
+
+String _announcementTypeLabel(String type) => switch (type) {
+  'EVENT' => 'Sự kiện',
+  'TRAFFIC_ALERT' => 'Giao thông',
+  'PEAK_HOURS' => 'Giờ cao điểm',
+  'CLOSURE' => 'Đóng tạm thời',
+  _ => 'Thông báo',
+};
+
 class LotDetailsSheet extends StatefulWidget {
   const LotDetailsSheet({
     super.key,
@@ -163,6 +184,23 @@ class _LotDetailsSheetState extends State<LotDetailsSheet> {
                         ],
                       ),
                     ],
+                    if (_detail!.announcements.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text('Thông báo', style: theme.textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      Column(
+                        children: _detail!.announcements
+                            .map(
+                              (announcement) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _AnnouncementCard(
+                                  announcement: announcement,
+                                ),
+                              ),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     Text(
                       'Peak hours ${_detail!.peakHours.lookbackDays} ngày gần nhất',
@@ -218,6 +256,53 @@ class _FactCard extends StatelessWidget {
                 Text(value, style: Theme.of(context).textTheme.titleSmall),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementCard extends StatelessWidget {
+  const _AnnouncementCard({required this.announcement});
+
+  final DriverLotAnnouncement announcement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  announcement.title,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              Chip(
+                label: Text(
+                  _announcementTypeLabel(announcement.announcementType),
+                ),
+              ),
+            ],
+          ),
+          if ((announcement.content ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(announcement.content!),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            _announcementWindowLabel(announcement),
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),

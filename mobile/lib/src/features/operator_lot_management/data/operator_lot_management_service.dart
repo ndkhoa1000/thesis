@@ -151,8 +151,69 @@ class OperatorManagedParkingLot {
   }
 }
 
+class OperatorLotAnnouncement {
+  const OperatorLotAnnouncement({
+    required this.id,
+    required this.parkingLotId,
+    required this.postedBy,
+    required this.title,
+    required this.announcementType,
+    required this.visibleFrom,
+    required this.createdAt,
+    this.content,
+    this.visibleUntil,
+  });
+
+  final int id;
+  final int parkingLotId;
+  final int postedBy;
+  final String title;
+  final String? content;
+  final String announcementType;
+  final DateTime visibleFrom;
+  final DateTime? visibleUntil;
+  final DateTime createdAt;
+
+  factory OperatorLotAnnouncement.fromJson(Map<String, dynamic> json) {
+    return OperatorLotAnnouncement(
+      id: json['id'] as int,
+      parkingLotId: json['parking_lot_id'] as int,
+      postedBy: json['posted_by'] as int,
+      title: json['title'] as String,
+      content: json['content'] as String?,
+      announcementType: json['announcement_type'] as String? ?? 'GENERAL',
+      visibleFrom: DateTime.parse(json['visible_from'] as String),
+      visibleUntil: _parseDateTime(json['visible_until']),
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+}
+
 abstract class OperatorLotManagementService {
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots();
+
+  Future<List<OperatorLotAnnouncement>> getLotAnnouncements({
+    required int parkingLotId,
+  });
+
+  Future<OperatorLotAnnouncement> createLotAnnouncement({
+    required int parkingLotId,
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  });
+
+  Future<OperatorLotAnnouncement> updateLotAnnouncement({
+    required int parkingLotId,
+    required int announcementId,
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  });
 
   Future<List<OperatorManagedAttendant>> getLotAttendants({
     required int parkingLotId,
@@ -217,6 +278,97 @@ class BackendOperatorLotManagementService
           .whereType<Map<String, dynamic>>()
           .map(OperatorManagedParkingLot.fromJson)
           .toList(growable: false);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<List<OperatorLotAnnouncement>> getLotAnnouncements({
+    required int parkingLotId,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/operator/parking-lots/$parkingLotId/announcements',
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! List) {
+        throw const OperatorLotManagementException(
+          'Phản hồi danh sách thông báo không hợp lệ.',
+        );
+      }
+      return raw
+          .whereType<Map<String, dynamic>>()
+          .map(OperatorLotAnnouncement.fromJson)
+          .toList(growable: false);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<OperatorLotAnnouncement> createLotAnnouncement({
+    required int parkingLotId,
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  }) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/operator/parking-lots/$parkingLotId/announcements',
+        data: {
+          'title': title,
+          'content': content,
+          'announcement_type': announcementType,
+          'visible_from': visibleFrom.toUtc().toIso8601String(),
+          'visible_until': visibleUntil?.toUtc().toIso8601String(),
+        },
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const OperatorLotManagementException(
+          'Phản hồi tạo thông báo không hợp lệ.',
+        );
+      }
+      return OperatorLotAnnouncement.fromJson(raw);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<OperatorLotAnnouncement> updateLotAnnouncement({
+    required int parkingLotId,
+    required int announcementId,
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  }) async {
+    try {
+      final response = await _dio.patch<dynamic>(
+        '/operator/parking-lots/$parkingLotId/announcements/$announcementId',
+        data: {
+          'title': title,
+          'content': content,
+          'announcement_type': announcementType,
+          'visible_from': visibleFrom.toUtc().toIso8601String(),
+          'visible_until': visibleUntil?.toUtc().toIso8601String(),
+        },
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const OperatorLotManagementException(
+          'Phản hồi cập nhật thông báo không hợp lệ.',
+        );
+      }
+      return OperatorLotAnnouncement.fromJson(raw);
     } on DioException catch (error) {
       throw OperatorLotManagementException(_extractMessage(error));
     }

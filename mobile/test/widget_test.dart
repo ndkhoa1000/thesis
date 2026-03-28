@@ -543,6 +543,7 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   FakeOperatorLotManagementService({
     List<OperatorManagedParkingLot>? initialLots,
     Map<int, List<OperatorManagedAttendant>>? attendantsByLot,
+    Map<int, List<OperatorLotAnnouncement>>? announcementsByLot,
   }) : _parkingLots = List<OperatorManagedParkingLot>.from(
          initialLots ?? const [],
        ),
@@ -552,15 +553,92 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
                      const <int, List<OperatorManagedAttendant>>{})
                  .entries)
            entry.key: List<OperatorManagedAttendant>.from(entry.value),
+       },
+       _announcementsByLot = {
+         for (final entry
+             in (announcementsByLot ??
+                     const <int, List<OperatorLotAnnouncement>>{})
+                 .entries)
+           entry.key: List<OperatorLotAnnouncement>.from(entry.value),
        };
 
   final List<OperatorManagedParkingLot> _parkingLots;
   final Map<int, List<OperatorManagedAttendant>> _attendantsByLot;
+  final Map<int, List<OperatorLotAnnouncement>> _announcementsByLot;
   int _nextAttendantId = 200;
+  int _nextAnnouncementId = 300;
 
   @override
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots() async {
     return List<OperatorManagedParkingLot>.from(_parkingLots);
+  }
+
+  @override
+  Future<List<OperatorLotAnnouncement>> getLotAnnouncements({
+    required int parkingLotId,
+  }) async {
+    return List<OperatorLotAnnouncement>.from(
+      _announcementsByLot[parkingLotId] ?? const <OperatorLotAnnouncement>[],
+    );
+  }
+
+  @override
+  Future<OperatorLotAnnouncement> createLotAnnouncement({
+    required int parkingLotId,
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  }) async {
+    final announcement = OperatorLotAnnouncement(
+      id: _nextAnnouncementId++,
+      parkingLotId: parkingLotId,
+      postedBy: 8,
+      title: title,
+      content: content,
+      announcementType: announcementType,
+      visibleFrom: visibleFrom,
+      visibleUntil: visibleUntil,
+      createdAt: DateTime(2026, 3, 28),
+    );
+    final announcements = _announcementsByLot.putIfAbsent(
+      parkingLotId,
+      () => <OperatorLotAnnouncement>[],
+    );
+    announcements.insert(0, announcement);
+    return announcement;
+  }
+
+  @override
+  Future<OperatorLotAnnouncement> updateLotAnnouncement({
+    required int parkingLotId,
+    required int announcementId,
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  }) async {
+    final announcements = _announcementsByLot.putIfAbsent(
+      parkingLotId,
+      () => <OperatorLotAnnouncement>[],
+    );
+    final index = announcements.indexWhere((item) => item.id == announcementId);
+    final current = announcements[index];
+    final updated = OperatorLotAnnouncement(
+      id: current.id,
+      parkingLotId: current.parkingLotId,
+      postedBy: current.postedBy,
+      title: title,
+      content: content,
+      announcementType: announcementType,
+      visibleFrom: visibleFrom,
+      visibleUntil: visibleUntil,
+      createdAt: current.createdAt,
+    );
+    announcements[index] = updated;
+    return updated;
   }
 
   @override
@@ -2047,6 +2125,109 @@ void main() {
 
     expect(find.text('Tran Van Truc'), findsNothing);
     expect(find.text('Le Thi Hoa'), findsOneWidget);
+  });
+
+  testWidgets('Operator workspace can create and update lot announcements', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 24,
+          leaseId: 12,
+          lotOwnerId: 5,
+          name: 'Bai xe Hai Ba Trung',
+          address: '88 Hai Ba Trung, Quan 1',
+          latitude: 10.779,
+          longitude: 106.703,
+          currentAvailable: 7,
+          status: 'APPROVED',
+          occupiedCount: 5,
+          totalCapacity: 12,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 15000,
+        ),
+      ],
+      announcementsByLot: {
+        24: [
+          OperatorLotAnnouncement(
+            id: 401,
+            parkingLotId: 24,
+            postedBy: 8,
+            title: 'Thong bao hien co',
+            content: 'Su dung cong chinh o mat truoc.',
+            announcementType: 'GENERAL',
+            visibleFrom: DateTime(2026, 3, 28, 7, 0),
+            visibleUntil: DateTime(2026, 3, 29, 22, 0),
+            createdAt: DateTime(2026, 3, 28, 7, 0),
+          ),
+        ],
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Thông báo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thong bao hien co'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Tạo thông báo'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tiêu đề'),
+      'Bao tri cong 2',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Nội dung (tuỳ chọn)'),
+      'Su dung loi vao phia sau trong khung gio cao diem.',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Bắt đầu hiển thị (YYYY-MM-DD HH:mm)'),
+      '2026-03-29 07:30',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Kết thúc hiển thị (tuỳ chọn)'),
+      '2026-03-30 22:00',
+    );
+    final saveAnnouncementButton = find.widgetWithText(
+      FilledButton,
+      'Lưu thông báo',
+    );
+    await tester.ensureVisible(saveAnnouncementButton);
+    await tester.tap(saveAnnouncementButton);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bao tri cong 2'), findsOneWidget);
+
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Cập nhật thông báo').first,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Tiêu đề'),
+      'Bao tri cong 2 cap nhat',
+    );
+    await tester.ensureVisible(saveAnnouncementButton);
+    await tester.tap(saveAnnouncementButton);
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bao tri cong 2 cap nhat'), findsOneWidget);
+    expect(find.text('Bao tri cong 2'), findsNothing);
   });
 
   testWidgets('Operator workspace floors available slots at zero', (

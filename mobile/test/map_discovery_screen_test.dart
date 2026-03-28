@@ -243,6 +243,72 @@ void main() {
     );
   });
 
+  testWidgets('renders active lot announcements inside the details sheet', (
+    tester,
+  ) async {
+    final lotDetailsService = FakeLotDetailsService(
+      detailsById: {
+        1: DriverLotDetail(
+          id: 1,
+          name: 'Bãi xe Lê Lợi',
+          address: '45 Lê Lợi, Quận 1',
+          latitude: 10.7729,
+          longitude: 106.6983,
+          currentAvailable: 6,
+          status: 'APPROVED',
+          announcements: [
+            DriverLotAnnouncement(
+              id: 701,
+              title: 'Lối vào tạm thời thay đổi',
+              content: 'Vui lòng đi vào từ cổng số 2 đến hết cuối tuần.',
+              announcementType: 'TRAFFIC_ALERT',
+              visibleFrom: DateTime(2026, 3, 28, 7, 0),
+              visibleUntil: DateTime(2026, 3, 30, 22, 0),
+            ),
+          ],
+          peakHours: const LotHistoricalTrend(
+            status: 'INSUFFICIENT_DATA',
+            lookbackDays: 30,
+            totalSessions: 1,
+            points: [],
+          ),
+        ),
+      },
+    );
+
+    await tester.pumpWidget(
+      buildSubject(
+        mapDiscoveryService: FakeMapDiscoveryService(
+          lots: const [
+            MapDiscoveryLotSummary(
+              id: 1,
+              name: 'Bãi xe Lê Lợi',
+              address: '45 Lê Lợi, Quận 1',
+              latitude: 10.7729,
+              longitude: 106.6983,
+              currentAvailable: 6,
+              status: 'APPROVED',
+            ),
+          ],
+        ),
+        lotDetailsService: lotDetailsService,
+        locationPermissionService: FakeLocationPermissionService(true),
+        mapCanvasBuilder: (context, viewData) => const SizedBox.expand(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('lotCard:1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Thông báo'), findsOneWidget);
+    expect(find.text('Lối vào tạm thời thay đổi'), findsOneWidget);
+    expect(
+      find.text('Vui lòng đi vào từ cổng số 2 đến hết cuối tuần.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'shows a temporary en-route alert without clearing the watched lot',
     (tester) async {

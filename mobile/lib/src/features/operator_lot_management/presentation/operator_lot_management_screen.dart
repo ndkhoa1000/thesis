@@ -2,6 +2,47 @@ import 'package:flutter/material.dart';
 
 import '../data/operator_lot_management_service.dart';
 
+String _formatAnnouncementDateTime(DateTime value) {
+  final local = value.toLocal();
+  final year = local.year.toString().padLeft(4, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$year-$month-$day $hour:$minute';
+}
+
+DateTime? _parseAnnouncementDateTime(String value) {
+  final trimmed = value.trim();
+  final match = RegExp(
+    r'^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$',
+  ).firstMatch(trimmed);
+  if (match == null) {
+    return null;
+  }
+  final year = int.tryParse(match.group(1)!);
+  final month = int.tryParse(match.group(2)!);
+  final day = int.tryParse(match.group(3)!);
+  final hour = int.tryParse(match.group(4)!);
+  final minute = int.tryParse(match.group(5)!);
+  if (year == null ||
+      month == null ||
+      day == null ||
+      hour == null ||
+      minute == null) {
+    return null;
+  }
+  return DateTime(year, month, day, hour, minute);
+}
+
+String _announcementTypeLabel(String type) => switch (type) {
+  'EVENT' => 'Sự kiện',
+  'TRAFFIC_ALERT' => 'Giao thông',
+  'PEAK_HOURS' => 'Giờ cao điểm',
+  'CLOSURE' => 'Đóng tạm thời',
+  _ => 'Thông báo chung',
+};
+
 class OperatorLotManagementScreen extends StatefulWidget {
   const OperatorLotManagementScreen({
     super.key,
@@ -86,6 +127,19 @@ class _OperatorLotManagementScreenState
     );
   }
 
+  Future<void> _openAnnouncementManagement(
+    OperatorManagedParkingLot lot,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _OperatorAnnouncementManagementSheet(
+        parkingLot: lot,
+        lotManagementService: widget.lotManagementService,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,6 +187,7 @@ class _OperatorLotManagementScreenState
                 parkingLot: lot,
                 onConfigure: () => _openForm(lot),
                 onManageAttendants: () => _openAttendantManagement(lot),
+                onManageAnnouncements: () => _openAnnouncementManagement(lot),
               );
             },
           );
@@ -181,11 +236,13 @@ class _ManagedLotCard extends StatelessWidget {
     required this.parkingLot,
     required this.onConfigure,
     required this.onManageAttendants,
+    required this.onManageAnnouncements,
   });
 
   final OperatorManagedParkingLot parkingLot;
   final VoidCallback onConfigure;
   final VoidCallback onManageAttendants;
+  final VoidCallback onManageAnnouncements;
 
   @override
   Widget build(BuildContext context) {
@@ -228,15 +285,21 @@ class _ManagedLotCard extends StatelessWidget {
             if ((parkingLot.coverImage ?? '').isNotEmpty)
               _InfoRow(label: 'Ảnh đại diện', value: parkingLot.coverImage!),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.end,
               children: [
                 OutlinedButton.icon(
                   onPressed: onManageAttendants,
                   icon: const Icon(Icons.badge_outlined),
                   label: const Text('Nhân viên trực'),
                 ),
-                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: onManageAnnouncements,
+                  icon: const Icon(Icons.campaign_outlined),
+                  label: const Text('Thông báo'),
+                ),
                 FilledButton.icon(
                   onPressed: onConfigure,
                   icon: const Icon(Icons.settings_outlined),
@@ -764,6 +827,470 @@ class _AttendantAccountFormSheet extends StatelessWidget {
               const SizedBox(height: 16),
               _AttendantAccountForm(onSubmit: onSubmit),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OperatorAnnouncementManagementSheet extends StatefulWidget {
+  const _OperatorAnnouncementManagementSheet({
+    required this.parkingLot,
+    required this.lotManagementService,
+  });
+
+  final OperatorManagedParkingLot parkingLot;
+  final OperatorLotManagementService lotManagementService;
+
+  @override
+  State<_OperatorAnnouncementManagementSheet> createState() =>
+      _OperatorAnnouncementManagementSheetState();
+}
+
+class _OperatorAnnouncementManagementSheetState
+    extends State<_OperatorAnnouncementManagementSheet> {
+  late Future<List<OperatorLotAnnouncement>> _announcementsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadAnnouncements();
+  }
+
+  void _reloadAnnouncements() {
+    setState(() {
+      _announcementsFuture = widget.lotManagementService.getLotAnnouncements(
+        parkingLotId: widget.parkingLot.id,
+      );
+    });
+  }
+
+  Future<void> _openAnnouncementForm({
+    OperatorLotAnnouncement? existing,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => _AnnouncementFormSheet(
+        existing: existing,
+        onSubmit:
+            ({
+              required title,
+              content,
+              required announcementType,
+              required visibleFrom,
+              visibleUntil,
+            }) async {
+              try {
+                if (existing == null) {
+                  await widget.lotManagementService.createLotAnnouncement(
+                    parkingLotId: widget.parkingLot.id,
+                    title: title,
+                    content: content,
+                    announcementType: announcementType,
+                    visibleFrom: visibleFrom,
+                    visibleUntil: visibleUntil,
+                  );
+                } else {
+                  await widget.lotManagementService.updateLotAnnouncement(
+                    parkingLotId: widget.parkingLot.id,
+                    announcementId: existing.id,
+                    title: title,
+                    content: content,
+                    announcementType: announcementType,
+                    visibleFrom: visibleFrom,
+                    visibleUntil: visibleUntil,
+                  );
+                }
+                if (!mounted || !sheetContext.mounted) {
+                  return;
+                }
+                Navigator.of(sheetContext).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      existing == null
+                          ? 'Đã tạo thông báo cho ${widget.parkingLot.name}.'
+                          : 'Đã cập nhật thông báo cho ${widget.parkingLot.name}.',
+                    ),
+                  ),
+                );
+                _reloadAnnouncements();
+              } on OperatorLotManagementException catch (error) {
+                if (!sheetContext.mounted) {
+                  return;
+                }
+                ScaffoldMessenger.of(sheetContext).showSnackBar(
+                  SnackBar(
+                    content: Text(error.message),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.95,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Thông báo bãi xe',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(widget.parkingLot.name),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => _openAnnouncementForm(),
+                icon: const Icon(Icons.add_alert_outlined),
+                label: const Text('Tạo thông báo'),
+              ),
+              Expanded(
+                child: FutureBuilder<List<OperatorLotAnnouncement>>(
+                  future: _announcementsFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return _OperatorLotErrorState(
+                        message: snapshot.error.toString(),
+                        onRetry: _reloadAnnouncements,
+                      );
+                    }
+
+                    final announcements =
+                        snapshot.data ?? const <OperatorLotAnnouncement>[];
+                    if (announcements.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'Chưa có thông báo nào cho bãi xe này.',
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.only(top: 16),
+                      itemCount: announcements.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final announcement = announcements[index];
+                        return Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        announcement.title,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                    ),
+                                    Chip(
+                                      label: Text(
+                                        _announcementTypeLabel(
+                                          announcement.announcementType,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if ((announcement.content ?? '')
+                                    .isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(announcement.content!),
+                                ],
+                                const SizedBox(height: 12),
+                                _InfoRow(
+                                  label: 'Bắt đầu hiển thị',
+                                  value: _formatAnnouncementDateTime(
+                                    announcement.visibleFrom,
+                                  ),
+                                ),
+                                _InfoRow(
+                                  label: 'Kết thúc hiển thị',
+                                  value: announcement.visibleUntil == null
+                                      ? 'Không giới hạn'
+                                      : _formatAnnouncementDateTime(
+                                          announcement.visibleUntil!,
+                                        ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _openAnnouncementForm(
+                                      existing: announcement,
+                                    ),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: const Text('Cập nhật thông báo'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnnouncementFormSheet extends StatefulWidget {
+  const _AnnouncementFormSheet({required this.onSubmit, this.existing});
+
+  final OperatorLotAnnouncement? existing;
+  final Future<void> Function({
+    required String title,
+    String? content,
+    required String announcementType,
+    required DateTime visibleFrom,
+    DateTime? visibleUntil,
+  })
+  onSubmit;
+
+  @override
+  State<_AnnouncementFormSheet> createState() => _AnnouncementFormSheetState();
+}
+
+class _AnnouncementFormSheetState extends State<_AnnouncementFormSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _titleController;
+  late final TextEditingController _contentController;
+  late final TextEditingController _visibleFromController;
+  late final TextEditingController _visibleUntilController;
+  late String _announcementType;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(
+      text: widget.existing?.title ?? '',
+    );
+    _contentController = TextEditingController(
+      text: widget.existing?.content ?? '',
+    );
+    _visibleFromController = TextEditingController(
+      text: widget.existing == null
+          ? _formatAnnouncementDateTime(DateTime.now())
+          : _formatAnnouncementDateTime(widget.existing!.visibleFrom),
+    );
+    _visibleUntilController = TextEditingController(
+      text: widget.existing?.visibleUntil == null
+          ? ''
+          : _formatAnnouncementDateTime(widget.existing!.visibleUntil!),
+    );
+    _announcementType = widget.existing?.announcementType ?? 'GENERAL';
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    _visibleFromController.dispose();
+    _visibleUntilController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.onSubmit(
+        title: _titleController.text.trim(),
+        content: _contentController.text.trim().isEmpty
+            ? null
+            : _contentController.text.trim(),
+        announcementType: _announcementType,
+        visibleFrom: _parseAnnouncementDateTime(
+          _visibleFromController.text.trim(),
+        )!,
+        visibleUntil: _visibleUntilController.text.trim().isEmpty
+            ? null
+            : _parseAnnouncementDateTime(_visibleUntilController.text.trim()),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.existing == null
+                      ? 'Tạo thông báo'
+                      : 'Cập nhật thông báo',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(labelText: 'Tiêu đề'),
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    if (trimmed.isEmpty) {
+                      return 'Tiêu đề là bắt buộc';
+                    }
+                    if (trimmed.length < 2) {
+                      return 'Tiêu đề phải có ít nhất 2 ký tự';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _contentController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Nội dung (tuỳ chọn)',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _announcementType,
+                  decoration: const InputDecoration(
+                    labelText: 'Loại thông báo',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'GENERAL',
+                      child: Text('Thông báo chung'),
+                    ),
+                    DropdownMenuItem(value: 'EVENT', child: Text('Sự kiện')),
+                    DropdownMenuItem(
+                      value: 'TRAFFIC_ALERT',
+                      child: Text('Giao thông'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'PEAK_HOURS',
+                      child: Text('Giờ cao điểm'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'CLOSURE',
+                      child: Text('Đóng tạm thời'),
+                    ),
+                  ],
+                  onChanged: _isSubmitting
+                      ? null
+                      : (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          setState(() {
+                            _announcementType = value;
+                          });
+                        },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _visibleFromController,
+                  keyboardType: TextInputType.datetime,
+                  decoration: const InputDecoration(
+                    labelText: 'Bắt đầu hiển thị (YYYY-MM-DD HH:mm)',
+                  ),
+                  validator: (value) {
+                    if (_parseAnnouncementDateTime((value ?? '').trim()) ==
+                        null) {
+                      return 'Nhập theo định dạng YYYY-MM-DD HH:mm';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _visibleUntilController,
+                  keyboardType: TextInputType.datetime,
+                  decoration: const InputDecoration(
+                    labelText: 'Kết thúc hiển thị (tuỳ chọn)',
+                  ),
+                  validator: (value) {
+                    final trimmed = (value ?? '').trim();
+                    if (trimmed.isEmpty) {
+                      return null;
+                    }
+                    final visibleUntil = _parseAnnouncementDateTime(trimmed);
+                    if (visibleUntil == null) {
+                      return 'Nhập theo định dạng YYYY-MM-DD HH:mm';
+                    }
+                    final visibleFrom = _parseAnnouncementDateTime(
+                      _visibleFromController.text.trim(),
+                    );
+                    if (visibleFrom != null &&
+                        visibleUntil.isBefore(visibleFrom)) {
+                      return 'Thời gian kết thúc phải sau thời gian bắt đầu';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isSubmitting ? null : _submit,
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(
+                      _isSubmitting ? 'Đang lưu...' : 'Lưu thông báo',
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

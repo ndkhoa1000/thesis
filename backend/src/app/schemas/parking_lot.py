@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from ..models.enums import ParkingLotStatus, PricingMode
+from ..models.enums import AnnouncementType, ParkingLotStatus, PricingMode
 from .user import _validate_password_strength
 
 
@@ -84,6 +84,60 @@ class ParkingLotPeakHoursRead(BaseModel):
     points: list[ParkingLotPeakHourPointRead] = Field(default_factory=list)
 
 
+class ParkingLotAnnouncementRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    parking_lot_id: int
+    posted_by: int
+    title: str
+    content: str | None = None
+    announcement_type: AnnouncementType
+    visible_from: datetime
+    visible_until: datetime | None = None
+    created_at: datetime
+
+
+class OperatorManagedAnnouncementCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: Annotated[str, Field(min_length=2, max_length=100)]
+    content: Annotated[str | None, Field(max_length=4000, default=None)]
+    announcement_type: AnnouncementType = AnnouncementType.GENERAL
+    visible_from: datetime
+    visible_until: datetime | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def strip_required_title(cls, value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Field must be a string")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Field is required")
+        return stripped
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def strip_optional_content(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @field_validator("visible_until")
+    @classmethod
+    def validate_visibility_window(cls, value: datetime | None, info) -> datetime | None:
+        visible_from = info.data.get("visible_from")
+        if value is not None and visible_from is not None and value < visible_from:
+            raise ValueError("visible_until must be greater than or equal to visible_from")
+        return value
+
+
+class OperatorManagedAnnouncementUpdate(OperatorManagedAnnouncementCreate):
+    pass
+
+
 class ParkingLotDriverDetailRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -103,6 +157,7 @@ class ParkingLotDriverDetailRead(BaseModel):
     price_amount: float | None = None
     feature_labels: list[str] = Field(default_factory=list)
     tag_labels: list[str] = Field(default_factory=list)
+    announcements: list[ParkingLotAnnouncementRead] = Field(default_factory=list)
     peak_hours: ParkingLotPeakHoursRead
 
 

@@ -1,6 +1,6 @@
 # Story 6.2: Configure Announcements
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -22,25 +22,25 @@ so that drivers see important notices.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add lot announcement management endpoints for operators (AC: 1, 3)
-  - [ ] Introduce or expose a parking-lot announcement API surface bound to the operator's managed lots.
-  - [ ] Reuse `ParkingLotAnnouncement` as the canonical domain model and enforce lot ownership/lease authorization.
-  - [ ] Filter driver-visible announcement reads by `visible_from` and `visible_until` so hidden or expired items never leak to the lot details response.
+- [x] Task 1: Add lot announcement management endpoints for operators (AC: 1, 3)
+  - [x] Introduce or expose a parking-lot announcement API surface bound to the operator's managed lots.
+  - [x] Reuse `ParkingLotAnnouncement` as the canonical domain model and enforce lot ownership/lease authorization.
+  - [x] Filter driver-visible announcement reads by `visible_from` and `visible_until` so hidden or expired items never leak to the lot details response.
 
-- [ ] Task 2: Surface operator announcement management in the mobile operator workspace (AC: 1)
-  - [ ] Extend the existing operator lot-management flow with an announcement management entry point per managed lot.
-  - [ ] Allow operators to create and update announcement metadata without leaving the lot-management experience.
-  - [ ] Keep the UX aligned to the bright, management-oriented operator context rather than the attendant dark operational UI.
+- [x] Task 2: Surface operator announcement management in the mobile operator workspace (AC: 1)
+  - [x] Extend the existing operator lot-management flow with an announcement management entry point per managed lot.
+  - [x] Allow operators to create and update announcement metadata without leaving the lot-management experience.
+  - [x] Keep the UX aligned to the bright, management-oriented operator context rather than the attendant dark operational UI.
 
-- [ ] Task 3: Render active announcements on the driver lot-details surface (AC: 2, 3)
-  - [ ] Extend the lot-detail backend contract and Flutter model to include visible announcements.
-  - [ ] Add an announcement section to the existing lot-details sheet instead of creating a separate driver page.
-  - [ ] Ensure announcement ordering and empty states are explicit and deterministic.
+- [x] Task 3: Render active announcements on the driver lot-details surface (AC: 2, 3)
+  - [x] Extend the lot-detail backend contract and Flutter model to include visible announcements.
+  - [x] Add an announcement section to the existing lot-details sheet instead of creating a separate driver page.
+  - [x] Ensure announcement ordering and empty states are explicit and deterministic.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3)
-  - [ ] Add backend tests for operator authorization, visibility-window filtering, and lot-detail announcement projection.
-  - [ ] Add Flutter tests for operator announcement configuration UI and driver lot-detail rendering.
-  - [ ] Verify with backend Docker tests and local `flutter test`.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3)
+  - [x] Add backend tests for operator authorization, visibility-window filtering, and lot-detail announcement projection.
+  - [x] Add Flutter tests for operator announcement configuration UI and driver lot-detail rendering.
+  - [x] Verify with backend Docker tests and local `flutter test`.
 
 ## Dev Notes
 
@@ -120,10 +120,28 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Story context prepared for Epic 6 implementation.
-- Key guardrail: `ParkingLotAnnouncement` is the canonical announcement model; `Post` is explicitly out of scope.
-- No `project-context.md` file was present in the repository at story creation time.
+- Added operator-managed announcement endpoints on the existing lot management surface for list, create, and update flows, all guarded by active lease authorization and backed by `ParkingLotAnnouncement`.
+- Extended the public `/lots/{id}` detail projection and Flutter lot-detail model so drivers only receive announcements whose visibility window is active at read time.
+- Added a management sheet in the operator workspace for creating and updating lot-scoped announcements with title, content, type, and visibility window fields, while preserving the existing bright management UI.
+- Added an announcement section to the driver lot-details sheet and kept ordering deterministic by sorting the backend response by `visible_from` descending and `id` descending.
+- Validation passed with `cd backend && docker compose run --rm pytest`, `cd mobile && flutter test test/map_discovery_screen_test.dart test/widget_test.dart`, and `cd mobile && flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/6-2-configure-announcements.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/lots.py`
+- `backend/src/app/schemas/parking_lot.py`
+- `backend/tests/test_operator_announcements.py`
+- `backend/tests/test_parking_lots.py`
+- `mobile/lib/src/features/lot_details/data/lot_details_service.dart`
+- `mobile/lib/src/features/lot_details/presentation/lot_details_sheet.dart`
+- `mobile/lib/src/features/operator_lot_management/data/operator_lot_management_service.dart`
+- `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
+- `mobile/test/map_discovery_screen_test.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-28: Created Story 6.2 implementation artifact for operator-managed lot announcements shown in driver lot details.
+- 2026-03-28: Implemented Story 6.2 with operator announcement management endpoints, mobile operator announcement configuration UI, driver lot-detail announcement rendering, and full backend/mobile regression validation.
