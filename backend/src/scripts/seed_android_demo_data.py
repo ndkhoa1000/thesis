@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from ..app.core.db.database import local_session
 from ..app.core.security import get_password_hash
@@ -297,6 +297,15 @@ async def _ensure_pricing(session, parking_lot_id: int, amount: float, mode: str
     return pricing
 
 
+async def _reset_setup_lot_configuration(session, parking_lot_id: int) -> None:
+    await session.execute(
+        delete(ParkingLotConfig).where(ParkingLotConfig.parking_lot_id == parking_lot_id)
+    )
+    await session.execute(
+        delete(Pricing).where(Pricing.parking_lot_id == parking_lot_id)
+    )
+
+
 async def _ensure_tag(session, parking_lot_id: int, tag_name: str) -> None:
     result = await session.execute(
         select(ParkingLotTag)
@@ -431,6 +440,7 @@ async def seed_demo_data() -> None:
 
         await _ensure_active_lease(session, ready_lot.id, manager.id)
         await _ensure_active_lease(session, setup_lot.id, manager.id)
+        await _reset_setup_lot_configuration(session, setup_lot.id)
         await _ensure_config(session, ready_lot.id, manager.id, 20, time(6, 0), time(22, 0))
         await _ensure_pricing(session, ready_lot.id, 15000, PricingMode.HOURLY.value)
         await _ensure_tag(session, ready_lot.id, "trung-tam")

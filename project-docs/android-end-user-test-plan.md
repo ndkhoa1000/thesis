@@ -13,7 +13,7 @@ Tài liệu này chuẩn hóa môi trường test Android cho end user, danh sá
 
 ```bash
 cd backend
-python -m src.scripts.seed_android_demo_data
+docker compose run --rm pytest python -m src.scripts.seed_android_demo_data
 ```
 
 2. Mobile Android
@@ -23,6 +23,8 @@ python -m src.scripts.seed_android_demo_data
 API_BASE_URL=http://127.0.0.1:8000/api/v1
 MAPBOX_ACCESS_TOKEN=<your-mapbox-token>
 ```
+
+   - Nếu chạy Android emulator, dùng `API_BASE_URL=http://10.0.2.2:8000/api/v1`.
 
    - Nếu chạy trên thiết bị Android thật:
 
@@ -63,6 +65,7 @@ flutter run -d <device-id>
    - Đã có `ACTIVE` lease cho operator demo
    - Chưa có config/pricing hiện hành
    - Dùng riêng để test flow operator cấu hình bãi xe trên Android
+   - Sau khi operator hoàn tất first-time setup hợp lệ, bãi phải chuyển sang `APPROVED`
 
 ## Epic Test Matrix
 
@@ -105,13 +108,14 @@ Environment / Preconditions:
 
 Scenarios:
 - Operator login và thấy bãi được gán trong workspace.
-- Operator cấu hình sức chứa, giờ hoạt động, giá hiện hành cho bãi demo setup.
+- Operator cấu hình sức chứa, giờ hoạt động, giá hiện hành cho bãi demo setup và xác nhận bãi chuyển từ `CLOSED` sang `APPROVED`.
 - Operator tạo attendant mới rồi thu hồi attendant đó.
 
 Edge Cases:
 - Nhập `7:00` thay vì `07:00` vẫn lưu được sau chuẩn hóa.
 - Sức chứa mới nhỏ hơn số xe đang có trong bãi thì `current_available` không âm.
 - Giờ đóng cửa trùng giờ mở cửa bị chặn.
+- Bãi đã từng có config/pricing rồi bị admin đóng thì operator cập nhật lại không được tự reopen ngoài ý admin.
 
 ### Epic 4: Core Parking Loop
 
@@ -141,11 +145,13 @@ Scenarios:
 - Driver mở lot details bằng quick card rail.
 - Driver mở lot details bằng cách tap trực tiếp marker trên map.
 - Driver refresh lot details và thấy availability text/hours/pricing/peak hours.
+- Driver bấm `Dẫn đường` trên một bãi còn chỗ, sau đó nhận cảnh báo tạm thời nếu availability của đúng bãi đang theo dõi giảm về đầy.
 
 Edge Cases:
 - Không có Mapbox token: fallback canvas vẫn cho phép mở chi tiết từ danh sách và lot-owner vẫn có thể chọn vị trí bằng fallback picker.
 - Lot thiếu dữ liệu lịch sử: lot details hiện empty-state trung thực, không tạo fake chart.
 - Bản ghi pricing/config tương lai không được hiển thị sớm cho driver.
+- Driver đang xem bãi A nhưng availability của bãi B thay đổi thì không hiện cảnh báo en-route sai ngữ cảnh.
 
 ## Done Gate For Any Story/Epic
 

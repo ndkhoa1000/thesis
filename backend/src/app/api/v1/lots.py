@@ -748,12 +748,20 @@ async def patch_operator_parking_lot(
 
     effective_today = _utcnow().date()
     previous_current_available = parking_lot.current_available
+    latest_config = await _get_latest_parking_lot_config(db, parking_lot.id)
+    latest_pricing = await _get_latest_pricing(db, parking_lot.id)
     occupied_count = await _count_active_sessions(db, parking_lot.id)
     parking_lot.name = payload.name
     parking_lot.address = payload.address
     parking_lot.description = payload.description
     parking_lot.cover_image = payload.cover_image
     parking_lot.current_available = max(payload.total_capacity - occupied_count, 0)
+    if (
+        parking_lot.status == ParkingLotStatus.CLOSED.value
+        and latest_config is None
+        and latest_pricing is None
+    ):
+        parking_lot.status = ParkingLotStatus.APPROVED.value
     parking_lot.updated_at = _utcnow()
 
     parking_lot_config = ParkingLotConfig(

@@ -1,84 +1,127 @@
 # Smart Parking System: UAT Test Cases & Seed Data
 
-This document provides End-to-End (E2E) testing scenarios for User Acceptance Testing (UAT). It includes predefined test accounts (seed data) that should be pre-loaded into the database for rapid testing of core business flows (e.g., Check-in, lot configuration) without needing to configure a lot from scratch every time.
+This document is the current manual-test baseline for the local Android demo environment. It is aligned with the Docker-backed seed script, the completed stories through Epic 5 Story 5.4, and the verified operator first-time setup fix.
 
-## 1. Test Accounts (Seed Data Requirements)
+## 1. Environment Prerequisites
 
-The backend database initialization (`seed.py` or equivalent Alembic data migration) must pre-populate the following active accounts with their respective capabilities and a default password (e.g., `Password123!`):
+1. Start backend dependencies from the `backend` directory and apply the latest migrations.
+2. Seed the demo dataset from Docker Compose, not the host virtualenv:
 
-| Role / Capability | Email | Description |
-| :--- | :--- | :--- |
-| **Admin** | `admin@smartparking.local` | Has global approval access and system management. |
-| **Lot Owner** | `owner@smartparking.local` | Has `lot_owner` capability. Owns "Bãi Xe Mẫu Quận 1" (ID: 1). |
-| **Operator** | `operator@smartparking.local` | Has `manager` capability. Holds an ACTIVE lease for Lot ID 1. |
-| **Attendant** | `attendant_demo@smartparking.local` | Dedicated Attendant credential assigned to Lot ID 1. |
-| **Driver 1** | `driver_demo@smartparking.local` | Standard user with an approved vehicle profile (Plate: 59A-123.45). |
+```bash
+cd backend
+docker compose run --rm pytest python -m src.scripts.seed_android_demo_data
+```
 
-*(The backend must also ensure: Lot ID 1 is in an `ACTIVE` state, capacity = 50, pricing = 10k/hr, and Operating Hours = 06:00 - 22:00).*
+3. Configure `mobile/.env`:
 
----
+```env
+API_BASE_URL=http://127.0.0.1:8000/api/v1
+MAPBOX_ACCESS_TOKEN=<your-mapbox-token>
+```
 
-## 2. UAT Scenarios (End-to-End Flows)
+4. For a real Android device, reverse the backend port before launching the app:
 
-### Scenario A: Lot Configuration & Capacity Overflow (Focus on Epic 3 & 4)
-**Goal:** Verify Operator's UI configuration standardization and the non-blocking "OVERFLOW" edge case.
+```bash
+adb reverse tcp:8000 tcp:8000
+cd mobile
+flutter run -d <device-id>
+```
 
-1. **Login:** Log in as `operator@smartparking.local` on the Operator Workspace.
-2. **Access Configuration:** Navigate to the Configuration / Settings tab for Lot ID 1.
-3. **Verify Standard UI Components (Edge Case Fixed):**
-   - Attempt to change the Operating Hours.
-   - **Expected Result:** The UI forces the use of a native `TimePicker` dial. Manual text entry is disabled.
-4. **Trigger Overflow:** 
-   - Observe the `current_occupied_slots` (Assume it is currently 10).
-   - Change the Lot's `total_capacity` to 5.
-   - **Expected Result:** The system explicitly warns "Dung lượng nhỏ hơn số xe hiện tại. Bãi sẽ chuyển sang trạng thái QUÁ TẢI (OVERFLOW)". The change is saved successfully, but the UI shows an OVERFLOW warning flag.
-5. **Verify Non-Blocking Checkout:** 
-   - Log in as `attendant_demo@smartparking.local`.
-   - Perform a Check-Out action for an existing vehicle.
-   - **Expected Result:** The Check-Out succeeds normally without breaking, reducing occupancy to 9.
+5. For an Android emulator, use `API_BASE_URL=http://10.0.2.2:8000/api/v1`.
 
-### Scenario B: Walk-in Check-in with Camera (Focus on Epic 4 5-sec SLA)
-**Goal:** Verify Attendant can process walk-in vehicles without blocking the UI.
+## 2. Fixed Demo Accounts
 
-1. **Login:** Log in as `attendant_demo@smartparking.local`.
-2. **Walk-in Trigger:** Select the option to scan a walk-in vehicle (no app) or tap "Nhập tay/Chụp ảnh".
-3. **Capture Photo:** 
-   - The app prompts to take a photo of the vehicle/plate.
-   - **Expected Result:** The camera photo is taken successfully via an `ImagePicker/Camera` widget (not a text URL field).
-4. **Verify SLA (Edge Case Fixed):** 
-   - Submit the check-in.
-   - **Expected Result:** The UI returns immediately to the "Ready to Scan" state (green flash) < 5 seconds. The photo upload to Cloudinary runs *asynchronously* in the background. If you completely turn off Wifi/4G right after capturing, the check-in is still saved locally and queues for sync later.
+| Role | Email | Password | Primary use |
+| :--- | :--- | :--- | :--- |
+| Admin | `admin.demo@parking.local` | `Admin123!` | Approvals, lot suspension and reopen checks |
+| Driver | `driver.demo@parking.local` | `Driver123!` | Map discovery, lot details, parking history, QR flows |
+| Lot Owner | `owner.demo@parking.local` | `Owner123!` | Registering lots and owner-side smoke tests |
+| Operator | `operator.demo@parking.local` | `Operator123!` | Assigned-lot setup, pricing/config changes, attendant management |
+| Attendant | `attendant.demo@parking.local` | `Attendant123!` | QR scan, walk-in check-in, checkout preview/finalize |
 
-### Scenario C: Driver Storage & Map Fallback (Focus on Epic 1 & 5)
-**Goal:** Verify proper Media upload logic and GPS fallbacks.
+## 3. Seeded Demo Assets
 
-1. **Add Vehicle:** Log in as `driver_demo@smartparking.local`.
-   - Go to Profile -> Add Vehicle.
-   - **Expected Result:** The "Vehicle Photo" field opens a native gallery/camera picker. You cannot manually type a web link (e.g., "imgur.com/abc").
-2. **Deny GPS (Map Edge Case Fixed):**
-   - Go to App Settings -> Permissions -> Deny Location Access for the Parking App.
-   - Open the app's Map/Home Tab.
-   - **Expected Result:** A Toast or Banner message appears: "Không thể lấy vị trí. Một số tính năng bản đồ bị giới hạn." The app does not crash. The user is presented with a fallback view (e.g., a default city center map, or forced to use a manual Address Search bar) and can still select a lot and book parking.
+### Ready Lot: `Bãi xe Demo Nguyễn Huệ`
 
-### Scenario D: Lease Expiry Management (Focus on Epic 8)
-**Goal:** Verify Lot Owner's manual control over an expired Operator.
+- Status starts as `APPROVED`.
+- Has an active lease for the demo operator.
+- Has current config, pricing, tags, features, historical sessions, and one active checked-in session.
+- Is the primary lot for Epic 4 and Epic 5 verification.
 
-1. **Trigger Expiry:** (Backend Admin) Set Operator's Lease End Date to yesterday.
-2. **Verify Lot Owner Control:** 
-   - Log in as `owner@smartparking.local`.
-   - Navigate to Contracts.
-   - **Expected Result:** The contract clearly shows an "EXPIRED" warning. The lot remains operational, but the Owner sees a red "Vô hiệu hóa Bãi Xe" (Disable Lot) button.
-3. **Execute Disabling:**
-   - The Owner clicks "Vô hiệu hóa Bãi Xe".
-   - **Expected Result:** The Lot status changes to `SUSPENDED` / `DISABLED`. New drivers cannot check in, but existing parked vehicles can still check out.
+### Setup Lot: `Bãi xe Demo Thiết Lập`
 
-### Scenario E: Price Change Conflict (Focus on Epic 3 & 4)
-**Goal:** Ensure a parking session calculates correctly when prices change mid-session.
+- Status starts as `CLOSED`.
+- Has an active lease for the demo operator.
+- Has no current config or pricing after reseed.
+- Is reserved for testing the operator first-time setup flow.
+- Expected behavior: after a valid first-time setup, the lot transitions to `APPROVED`.
 
-1. **Setup Session:** `attendant_demo` checks in `driver_demo` at 08:00 AM while the Lot pricing is **10,000 VND / Hour**.
-2. **Change Price:** `operator@smartparking.local` edits the Pricing Rule to **20,000 VND / Hour** at 09:00 AM.
-3. **Perform Checkout:** `attendant_demo` checks out `driver_demo` at 10:00 AM (2 hours parked).
-4. **Expected Result:** The system checks the `effective_date` of rules. The driver is charged based on the price when they checked in (10,000 VND x 2 hrs = 20,000 VND total), NOT 40,000 VND. No invoice dispute occurs.
+## 4. UAT Scenarios
 
----
-*QA Note: All file/image uploads mentioned above MUST integrate with Cloudinary via FastAPI correctly (Multipart form data). If you intercept the HTTP request, there should be no raw `URL` strings being sent by the mobile app during create calls, only binary media.*
+### Scenario A: Operator First-Time Setup Reopens Assigned Lot
+
+**Goal:** Verify the assigned setup lot can be configured on Android and automatically reopens only for the first-time setup path.
+
+1. Log in as `operator.demo@parking.local`.
+2. Open the assigned lot list and select `Bãi xe Demo Thiết Lập`.
+3. Enter total capacity, operating hours, and pricing, then save.
+4. Expected result: the save succeeds and the lot status changes from `CLOSED` to `APPROVED`.
+5. Reopen the screen or refresh the lot list.
+6. Expected result: the configured values persist and the lot stays visible as an active assigned lot.
+
+### Scenario B: Admin Suspension Remains Authoritative
+
+**Goal:** Verify the first-time setup fix does not accidentally reopen a previously configured lot that an admin intentionally closed.
+
+1. Use the ready lot or a manually preconfigured lot.
+2. Log in as `admin.demo@parking.local` and close the lot.
+3. Log back in as `operator.demo@parking.local` and update pricing or operating hours.
+4. Expected result: the update may persist, but the lot does not auto-transition back to `APPROVED`.
+
+### Scenario C: QR Check-In and Checkout Core Loop
+
+**Goal:** Verify the Epic 4 happy path on the ready lot.
+
+1. Log in as `driver.demo@parking.local` and generate a check-in QR.
+2. Log in as `attendant.demo@parking.local` and scan the QR at `Bãi xe Demo Nguyễn Huệ`.
+3. Expected result: a parking session is created and availability decreases.
+4. Generate a driver checkout QR, preview checkout as the attendant, then finalize payment.
+5. Expected result: the session closes successfully and availability increases.
+
+### Scenario D: Walk-In Check-In With Plate Photo
+
+**Goal:** Verify the attendant walk-in flow still works against the seeded ready lot.
+
+1. Log in as `attendant.demo@parking.local`.
+2. Start a walk-in check-in and capture the vehicle or plate image.
+3. Complete the check-in.
+4. Expected result: the session is created, the app returns to the scan-ready state quickly, and lot availability decreases.
+
+### Scenario E: Driver Discovery, Lot Details, and En-Route Advisory
+
+**Goal:** Verify the Epic 5 flow, including Story 5.4 realtime capacity advisory.
+
+1. Log in as `driver.demo@parking.local`.
+2. Open the map or fallback discovery view.
+3. Open `Bãi xe Demo Nguyễn Huệ` from the marker or quick card.
+4. Expected result: lot details show current availability, operating hours, pricing, and peak-hours data from seeded history.
+5. Tap `Dẫn đường` for the selected lot.
+6. While the driver remains focused on that lot, trigger enough attendant check-ins or capacity changes so the lot becomes full.
+7. Expected result: the driver receives a temporary advisory alert for the watched lot, without being rerouted automatically.
+
+### Scenario F: Map Fallback Without Token or Location
+
+**Goal:** Verify driver and owner flows degrade safely when full Mapbox behavior is unavailable.
+
+1. Remove the Mapbox token or deny location permission.
+2. Launch the app and open the map-related flows.
+3. Expected result: the app does not crash and still exposes a usable fallback discovery/list experience.
+4. Log in as `owner.demo@parking.local` and open parking-lot registration.
+5. Expected result: the owner can still choose a location through the current picker fallback path and submit the lot form.
+
+## 5. Execution Notes
+
+1. Record whether the run used a real Android device or emulator.
+2. Record the exact `API_BASE_URL` and whether a Mapbox token was present.
+3. Reseed before each full manual regression if any tester has already configured the setup lot.
+4. When closing a story or epic, capture pass or fail per scenario, open defects, and any temporary workaround.

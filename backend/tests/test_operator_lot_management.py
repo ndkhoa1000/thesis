@@ -168,6 +168,10 @@ class TestOperatorManagedLots:
         parking_lot = _parking_lot()
         parking_lot_result = MagicMock()
         parking_lot_result.scalar_one_or_none.return_value = parking_lot
+        latest_config_result = MagicMock()
+        latest_config_result.scalar_one_or_none.return_value = _parking_lot_config(total_capacity=24)
+        latest_pricing_result = MagicMock()
+        latest_pricing_result.scalar_one_or_none.return_value = _pricing()
         active_sessions_result = MagicMock()
         active_sessions_result.scalar_one.return_value = 4
         mock_db.execute = AsyncMock(
@@ -175,6 +179,8 @@ class TestOperatorManagedLots:
                 manager_result,
                 lease_result,
                 parking_lot_result,
+                latest_config_result,
+                latest_pricing_result,
                 active_sessions_result,
             ]
         )
@@ -225,6 +231,10 @@ class TestOperatorManagedLots:
         parking_lot = _parking_lot()
         parking_lot_result = MagicMock()
         parking_lot_result.scalar_one_or_none.return_value = parking_lot
+        latest_config_result = MagicMock()
+        latest_config_result.scalar_one_or_none.return_value = _parking_lot_config(total_capacity=10)
+        latest_pricing_result = MagicMock()
+        latest_pricing_result.scalar_one_or_none.return_value = _pricing()
         active_sessions_result = MagicMock()
         active_sessions_result.scalar_one.return_value = 12
         mock_db.execute = AsyncMock(
@@ -232,6 +242,8 @@ class TestOperatorManagedLots:
                 manager_result,
                 lease_result,
                 parking_lot_result,
+                latest_config_result,
+                latest_pricing_result,
                 active_sessions_result,
             ]
         )
@@ -260,6 +272,106 @@ class TestOperatorManagedLots:
         assert result.total_capacity == 10
         assert result.occupied_count == 12
         assert result.current_available == 0
+
+    @pytest.mark.asyncio
+    async def test_patch_operator_parking_lot_reopens_first_time_setup_lot(self, mock_db):
+        manager_result = MagicMock()
+        manager_result.scalar_one_or_none.return_value = _manager_profile()
+        lease_result = MagicMock()
+        lease_result.scalar_one_or_none.return_value = _active_lease()
+        parking_lot = _parking_lot(status=ParkingLotStatus.CLOSED.value)
+        parking_lot_result = MagicMock()
+        parking_lot_result.scalar_one_or_none.return_value = parking_lot
+        latest_config_result = MagicMock()
+        latest_config_result.scalar_one_or_none.return_value = None
+        latest_pricing_result = MagicMock()
+        latest_pricing_result.scalar_one_or_none.return_value = None
+        active_sessions_result = MagicMock()
+        active_sessions_result.scalar_one.return_value = 0
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                manager_result,
+                lease_result,
+                parking_lot_result,
+                latest_config_result,
+                latest_pricing_result,
+                active_sessions_result,
+            ]
+        )
+        mock_db.add = Mock()
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        result = await patch_operator_parking_lot(
+            Mock(),
+            parking_lot.id,
+            OperatorManagedParkingLotUpdate(
+                name="Bai xe Thiet Lap",
+                address="45 Le Loi, Quan 1",
+                total_capacity=12,
+                opening_time=time(hour=7, minute=0),
+                closing_time=time(hour=22, minute=30),
+                pricing_mode=PricingMode.HOURLY,
+                price_amount=12000,
+                description="Ready for launch",
+                cover_image=None,
+            ),
+            _manager_user(),
+            mock_db,
+        )
+
+        assert parking_lot.status == ParkingLotStatus.APPROVED.value
+        assert result.status == ParkingLotStatus.APPROVED
+
+    @pytest.mark.asyncio
+    async def test_patch_operator_parking_lot_keeps_suspended_lot_closed_when_prior_config_exists(self, mock_db):
+        manager_result = MagicMock()
+        manager_result.scalar_one_or_none.return_value = _manager_profile()
+        lease_result = MagicMock()
+        lease_result.scalar_one_or_none.return_value = _active_lease()
+        parking_lot = _parking_lot(status=ParkingLotStatus.CLOSED.value)
+        parking_lot_result = MagicMock()
+        parking_lot_result.scalar_one_or_none.return_value = parking_lot
+        latest_config_result = MagicMock()
+        latest_config_result.scalar_one_or_none.return_value = _parking_lot_config(total_capacity=10)
+        latest_pricing_result = MagicMock()
+        latest_pricing_result.scalar_one_or_none.return_value = _pricing()
+        active_sessions_result = MagicMock()
+        active_sessions_result.scalar_one.return_value = 0
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                manager_result,
+                lease_result,
+                parking_lot_result,
+                latest_config_result,
+                latest_pricing_result,
+                active_sessions_result,
+            ]
+        )
+        mock_db.add = Mock()
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock()
+
+        result = await patch_operator_parking_lot(
+            Mock(),
+            parking_lot.id,
+            OperatorManagedParkingLotUpdate(
+                name="Bai xe Tam Dong",
+                address="45 Le Loi, Quan 1",
+                total_capacity=12,
+                opening_time=time(hour=7, minute=0),
+                closing_time=time(hour=22, minute=30),
+                pricing_mode=PricingMode.HOURLY,
+                price_amount=12000,
+                description="Still suspended",
+                cover_image=None,
+            ),
+            _manager_user(),
+            mock_db,
+        )
+
+        assert parking_lot.status == ParkingLotStatus.CLOSED.value
+        assert result.status == ParkingLotStatus.CLOSED
 
     @pytest.mark.asyncio
     async def test_patch_operator_parking_lot_raises_not_found_without_active_lease(self, mock_db):
