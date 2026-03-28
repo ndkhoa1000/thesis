@@ -98,6 +98,7 @@ async def create_attendant_shift_handover(
             status=ShiftStatus.OPEN.value,
         )
         db.add(shift)
+        await db.flush()
 
     if shift.status == ShiftStatus.LOCKED.value:
         raise BadRequestException("Current shift is already locked")
@@ -171,8 +172,7 @@ async def finalize_attendant_shift_handover(
             status=ShiftStatus.OPEN.value,
         )
         db.add(incoming_shift)
-        if getattr(incoming_shift, "id", None) is None:
-            incoming_shift.id = 0
+        await db.flush()
 
     outgoing_shift.status = ShiftStatus.LOCKED.value
     if outgoing_shift.ended_at is None:
@@ -191,7 +191,8 @@ async def finalize_attendant_shift_handover(
                 discrepancy_reason=discrepancy_reason or "",
             )
             db.add(notification)
-            notification_ids.append(operator_user.id)
+            await db.flush()
+            notification_ids.append(notification.id)
 
     handover = ShiftHandover(
         outgoing_shift_id=outgoing_shift.id,

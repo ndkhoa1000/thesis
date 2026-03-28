@@ -1,9 +1,10 @@
 """Unit tests for Story 6.4 zero-trust shift handover."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
+from jose import jwt
 
 from src.app.api.v1.shifts import (
     create_attendant_shift_handover,
@@ -11,7 +12,13 @@ from src.app.api.v1.shifts import (
     read_operator_shift_handover_alerts,
 )
 from src.app.core.exceptions.http_exceptions import BadRequestException, ForbiddenException
-from src.app.models.enums import LeaseStatus, NotificationType, ReferenceType, ShiftStatus, UserRole
+from src.app.models.enums import (
+    LeaseStatus,
+    NotificationType,
+    ReferenceType,
+    ShiftStatus,
+    UserRole,
+)
 from src.app.models.leases import LotLease
 from src.app.models.notifications import Notification
 from src.app.models.parking import ParkingLot
@@ -19,8 +26,10 @@ from src.app.models.shifts import Shift, ShiftHandover
 from src.app.models.user import User
 from src.app.models.users import Attendant, Manager
 from src.app.schemas.shift import AttendantShiftHandoverFinalizeCreate
-from src.app.services.shift_service import build_shift_handover_token
-
+from src.app.services.shift_service import (
+    build_shift_handover_token,
+    decode_shift_handover_token,
+)
 
 NOW = datetime(2026, 3, 28, 9, 0, tzinfo=UTC)
 
@@ -149,6 +158,42 @@ class TestAttendantShiftHandoverStart:
         assert compiled.params['payment_method_1'] == 'CASH'
         assert compiled.params['payment_status_1'] == 'COMPLETED'
 
+    @pytest.mark.asyncio
+    async def test_flushes_new_shift_before_building_qr_token(self, mock_db, monkeypatch):
+        monkeypatch.setattr('src.app.api.v1.shifts._utcnow', lambda: NOW)
+
+        attendant_result = MagicMock()
+        attendant_result.scalar_one_or_none.return_value = _make_attendant()
+        lot_result = MagicMock()
+        lot_result.scalar_one_or_none.return_value = _make_lot()
+        shift_result = MagicMock()
+        shift_result.scalar_one_or_none.return_value = None
+        expected_cash_result = MagicMock()
+        expected_cash_result.scalar_one.return_value = 0
+
+        created_records: list[object] = []
+
+        def track_add(record):
+            created_records.append(record)
+
+        async def assign_shift_id():
+            created_shift = next(item for item in created_records if isinstance(item, Shift))
+            created_shift.id = 23
+
+        mock_db.execute = AsyncMock(
+            side_effect=[attendant_result, lot_result, shift_result, expected_cash_result]
+        )
+        mock_db.add = Mock(side_effect=track_add)
+        mock_db.flush = AsyncMock(side_effect=assign_shift_id)
+        mock_db.commit = AsyncMock()
+
+        result = await create_attendant_shift_handover(Mock(), _attendant_user(), mock_db)
+
+        token_payload = jwt.get_unverified_claims(result.token)
+        assert result.shift_id == 23
+        assert token_payload['shift_id'] == 23
+        mock_db.flush.assert_awaited_once()
+
 
 class TestAttendantShiftHandoverFinalize:
     @pytest.mark.asyncio
@@ -174,7 +219,7 @@ class TestAttendantShiftHandoverFinalize:
         token = build_shift_handover_token(
             shift=outgoing_shift,
             expected_cash=85000,
-            expires_at=datetime(2026, 3, 28, 9, 5, tzinfo=UTC),
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
 
         mock_db.execute = AsyncMock(
@@ -221,8 +266,20 @@ class TestAttendantShiftHandoverFinalize:
         token = build_shift_handover_token(
             shift=outgoing_shift,
             expected_cash=85000,
-            expires_at=datetime(2026, 3, 28, 9, 5, tzinfo=UTC),
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),
         )
+
+        created_records: list[object] = []
+
+        def track_add(record):
+            created_records.append(record)
+
+        async def assign_ids():
+            for record in created_records:
+                if isinstance(record, Shift) and getattr(record, 'id', None) is None:
+                    record.id = 18
+                if isinstance(record, Notification) and getattr(record, 'id', None) is None:
+                    record.id = 41
 
         mock_db.execute = AsyncMock(
             side_effect=[
@@ -234,7 +291,8 @@ class TestAttendantShiftHandoverFinalize:
                 operator_rows_result,
             ]
         )
-        mock_db.add = Mock()
+        mock_db.add = Mock(side_effect=track_add)
+        mock_db.flush = AsyncMock(side_effect=assign_ids)
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -255,11 +313,15 @@ class TestAttendantShiftHandoverFinalize:
         created_notification = next(item for item in added if isinstance(item, Notification))
 
         assert created_incoming_shift.attendant_id == 9
+        assert created_incoming_shift.id == 18
         assert created_handover.outgoing_shift_id == 17
+        assert created_handover.incoming_shift_id == 18
         assert created_handover.expected_cash == 85000
         assert created_handover.actual_cash == 80000
         assert created_handover.discrepancy_reason == 'Thieu 5.000 VND sau khi doi ca.'
+        assert created_handover.operator_notification_id == 41
         assert created_notification.user_id == 21
+        assert created_notification.id == 41
         assert created_notification.notification_type == NotificationType.SHIFT_HANDOVER_DISCREPANCY.value
         assert created_notification.reference_type == ReferenceType.SHIFT_HANDOVER.value
         assert outgoing_shift.status == ShiftStatus.LOCKED.value
@@ -267,6 +329,25 @@ class TestAttendantShiftHandoverFinalize:
         assert result.discrepancy_flagged is True
         assert result.expected_cash == 85000
         assert result.actual_cash == 80000
+
+
+class TestShiftHandoverTokenValidation:
+    def test_rejects_expired_shift_handover_token(self):
+        outgoing_shift = _make_shift(
+            shift_id=17,
+            attendant_id=7,
+            started_at=datetime(2026, 3, 28, 6, 0, tzinfo=UTC),
+            ended_at=datetime(2026, 3, 28, 8, 45, tzinfo=UTC),
+            status=ShiftStatus.HANDOVER_PENDING.value,
+        )
+        expired_token = build_shift_handover_token(
+            shift=outgoing_shift,
+            expected_cash=85000,
+            expires_at=datetime.now(UTC) - timedelta(minutes=5),
+        )
+
+        with pytest.raises(BadRequestException, match='Shift handover QR has expired'):
+            decode_shift_handover_token(expired_token)
 
 
 class TestOperatorShiftAlerts:

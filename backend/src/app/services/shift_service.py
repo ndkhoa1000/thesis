@@ -2,13 +2,21 @@
 
 from datetime import UTC, datetime, timedelta
 
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.exceptions.http_exceptions import BadRequestException
 from ..core.security import ALGORITHM, SECRET_KEY
-from ..models.enums import LeaseStatus, NotificationType, PayableType, PaymentMethod, PaymentStatus, ReferenceType, ShiftStatus
+from ..models.enums import (
+    LeaseStatus,
+    NotificationType,
+    PayableType,
+    PaymentMethod,
+    PaymentStatus,
+    ReferenceType,
+    ShiftStatus,
+)
 from ..models.financials import Payment
 from ..models.leases import LotLease
 from ..models.notifications import Notification
@@ -114,8 +122,9 @@ def decode_shift_handover_token(token: str) -> dict[str, int | float]:
             token,
             SECRET_KEY.get_secret_value(),
             algorithms=[ALGORITHM],
-            options={"verify_exp": False},
         )
+    except ExpiredSignatureError as exc:
+        raise BadRequestException("Shift handover QR has expired. Please generate a new one.") from exc
     except JWTError as exc:
         raise BadRequestException("Invalid shift handover QR. Please generate a new one.") from exc
 
@@ -126,7 +135,11 @@ def decode_shift_handover_token(token: str) -> dict[str, int | float]:
     parking_lot_id = payload.get("parking_lot_id")
     outgoing_attendant_id = payload.get("outgoing_attendant_id")
     expected_cash = payload.get("expected_cash")
-    if not isinstance(shift_id, int) or not isinstance(parking_lot_id, int) or not isinstance(outgoing_attendant_id, int):
+    if (
+        not isinstance(shift_id, int)
+        or not isinstance(parking_lot_id, int)
+        or not isinstance(outgoing_attendant_id, int)
+    ):
         raise BadRequestException("Invalid shift handover QR. Please generate a new one.")
     if not isinstance(expected_cash, (int, float)):
         raise BadRequestException("Invalid shift handover QR. Please generate a new one.")
@@ -153,7 +166,7 @@ async def get_operator_recipients_for_lot(
         )
         .order_by(LotLease.created_at.desc(), LotLease.id.desc())
     )
-    return list(result.all())
+    return [(lease, manager, user) for lease, manager, user in result.all()]
 
 
 def build_shift_discrepancy_notification(
