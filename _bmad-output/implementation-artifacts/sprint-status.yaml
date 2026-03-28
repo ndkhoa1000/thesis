@@ -66,11 +66,11 @@ development_status:
   5-3-driver-parking-history: done
   5-4-en-route-lot-capacity-alert: done
   epic-5-retrospective: done
-  epic-6: backlog
-  6-1-attendant-views-lot-occupancy-stats: backlog
-  6-2-configure-announcements: backlog
-  6-3-force-close-timeout-session: backlog
-  6-4-zero-trust-shift-handover: backlog
+  epic-6: in-progress
+  6-1-attendant-views-lot-occupancy-stats: ready-for-dev
+  6-2-configure-announcements: ready-for-dev
+  6-3-force-close-timeout-session: ready-for-dev
+  6-4-zero-trust-shift-handover: ready-for-dev
   epic-6-retrospective: optional
   epic-7: backlog
   7-1-driver-pre-books-parking-spot: backlog
