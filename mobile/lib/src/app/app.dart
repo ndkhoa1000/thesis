@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/network/api_client.dart';
 import '../features/admin_approvals/data/admin_approvals_service.dart';
 import '../features/admin_approvals/presentation/admin_approvals_screen.dart';
+import '../features/admin_workspace/presentation/admin_workspace_shell.dart';
 import '../features/attendant_check_in/data/attendant_check_in_service.dart';
 import '../features/attendant_check_in/presentation/attendant_check_in_screen.dart';
 import '../features/attendant_workspace/presentation/attendant_workspace_shell.dart';
@@ -617,12 +618,12 @@ class AuthenticatedHome extends StatelessWidget {
     final hasOperatorCapability = session.capabilities['operator'] ?? false;
 
     if (session.isAdmin) {
-      return Theme(
-        data: AppTheme.light(),
-        child: AdminApprovalsScreen(
+      return AdminWorkspaceShell(
+        approvalsTab: AdminApprovalsScreen(
           approvalsService: adminApprovalsServiceFactory(session.accessToken),
           onSignOut: onSignOut,
         ),
+        onSignOut: onSignOut,
       );
     }
 

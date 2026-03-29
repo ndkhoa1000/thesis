@@ -42,10 +42,12 @@ final class AppRouter {
       return session.capabilities['driver'] ?? session.role == 'DRIVER';
     }
     if (_matches(location, operatorPath)) {
-      return session.role == 'MANAGER' || session.capabilities['operator'] == true;
+      return session.role == 'MANAGER' ||
+          session.capabilities['operator'] == true;
     }
     if (_matches(location, lotOwnerPath)) {
-      return session.role == 'LOT_OWNER' || session.capabilities['lot_owner'] == true;
+      return session.role == 'LOT_OWNER' ||
+          session.capabilities['lot_owner'] == true;
     }
     return false;
   }

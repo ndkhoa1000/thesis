@@ -1,6 +1,6 @@
 # Story 9.5: Admin Workspace Shell
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -27,20 +27,20 @@ so that approvals, user management, and lot suspension are navigable from one pl
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create the Admin shell (AC: 1, 4, 5)
-  - [ ] Introduce a dedicated admin shell with tabs `Duyệt hồ sơ`, `Người dùng`, `Bãi xe`.
-  - [ ] Route admin sessions into the shell instead of directly into `AdminApprovalsScreen`.
-  - [ ] Apply the light theme consistently.
+- [x] Task 1: Create the Admin shell (AC: 1, 4, 5)
+  - [x] Introduce a dedicated admin shell with tabs `Duyệt hồ sơ`, `Người dùng`, `Bãi xe`.
+  - [x] Route admin sessions into the shell instead of directly into `AdminApprovalsScreen`.
+  - [x] Apply the light theme consistently.
 
-- [ ] Task 2: Integrate existing approvals flow and honest placeholders (AC: 2, 3)
-  - [ ] Mount `AdminApprovalsScreen` as the `Duyệt hồ sơ` tab content.
-  - [ ] Create shell placeholders for `Người dùng` and `Bãi xe` using the shared placeholder pattern from Story 9.6.
-  - [ ] Preserve sign-out and approval-refresh behavior.
+- [x] Task 2: Integrate existing approvals flow and honest placeholders (AC: 2, 3)
+  - [x] Mount `AdminApprovalsScreen` as the `Duyệt hồ sơ` tab content.
+  - [x] Create shell placeholders for `Người dùng` and `Bãi xe` using the shared placeholder pattern from Story 9.6.
+  - [x] Preserve sign-out and approval-refresh behavior.
 
-- [ ] Task 3: Add regression coverage (AC: 1, 2, 3, 4, 5)
-  - [ ] Add Flutter tests for admin route landing, tab switching, and continued `AdminApprovalsScreen` rendering under the shell.
-  - [ ] Verify placeholder honesty and light-theme usage.
-  - [ ] Verify with `cd mobile && flutter test`.
+- [x] Task 3: Add regression coverage (AC: 1, 2, 3, 4, 5)
+  - [x] Add Flutter tests for admin route landing, tab switching, and continued `AdminApprovalsScreen` rendering under the shell.
+  - [x] Verify placeholder honesty and light-theme usage.
+  - [x] Verify with `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -106,11 +106,19 @@ GPT-5.4
 
 - Story context anchored on the current direct `AdminApprovalsScreen` entry path and Epic 9's requirement to organize Admin by administrative function.
 - Added guardrails to keep the shell lightweight and separate from approval business logic.
+- Added `AdminWorkspaceShell` with workspace tabs `Duyệt hồ sơ`, `Người dùng`, and `Bãi xe`, keeping approvals as the first tab while presenting honest placeholders for the unfinished admin surfaces.
+- Re-routed admin sessions through the shell in the shared app composition layer without changing `AdminApprovalsScreen` approval loading, mutation, refresh, or sign-out behavior.
+- Extended widget coverage for admin route landing and placeholder tabs, then validated with `flutter test test/widget_test.dart -r expanded` and the full `flutter test` suite.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/9-5-admin-workspace-shell.md`
-- `mobile/lib/src/app/app_router.dart`
-- `mobile/lib/src/features/admin_workspace/`
-- `mobile/lib/src/features/admin_approvals/presentation/admin_approvals_screen.dart`
-- `mobile/test/`
+- `mobile/lib/src/app/app.dart`
+- `mobile/lib/src/features/admin_workspace/presentation/admin_workspace_shell.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- Added a dedicated admin shell and routed admin entry through it instead of landing directly on the approvals screen.
+- Kept `AdminApprovalsScreen` intact as the first admin workspace tab while adding honest placeholder tabs for user and parking-lot administration.
+- Updated admin route widget coverage and confirmed the full mobile regression suite remains green.

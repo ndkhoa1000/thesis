@@ -1117,8 +1117,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AdminApprovalsScreen), findsOneWidget);
+    expect(find.text('Duyệt hồ sơ'), findsOneWidget);
+    expect(find.text('Người dùng'), findsWidgets);
+    expect(find.text('Bãi xe'), findsWidgets);
     expect(find.text('Điều phối hệ thống'), findsOneWidget);
     expect(find.text('Nguyen Van A'), findsOneWidget);
+
+    await tester.tap(find.text('Người dùng').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Quản lý người dùng sẽ được gom về workspace riêng'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Bãi xe').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Điều phối bãi xe đang bám vào dashboard approvals'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('ParkingApp routes manager session to operator lot workspace', (

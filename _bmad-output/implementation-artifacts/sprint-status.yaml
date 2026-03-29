@@ -88,7 +88,7 @@ development_status:
   9-2-driver-workspace-shell: review
   9-3-attendant-workspace-shell: review
   9-4-management-workspace-shells: review
-  9-5-admin-workspace-shell: ready-for-dev
+  9-5-admin-workspace-shell: review
   9-6-shared-ui-components-localization: ready-for-dev
   9-7-media-storage-backend-infrastructure: ready-for-dev
   epic-9-retrospective: optional
