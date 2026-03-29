@@ -1,6 +1,6 @@
 # Story 9.1: App Routing Foundation & Dual Theme System
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,30 +28,30 @@ so that all workspace screens consistently use correct themes and navigation fro
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Introduce app bootstrap and routing foundation (AC: 1, 2, 5, 6)
-  - [ ] Create a dedicated mobile bootstrap entry such as `mobile/lib/src/app/app.dart` and move `MaterialApp` composition out of `mobile/lib/main.dart`.
-  - [ ] Add `go_router` to `pubspec.yaml` if missing and configure named routes for auth plus all 5 workspace entry points.
-  - [ ] Keep `AuthGate` as the authentication resolver, but route from its result instead of hardwiring workspace widgets directly in `home:`.
+- [x] Task 1: Introduce app bootstrap and routing foundation (AC: 1, 2, 5, 6)
+  - [x] Create a dedicated mobile bootstrap entry such as `mobile/lib/src/app/app.dart` and move `MaterialApp` composition out of `mobile/lib/main.dart`.
+  - [x] Add `go_router` to `pubspec.yaml` if missing and configure named routes for auth plus all 5 workspace entry points.
+  - [x] Keep `AuthGate` as the authentication resolver, but route from its result instead of hardwiring workspace widgets directly in `home:`.
 
-- [ ] Task 2: Implement dual theme system (AC: 3, 4)
-  - [ ] Create a reusable theme module such as `mobile/lib/src/app/app_theme.dart` exposing `AppTheme.light()` and `AppTheme.dark()`.
-  - [ ] Encode MD3 light defaults around primary `#1A73E8` and the dark attendant profile around `#121212` plus oversized typography.
-  - [ ] Ensure the attendant workspace can override the default light app theme without forking app bootstrap logic.
+- [x] Task 2: Implement dual theme system (AC: 3, 4)
+  - [x] Create a reusable theme module such as `mobile/lib/src/app/app_theme.dart` exposing `AppTheme.light()` and `AppTheme.dark()`.
+  - [x] Encode MD3 light defaults around primary `#1A73E8` and the dark attendant profile around `#121212` plus oversized typography.
+  - [x] Ensure the attendant workspace can override the default light app theme without forking app bootstrap logic.
 
-- [ ] Task 3: Replace temporary workspace switching with route-aware entry (AC: 1, 2, 5)
-  - [ ] Remove `_PublicWorkspaceSwitcherScreen` as the primary bridge and replace it with explicit role-aware route destinations.
-  - [ ] Preserve the current public-account capability model: one `user.role` primary workspace with optional linked `lot_owner` and `manager` capabilities.
-  - [ ] Keep Admin and Attendant as separate-account flows and do not merge them into the public capability switcher.
+- [x] Task 3: Replace temporary workspace switching with route-aware entry (AC: 1, 2, 5)
+  - [x] Remove `_PublicWorkspaceSwitcherScreen` as the primary bridge and replace it with explicit role-aware route destinations.
+  - [x] Preserve the current public-account capability model: one `user.role` primary workspace with optional linked `lot_owner` and `manager` capabilities.
+  - [x] Keep Admin and Attendant as separate-account flows and do not merge them into the public capability switcher.
 
-- [ ] Task 4: Preserve service boundaries and existing feature reachability (AC: 2, 5)
-  - [ ] Consolidate service factory creation so each authenticated session creates service instances once per app composition path.
-  - [ ] Pass existing services into screens without moving API logic into router classes.
-  - [ ] Confirm Driver, Attendant, Operator, Lot Owner, and Admin entry screens still work through the new routing layer.
+- [x] Task 4: Preserve service boundaries and existing feature reachability (AC: 2, 5)
+  - [x] Consolidate service factory creation so each authenticated session creates service instances once per app composition path.
+  - [x] Pass existing services into screens without moving API logic into router classes.
+  - [x] Confirm Driver, Attendant, Operator, Lot Owner, and Admin entry screens still work through the new routing layer.
 
-- [ ] Task 5: Add focused regression coverage (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Add Flutter tests for unauthenticated redirect, role-based route resolution, and multi-capability public-account routing.
-  - [ ] Add theme assertions proving Attendant uses dark styling while other workspaces use light styling.
-  - [ ] Verify with `cd mobile && flutter test`.
+- [x] Task 5: Add focused regression coverage (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Add Flutter tests for unauthenticated redirect, role-based route resolution, and multi-capability public-account routing.
+  - [x] Add theme assertions proving Attendant uses dark styling while other workspaces use light styling.
+  - [x] Verify with `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -125,6 +125,11 @@ GPT-5.4
 
 - Story context anchored on Epic 9 routing and dual-theme acceptance criteria, current bootstrap drift in `main.dart`, and the architecture requirement to adopt `go_router`.
 - Added explicit guardrails to prevent route-level business logic creep and to retire the temporary multi-capability switcher during implementation.
+- Implemented `MaterialApp.router` bootstrap through `mobile/lib/src/app/app.dart`, with `go_router` redirecting authenticated users to role-specific workspace entry points and unauthenticated users to `AuthGate`.
+- Added `AppTheme.light()` and `AppTheme.dark()` in `mobile/lib/src/app/app_theme.dart`, and applied the dark surface `#121212` to the attendant workspace while keeping public/admin routes on the light MD3 profile.
+- Replaced public multi-capability workspace switching with primary-role routing based on `session.role`, while preserving separate Admin and Attendant account flows.
+- Added a guarded auth-service wrapper so logout returns cleanly to the login route in tests and runtime without immediately restoring the prior session.
+- Validation completed with `cd /home/khoa/thesis/app/mobile && flutter pub get && TERM=dumb flutter test test/widget_test.dart -r expanded` and `cd /home/khoa/thesis/app/mobile && TERM=dumb flutter test`.
 
 ### File List
 
@@ -133,6 +138,11 @@ GPT-5.4
 - `mobile/lib/src/app/app.dart`
 - `mobile/lib/src/app/app_router.dart`
 - `mobile/lib/src/app/app_theme.dart`
-- `mobile/lib/src/features/auth/presentation/auth_gate.dart`
+- `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
 - `mobile/pubspec.yaml`
-- `mobile/test/`
+- `mobile/pubspec.lock`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-29: Introduced `go_router`-based app bootstrap, centralized light/dark theme profiles, primary-role workspace routing, and regression coverage for the new routing behavior.

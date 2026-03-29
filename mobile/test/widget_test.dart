@@ -1018,6 +1018,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Quét mã check-in'), findsOneWidget);
+    final attendantTheme = Theme.of(
+      tester.element(find.text('Quét mã check-in')),
+    );
+    expect(attendantTheme.scaffoldBackgroundColor, const Color(0xFF121212));
   });
 
   testWidgets('ParkingApp routes admin session to approvals dashboard', (
@@ -1123,33 +1127,11 @@ void main() {
   });
 
   testWidgets(
-    'ParkingApp routes operator-capable public session to operator workspace',
+    'ParkingApp keeps operator-capable public session on driver workspace when primary role is driver',
     (WidgetTester tester) async {
-      final lotManagementService = FakeOperatorLotManagementService(
-        initialLots: const [
-          OperatorManagedParkingLot(
-            id: 18,
-            leaseId: 6,
-            lotOwnerId: 4,
-            name: 'Bai xe Mac Thi Buoi',
-            address: '6 Mac Thi Buoi, Quan 1',
-            latitude: 10.775,
-            longitude: 106.704,
-            currentAvailable: 5,
-            status: 'APPROVED',
-            occupiedCount: 1,
-            totalCapacity: 6,
-            openingTime: '05:30',
-            closingTime: '21:30',
-            pricingMode: 'SESSION',
-            priceAmount: 25000,
-          ),
-        ],
-      );
-
       await tester.pumpWidget(
-        MaterialApp(
-          home: AuthenticatedHome(
+        MyApp(
+          authService: FakeAuthService(
             session: const AuthSession(
               accessToken: 'access',
               refreshToken: 'refresh',
@@ -1163,17 +1145,19 @@ void main() {
                 'public_account': true,
               },
             ),
-            authService: FakeAuthService(),
-            onSignOut: () async {},
-            onSessionUpdated: (_) {},
-            operatorLotManagementServiceFactory: (_) => lotManagementService,
           ),
+          mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+          lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+          parkingHistoryServiceFactory: (_) => FakeParkingHistoryService(),
+          mapLocationPermissionService:
+              const FakeMapLocationPermissionService(true),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(OperatorLotManagementScreen), findsOneWidget);
-      expect(find.text('Bai xe Mac Thi Buoi'), findsOneWidget);
+      expect(find.byType(MapDiscoveryScreen), findsOneWidget);
+      expect(find.textContaining('chế độ fallback'), findsOneWidget);
+      expect(find.byType(OperatorLotManagementScreen), findsNothing);
     },
   );
 
@@ -1226,7 +1210,7 @@ void main() {
   });
 
   testWidgets(
-    'Public multi-capability session shows workspace switcher bridge',
+    'Public multi-capability session lands in primary role workspace without switcher bridge',
     (WidgetTester tester) async {
       final parkingLotService = FakeParkingLotService(
         initialLots: const [
@@ -1242,31 +1226,10 @@ void main() {
           ),
         ],
       );
-      final lotManagementService = FakeOperatorLotManagementService(
-        initialLots: const [
-          OperatorManagedParkingLot(
-            id: 18,
-            leaseId: 6,
-            lotOwnerId: 4,
-            name: 'Bai xe Mac Thi Buoi',
-            address: '6 Mac Thi Buoi, Quan 1',
-            latitude: 10.775,
-            longitude: 106.704,
-            currentAvailable: 5,
-            status: 'APPROVED',
-            occupiedCount: 1,
-            totalCapacity: 6,
-            openingTime: '05:30',
-            closingTime: '21:30',
-            pricingMode: 'SESSION',
-            priceAmount: 25000,
-          ),
-        ],
-      );
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: AuthenticatedHome(
+        MyApp(
+          authService: FakeAuthService(
             session: const AuthSession(
               accessToken: 'access',
               refreshToken: 'refresh',
@@ -1280,30 +1243,16 @@ void main() {
                 'public_account': true,
               },
             ),
-            authService: FakeAuthService(),
-            onSignOut: () async {},
-            onSessionUpdated: (_) {},
-            parkingLotServiceFactory: (_) => parkingLotService,
-            operatorLotManagementServiceFactory: (_) => lotManagementService,
           ),
+          parkingLotServiceFactory: (_) => parkingLotService,
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Chọn không gian làm việc'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Chủ bãi'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, 'Operator'), findsOneWidget);
-
-      await tester.tap(find.widgetWithText(FilledButton, 'Operator'));
-      await tester.pumpAndSettle();
-      expect(find.byType(OperatorLotManagementScreen), findsOneWidget);
-
-      await tester.pageBack();
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.widgetWithText(FilledButton, 'Chủ bãi'));
-      await tester.pumpAndSettle();
       expect(find.byType(ParkingLotRegistrationScreen), findsOneWidget);
+      expect(find.text('Bãi xe của tôi'), findsOneWidget);
+      expect(find.text('Chọn không gian làm việc'), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'Operator'), findsNothing);
     },
   );
 

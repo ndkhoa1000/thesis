@@ -457,7 +457,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       data: ThemeData(
         brightness: Brightness.dark,
         colorScheme: colorScheme,
-        scaffoldBackgroundColor: const Color(0xFF050505),
+        scaffoldBackgroundColor: const Color(0xFF121212),
         useMaterial3: true,
       ),
       child: Scaffold(
