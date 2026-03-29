@@ -30,4 +30,27 @@ final class AppRouter {
         return driverPath;
     }
   }
+
+  static bool canAccessLocation(AuthSession session, String location) {
+    if (_matches(location, adminPath)) {
+      return session.isAdmin;
+    }
+    if (_matches(location, attendantPath)) {
+      return session.isAttendant;
+    }
+    if (_matches(location, driverPath)) {
+      return session.capabilities['driver'] ?? session.role == 'DRIVER';
+    }
+    if (_matches(location, operatorPath)) {
+      return session.role == 'MANAGER' || session.capabilities['operator'] == true;
+    }
+    if (_matches(location, lotOwnerPath)) {
+      return session.role == 'LOT_OWNER' || session.capabilities['lot_owner'] == true;
+    }
+    return false;
+  }
+
+  static bool _matches(String location, String path) {
+    return location == path || location.startsWith('$path/');
+  }
 }

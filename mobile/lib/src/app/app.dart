@@ -7,6 +7,7 @@ import '../features/admin_approvals/data/admin_approvals_service.dart';
 import '../features/admin_approvals/presentation/admin_approvals_screen.dart';
 import '../features/attendant_check_in/data/attendant_check_in_service.dart';
 import '../features/attendant_check_in/presentation/attendant_check_in_screen.dart';
+import '../features/attendant_workspace/presentation/attendant_workspace_shell.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/auth/presentation/auth_gate.dart';
 import '../features/driver_booking/data/driver_booking_service.dart';
@@ -18,6 +19,7 @@ import '../features/lot_owner_application/data/lot_owner_application_service.dar
 import '../features/lot_owner_application/presentation/lot_owner_application_screen.dart';
 import '../features/map_discovery/data/map_discovery_service.dart';
 import '../features/map_discovery/presentation/map_discovery_screen.dart';
+import '../features/management_workspace/presentation/management_workspace_shell.dart';
 import '../features/operator_application/data/operator_application_service.dart';
 import '../features/operator_application/presentation/operator_application_screen.dart';
 import '../features/operator_lot_management/data/operator_lot_management_service.dart';
@@ -329,8 +331,11 @@ class _MyAppState extends State<MyApp> {
             : AppRouter.authPath;
       }
 
-      final target = AppRouter.locationForSession(session);
-      return state.matchedLocation == target ? null : target;
+      if (AppRouter.canAccessLocation(session, state.matchedLocation)) {
+        return null;
+      }
+
+      return AppRouter.locationForSession(session);
     },
     routes: [
       GoRoute(
@@ -351,27 +356,27 @@ class _MyAppState extends State<MyApp> {
       GoRoute(
         name: AppRouter.driverName,
         path: AppRouter.driverPath,
-        builder: (context, state) => _buildWorkspace(),
+        builder: (context, state) => _buildWorkspace(AppRouter.driverPath),
       ),
       GoRoute(
         name: AppRouter.operatorName,
         path: AppRouter.operatorPath,
-        builder: (context, state) => _buildWorkspace(),
+        builder: (context, state) => _buildWorkspace(AppRouter.operatorPath),
       ),
       GoRoute(
         name: AppRouter.lotOwnerName,
         path: AppRouter.lotOwnerPath,
-        builder: (context, state) => _buildWorkspace(),
+        builder: (context, state) => _buildWorkspace(AppRouter.lotOwnerPath),
       ),
       GoRoute(
         name: AppRouter.attendantName,
         path: AppRouter.attendantPath,
-        builder: (context, state) => _buildWorkspace(),
+        builder: (context, state) => _buildWorkspace(AppRouter.attendantPath),
       ),
       GoRoute(
         name: AppRouter.adminName,
         path: AppRouter.adminPath,
-        builder: (context, state) => _buildWorkspace(),
+        builder: (context, state) => _buildWorkspace(AppRouter.adminPath),
       ),
     ],
   );
@@ -411,13 +416,14 @@ class _MyAppState extends State<MyApp> {
     _refreshRouter();
   }
 
-  Widget _buildWorkspace() {
+  Widget _buildWorkspace(String workspacePath) {
     final session = _session;
     if (session == null) {
       return const SizedBox.shrink();
     }
 
     return AuthenticatedHome(
+      workspacePath: workspacePath,
       session: session,
       authService: widget.authService,
       onSignOut: _handleSignOut,
@@ -548,6 +554,7 @@ class _GuardedAuthService implements AuthService {
 class AuthenticatedHome extends StatelessWidget {
   const AuthenticatedHome({
     super.key,
+    this.workspacePath,
     required this.session,
     required this.authService,
     required this.onSignOut,
@@ -573,6 +580,7 @@ class AuthenticatedHome extends StatelessWidget {
     this.attendantScannerBuilder = defaultAttendantScannerBuilder,
   });
 
+  final String? workspacePath;
   final AuthSession session;
   final AuthService authService;
   final Future<void> Function() onSignOut;
@@ -593,11 +601,21 @@ class AuthenticatedHome extends StatelessWidget {
   final MapLocationPermissionService mapLocationPermissionService;
   final AttendantScannerBuilder attendantScannerBuilder;
 
-  bool get _isOperatorWorkspace => session.role == 'MANAGER';
-  bool get _isLotOwnerWorkspace => session.role == 'LOT_OWNER';
+  String get _effectiveWorkspacePath =>
+      workspacePath ?? AppRouter.locationForSession(session);
+
+  bool get _isOperatorWorkspace =>
+      _effectiveWorkspacePath == AppRouter.operatorPath;
+  bool get _isLotOwnerWorkspace =>
+      _effectiveWorkspacePath == AppRouter.lotOwnerPath;
+  bool get _isDriverWorkspace =>
+      _effectiveWorkspacePath == AppRouter.driverPath;
 
   @override
   Widget build(BuildContext context) {
+    final hasLotOwnerCapability = session.capabilities['lot_owner'] ?? false;
+    final hasOperatorCapability = session.capabilities['operator'] ?? false;
+
     if (session.isAdmin) {
       return Theme(
         data: AppTheme.light(),
@@ -609,40 +627,43 @@ class AuthenticatedHome extends StatelessWidget {
     }
 
     if (session.isAttendant) {
-      return Theme(
-        data: AppTheme.dark(),
-        child: AttendantCheckInScreen(
-          attendantCheckInService: attendantCheckInServiceFactory(
-            session.accessToken,
-          ),
-          scannerBuilder: attendantScannerBuilder,
-          onSignOut: onSignOut,
+      return AttendantWorkspaceShell(
+        attendantCheckInService: attendantCheckInServiceFactory(
+          session.accessToken,
         ),
+        scannerBuilder: attendantScannerBuilder,
+        onSignOut: onSignOut,
       );
     }
 
     if (_isOperatorWorkspace) {
-      return Theme(
-        data: AppTheme.light(),
-        child: OperatorLotManagementScreen(
+      return OperatorWorkspaceShell(
+        lotsTab: OperatorLotManagementScreen(
           lotManagementService: operatorLotManagementServiceFactory(
             session.accessToken,
           ),
           onSignOut: onSignOut,
         ),
+        onOpenLotOwnerWorkspace: hasLotOwnerCapability
+            ? () => GoRouter.of(context).go(AppRouter.lotOwnerPath)
+            : null,
+        onSignOut: onSignOut,
       );
     }
 
     if (_isLotOwnerWorkspace) {
-      return Theme(
-        data: AppTheme.light(),
-        child: ParkingLotRegistrationScreen(
+      return LotOwnerWorkspaceShell(
+        lotsTab: ParkingLotRegistrationScreen(
           parkingLotService: parkingLotServiceFactory(session.accessToken),
           ownerRevenueDashboardService: ownerRevenueDashboardServiceFactory(
             session.accessToken,
           ),
           onSignOut: onSignOut,
         ),
+        onOpenOperatorWorkspace: hasOperatorCapability
+            ? () => GoRouter.of(context).go(AppRouter.operatorPath)
+            : null,
+        onSignOut: onSignOut,
       );
     }
 
@@ -652,23 +673,69 @@ class AuthenticatedHome extends StatelessWidget {
         ? defaultDriverMapFallbackCanvasBuilder
         : defaultDriverMapCanvasBuilder;
 
-    return Theme(
-      data: AppTheme.light(),
-      child: DriverWorkspaceShell(
-        mapTab: MapDiscoveryScreen(
-          mapDiscoveryService: mapDiscoveryServiceFactory(session.accessToken),
-          lotDetailsService: lotDetailsServiceFactory(session.accessToken),
-          driverBookingService: driverBookingServiceFactory(
-            session.accessToken,
+    if (_isDriverWorkspace) {
+      return Theme(
+        data: AppTheme.light(),
+        child: DriverWorkspaceShell(
+          mapTab: MapDiscoveryScreen(
+            mapDiscoveryService: mapDiscoveryServiceFactory(
+              session.accessToken,
+            ),
+            lotDetailsService: lotDetailsServiceFactory(session.accessToken),
+            driverBookingService: driverBookingServiceFactory(
+              session.accessToken,
+            ),
+            vehicleService: vehicleServiceFactory(session.accessToken),
+            onOpenParkingHistory: () => openParkingHistory(
+              context,
+              session,
+              parkingHistoryServiceFactory: parkingHistoryServiceFactory,
+            ),
+            locationPermissionService: mapLocationPermissionService,
+            mapCanvasBuilder: mapCanvasBuilder,
+            onOpenDriverCheckIn: () => openDriverCheckIn(
+              context,
+              session,
+              vehicleServiceFactory: vehicleServiceFactory,
+              driverCheckInServiceFactory: driverCheckInServiceFactory,
+            ),
+            onOpenVehicles: () => openVehicleManagement(
+              context,
+              session,
+              vehicleServiceFactory: vehicleServiceFactory,
+            ),
+            onOpenLotOwnerApplication: hasLotOwnerCapability
+                ? null
+                : () => openLotOwnerApplication(
+                    context,
+                    session,
+                    authService: authService,
+                    onSessionUpdated: onSessionUpdated,
+                    applicationServiceFactory: applicationServiceFactory,
+                  ),
+            onOpenOperatorApplication: hasOperatorCapability
+                ? null
+                : () => openOperatorApplication(
+                    context,
+                    session,
+                    authService: authService,
+                    onSessionUpdated: onSessionUpdated,
+                    applicationServiceFactory:
+                        operatorApplicationServiceFactory,
+                  ),
+            onSignOut: onSignOut,
+            showParkingHistoryAction: false,
+            showDriverCheckInAction: false,
+            showVehicleAction: false,
+            showLotOwnerApplicationAction: false,
+            showOperatorApplicationAction: false,
+            showSignOutAction: false,
           ),
-          vehicleService: vehicleServiceFactory(session.accessToken),
-          onOpenParkingHistory: () => openParkingHistory(
-            context,
-            session,
-            parkingHistoryServiceFactory: parkingHistoryServiceFactory,
+          historyTab: ParkingHistoryScreen(
+            parkingHistoryService: parkingHistoryServiceFactory(
+              session.accessToken,
+            ),
           ),
-          locationPermissionService: mapLocationPermissionService,
-          mapCanvasBuilder: mapCanvasBuilder,
           onOpenDriverCheckIn: () => openDriverCheckIn(
             context,
             session,
@@ -680,60 +747,35 @@ class AuthenticatedHome extends StatelessWidget {
             session,
             vehicleServiceFactory: vehicleServiceFactory,
           ),
-          onOpenLotOwnerApplication: () => openLotOwnerApplication(
-            context,
-            session,
-            authService: authService,
-            onSessionUpdated: onSessionUpdated,
-            applicationServiceFactory: applicationServiceFactory,
-          ),
-          onOpenOperatorApplication: () => openOperatorApplication(
-            context,
-            session,
-            authService: authService,
-            onSessionUpdated: onSessionUpdated,
-            applicationServiceFactory: operatorApplicationServiceFactory,
-          ),
+          onOpenLotOwnerWorkspace: hasLotOwnerCapability
+              ? () => GoRouter.of(context).go(AppRouter.lotOwnerPath)
+              : null,
+          onOpenOperatorWorkspace: hasOperatorCapability
+              ? () => GoRouter.of(context).go(AppRouter.operatorPath)
+              : null,
+          onOpenLotOwnerApplication: hasLotOwnerCapability
+              ? null
+              : () => openLotOwnerApplication(
+                  context,
+                  session,
+                  authService: authService,
+                  onSessionUpdated: onSessionUpdated,
+                  applicationServiceFactory: applicationServiceFactory,
+                ),
+          onOpenOperatorApplication: hasOperatorCapability
+              ? null
+              : () => openOperatorApplication(
+                  context,
+                  session,
+                  authService: authService,
+                  onSessionUpdated: onSessionUpdated,
+                  applicationServiceFactory: operatorApplicationServiceFactory,
+                ),
           onSignOut: onSignOut,
-          showParkingHistoryAction: false,
-          showDriverCheckInAction: false,
-          showVehicleAction: false,
-          showLotOwnerApplicationAction: false,
-          showOperatorApplicationAction: false,
-          showSignOutAction: false,
         ),
-        historyTab: ParkingHistoryScreen(
-          parkingHistoryService: parkingHistoryServiceFactory(
-            session.accessToken,
-          ),
-        ),
-        onOpenDriverCheckIn: () => openDriverCheckIn(
-          context,
-          session,
-          vehicleServiceFactory: vehicleServiceFactory,
-          driverCheckInServiceFactory: driverCheckInServiceFactory,
-        ),
-        onOpenVehicles: () => openVehicleManagement(
-          context,
-          session,
-          vehicleServiceFactory: vehicleServiceFactory,
-        ),
-        onOpenLotOwnerApplication: () => openLotOwnerApplication(
-          context,
-          session,
-          authService: authService,
-          onSessionUpdated: onSessionUpdated,
-          applicationServiceFactory: applicationServiceFactory,
-        ),
-        onOpenOperatorApplication: () => openOperatorApplication(
-          context,
-          session,
-          authService: authService,
-          onSessionUpdated: onSessionUpdated,
-          applicationServiceFactory: operatorApplicationServiceFactory,
-        ),
-        onSignOut: onSignOut,
-      ),
-    );
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }

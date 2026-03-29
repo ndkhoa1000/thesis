@@ -1,6 +1,6 @@
 # Story 9.4: Management Workspace Shells
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that I can navigate between lot management, financial, and operational tasks 
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create the Operator shell (AC: 1, 2, 6)
-  - [ ] Introduce an Operator shell with tabs `Bãi xe`, `Nhân viên`, `Doanh thu`.
-  - [ ] Mount the current `OperatorLotManagementScreen` inside the appropriate tab path without changing its service contract.
-  - [ ] Route current and future operator revenue and staffing surfaces into durable shell tabs, using `EmptyView` only where the repo truly lacks content.
+- [x] Task 1: Create the Operator shell (AC: 1, 2, 6)
+  - [x] Introduce an Operator shell with tabs `Bãi xe`, `Nhân viên`, `Doanh thu`.
+  - [x] Mount the current `OperatorLotManagementScreen` inside the appropriate tab path without changing its service contract.
+  - [x] Route current and future operator revenue and staffing surfaces into durable shell tabs, using `EmptyView` only where the repo truly lacks content.
 
-- [ ] Task 2: Create the Lot Owner shell (AC: 3, 4, 5, 6)
-  - [ ] Introduce a Lot Owner shell with tabs `Bãi của tôi`, `Hợp đồng`, `Cá nhân`.
-  - [ ] Mount `ParkingLotRegistrationScreen` under `Bãi của tôi`.
-  - [ ] Provide honest placeholder content for `Hợp đồng` and `Cá nhân` until their final feature surfaces are integrated.
+- [x] Task 2: Create the Lot Owner shell (AC: 3, 4, 5, 6)
+  - [x] Introduce a Lot Owner shell with tabs `Bãi của tôi`, `Hợp đồng`, `Cá nhân`.
+  - [x] Mount `ParkingLotRegistrationScreen` under `Bãi của tôi`.
+  - [x] Provide honest placeholder content for `Hợp đồng` and `Cá nhân` until their final feature surfaces are integrated.
 
-- [ ] Task 3: Replace the temporary public workspace switch path (AC: 1, 2, 3, 4)
-  - [ ] Remove the current `_PublicWorkspaceSwitcherScreen` navigation dependency from the authenticated public-account entry path.
-  - [ ] Ensure public users with both lot-owner and operator capabilities can deliberately enter the correct shell through route-aware navigation.
-  - [ ] Keep current sign-out and service injection behavior intact.
+- [x] Task 3: Replace the temporary public workspace switch path (AC: 1, 2, 3, 4)
+  - [x] Remove the current `_PublicWorkspaceSwitcherScreen` navigation dependency from the authenticated public-account entry path.
+  - [x] Ensure public users with both lot-owner and operator capabilities can deliberately enter the correct shell through route-aware navigation.
+  - [x] Keep current sign-out and service injection behavior intact.
 
-- [ ] Task 4: Add regression coverage (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Add Flutter tests for Operator and Lot Owner shell landing, tab switching, and placeholder rendering.
-  - [ ] Confirm current operator lot-management and lot-owner registration flows still work after shell wrapping.
-  - [ ] Verify with `cd mobile && flutter test`.
+- [x] Task 4: Add regression coverage (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Add Flutter tests for Operator and Lot Owner shell landing, tab switching, and placeholder rendering.
+  - [x] Confirm current operator lot-management and lot-owner registration flows still work after shell wrapping.
+  - [x] Verify with `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -119,13 +119,21 @@ GPT-5.4
 
 - Story context anchored on the current direct public workspace entry logic in `main.dart` and Epic 9's explicit requirement to absorb temporary workspace switching.
 - Added guardrails to prevent shell work from duplicating backend-driven lease, revenue, and staffing logic.
+- Added durable `OperatorWorkspaceShell` and `LotOwnerWorkspaceShell` tabs while keeping the existing business screens intact as embedded tab roots instead of rewriting stable feature logic.
+- Updated route authorization and driver profile actions so multi-capability public accounts can deliberately enter Operator or Lot Owner shells without reviving a temporary workspace switch bridge.
+- Extended widget coverage for management shell landing, placeholder rendering, and cross-workspace navigation, then validated with `flutter test test/widget_test.dart -r expanded` and the full `flutter test` suite.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/9-4-management-workspace-shells.md`
 - `mobile/lib/src/app/app_router.dart`
-- `mobile/lib/src/features/management_workspace/`
-- `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
-- `mobile/lib/src/features/operator_revenue_dashboard/presentation/operator_revenue_dashboard_sheet.dart`
-- `mobile/lib/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart`
-- `mobile/test/`
+- `mobile/lib/src/app/app.dart`
+- `mobile/lib/src/features/driver_workspace/presentation/driver_workspace_shell.dart`
+- `mobile/lib/src/features/management_workspace/presentation/management_workspace_shell.dart`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- Added operator and lot-owner management shells with honest placeholder tabs for unfinished top-level sections.
+- Made app routing capability-aware so authorized users can enter non-primary management shells without being redirected away.
+- Updated driver profile actions to surface workspace navigation when operator or lot-owner capabilities already exist.

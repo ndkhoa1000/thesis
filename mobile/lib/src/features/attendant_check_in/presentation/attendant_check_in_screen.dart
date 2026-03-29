@@ -27,6 +27,8 @@ class AttendantCheckInScreen extends StatefulWidget {
     this.capturePlateImage = defaultCapturePlateImage,
     this.onSignOut,
     this.startInWalkInMode = false,
+    this.embeddedInShell = false,
+    this.onParkingLotNameChanged,
   });
 
   final AttendantCheckInService attendantCheckInService;
@@ -35,6 +37,8 @@ class AttendantCheckInScreen extends StatefulWidget {
   final AttendantImageCapture capturePlateImage;
   final Future<void> Function()? onSignOut;
   final bool startInWalkInMode;
+  final bool embeddedInShell;
+  final ValueChanged<String?>? onParkingLotNameChanged;
 
   @override
   State<AttendantCheckInScreen> createState() => _AttendantCheckInScreenState();
@@ -80,6 +84,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       if (!mounted) {
         return;
       }
+      widget.onParkingLotNameChanged?.call(summary.parkingLotName);
       setState(() {
         _occupancySummary = summary;
         _occupancyErrorMessage = null;
@@ -460,198 +465,298 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
         scaffoldBackgroundColor: const Color(0xFF121212),
         useMaterial3: true,
       ),
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _mode == _AttendantGateMode.walkIn
-                ? 'Walk-in check-in'
-                : _scannerFlow == _AttendantScannerFlow.checkOut
-                ? 'Quet ma check-out'
-                : 'Quét mã check-in',
-          ),
-          actions: [
-            IconButton(
-              key: const ValueKey('shift-handover-button'),
-              icon: const Icon(Icons.qr_code_2_outlined),
-              tooltip: 'Ban giao ca',
-              onPressed: _openShiftHandover,
-            ),
-            IconButton(
-              key: const ValueKey('active-session-management-button'),
-              icon: const Icon(Icons.fact_check_outlined),
-              tooltip: 'Phien ton',
-              onPressed: _openActiveSessionManagement,
-            ),
-            if (widget.onSignOut != null)
-              IconButton(
-                icon: const Icon(Icons.logout),
-                tooltip: 'Đăng xuất',
-                onPressed: widget.onSignOut,
+      child: Builder(
+        builder: (context) {
+          if (widget.embeddedInShell) {
+            return _buildEmbeddedShellBody(context, colorScheme);
+          }
+
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(
+                _mode == _AttendantGateMode.walkIn
+                    ? 'Walk-in check-in'
+                    : _scannerFlow == _AttendantScannerFlow.checkOut
+                    ? 'Quet ma check-out'
+                    : 'Quét mã check-in',
               ),
+              actions: [
+                IconButton(
+                  key: const ValueKey('shift-handover-button'),
+                  icon: const Icon(Icons.qr_code_2_outlined),
+                  tooltip: 'Ban giao ca',
+                  onPressed: _openShiftHandover,
+                ),
+                IconButton(
+                  key: const ValueKey('active-session-management-button'),
+                  icon: const Icon(Icons.fact_check_outlined),
+                  tooltip: 'Phien ton',
+                  onPressed: _openActiveSessionManagement,
+                ),
+                if (widget.onSignOut != null)
+                  IconButton(
+                    icon: const Icon(Icons.logout),
+                    tooltip: 'Đăng xuất',
+                    onPressed: widget.onSignOut,
+                  ),
+              ],
+            ),
+            body: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final operationPanelHeight = (constraints.maxHeight * 0.26)
+                      .clamp(150.0, 220.0);
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildStatusAndSummaryPanel(
+                          context,
+                          colorScheme,
+                          includeQuickActions: false,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          height: operationPanelHeight,
+                          child: _buildOperationSurface(context, colorScheme),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmbeddedShellBody(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                key: const ValueKey('attendant-shell-top-zone'),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0B0B0B),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0xFF2C2C2C)),
+                ),
+                padding: const EdgeInsets.all(12),
+                child: _buildOperationSurface(context, colorScheme),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Container(
+                key: const ValueKey('attendant-shell-bottom-zone'),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF181818),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0xFF2A2A2A)),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+                  child: _buildStatusAndSummaryPanel(
+                    context,
+                    colorScheme,
+                    includeQuickActions: true,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final operationPanelHeight = (constraints.maxHeight * 0.34).clamp(
-                180.0,
-                280.0,
-              );
+      ),
+    );
+  }
 
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      _statusLabel,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    _OccupancySummaryPanel(
-                      isLoading: _isLoadingOccupancy,
-                      summary: _occupancySummary,
-                      errorMessage: _occupancyErrorMessage,
-                      onRefresh: _reloadOccupancySummary,
-                      vehicleTypeLabel: _vehicleTypeLabel,
-                    ),
-                    const SizedBox(height: 16),
-                    if (_mode == _AttendantGateMode.scanner) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _ScannerModeButton(
-                              key: const ValueKey('attendant-check-in-mode'),
-                              label: 'Xe vao',
-                              isSelected:
-                                  _scannerFlow == _AttendantScannerFlow.checkIn,
-                              onPressed: () => _selectScannerFlow(
-                                _AttendantScannerFlow.checkIn,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _ScannerModeButton(
-                              key: const ValueKey('attendant-check-out-mode'),
-                              label: 'Xe ra',
-                              isSelected:
-                                  _scannerFlow ==
-                                  _AttendantScannerFlow.checkOut,
-                              onPressed: () => _selectScannerFlow(
-                                _AttendantScannerFlow.checkOut,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    SizedBox(
-                      height: operationPanelHeight,
-                      child: _mode == _AttendantGateMode.scanner
-                          ? _scannerFlow == _AttendantScannerFlow.checkOut &&
-                                    _lastCheckOutPreview != null
-                                ? _CheckOutSettlementZone(
-                                    key: const ValueKey(
-                                      'attendant-check-out-settlement-zone',
-                                    ),
-                                    preview: _lastCheckOutPreview!,
-                                    isBusy: _isBusy,
-                                    dragOffset: _settlementDragOffset,
-                                    onDragStart: _handleSettlementDragStart,
-                                    onDragUpdate: _handleSettlementDragUpdate,
-                                    onDragEnd: _handleSettlementDragEnd,
-                                    vehicleTypeLabel: _vehicleTypeLabel,
-                                    formatCurrency: _formatCurrency,
-                                  )
-                                : DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(28),
-                                      border: Border.all(
-                                        color: _errorMessage == null
-                                            ? colorScheme.primary
-                                            : colorScheme.error,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(26),
-                                      child: widget.scannerBuilder(
-                                        context,
-                                        _handleScan,
-                                        _isBusy,
-                                      ),
-                                    ),
-                                  )
-                          : _WalkInPanel(
-                              isBusy: _isBusy,
-                              vehicleType: _walkInVehicleType,
-                              overviewImagePath: _overviewImagePath,
-                              plateImagePath: _plateImagePath,
-                              onVehicleTypeChanged: (value) {
-                                setState(() {
-                                  _walkInVehicleType = value;
-                                });
-                              },
-                              onCaptureOverviewImage: _captureOverviewImage,
-                              onCapturePlateImage: _capturePlateImage,
-                              onSubmit: _submitWalkIn,
-                              onBack: _returnToScannerMode,
-                            ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (_mode == _AttendantGateMode.scanner &&
-                        _scannerFlow == _AttendantScannerFlow.checkIn)
-                      FilledButton.icon(
-                        key: const ValueKey('walk-in-entry-button'),
-                        onPressed: _isBusy ? null : _openWalkInMode,
-                        icon: const Icon(Icons.camera_alt_outlined),
-                        label: const Text('Xe vang lai'),
-                      ),
-                    if (_mode == _AttendantGateMode.scanner &&
-                        _scannerFlow == _AttendantScannerFlow.checkIn)
-                      const SizedBox(height: 16),
-                    if (_errorMessage != null)
-                      _FeedbackCard(
-                        title: 'Quét thất bại',
-                        message: _errorMessage!,
-                        color: colorScheme.errorContainer,
-                        foregroundColor: colorScheme.onErrorContainer,
-                      ),
-                    if (_lastCheckInResult != null)
-                      _FeedbackCard(
-                        title: 'Check-in thành công',
-                        message:
-                            '${_lastCheckInResult!.licensePlate}\n${_vehicleTypeLabel(_lastCheckInResult!.vehicleType)}\nCòn ${_lastCheckInResult!.currentAvailable} chỗ trong bãi',
-                        color: const Color(0xFF003B1F),
-                        foregroundColor: const Color(0xFFB9F6CA),
-                      ),
-                    if (_lastCheckOutPreview != null &&
-                        !(_mode == _AttendantGateMode.scanner &&
-                            _scannerFlow == _AttendantScannerFlow.checkOut))
-                      _CheckOutPreviewCard(
-                        preview: _lastCheckOutPreview!,
-                        vehicleTypeLabel: _vehicleTypeLabel,
-                        formatCurrency: _formatCurrency,
-                      ),
-                    if (_lastCheckOutFinalize != null)
-                      _FeedbackCard(
-                        title: 'Hoan tat xe ra',
-                        message:
-                            '${_lastCheckOutFinalize!.licensePlate}\n${_paymentMethodLabel(_lastCheckOutFinalize!.paymentMethod)}\nCon ${_lastCheckOutFinalize!.currentAvailable} cho trong bai',
-                        color: const Color(0xFF003B1F),
-                        foregroundColor: const Color(0xFFB9F6CA),
-                      ),
-                  ],
+  Widget _buildStatusAndSummaryPanel(
+    BuildContext context,
+    ColorScheme colorScheme, {
+    required bool includeQuickActions,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          _statusLabel,
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+          textAlign: includeQuickActions ? TextAlign.start : TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        if (includeQuickActions) ...[
+          _buildQuickActions(context),
+          const SizedBox(height: 12),
+        ],
+        _OccupancySummaryPanel(
+          isLoading: _isLoadingOccupancy,
+          summary: _occupancySummary,
+          errorMessage: _occupancyErrorMessage,
+          onRefresh: _reloadOccupancySummary,
+          vehicleTypeLabel: _vehicleTypeLabel,
+        ),
+        const SizedBox(height: 12),
+        if (_mode == _AttendantGateMode.scanner) ...[
+          Row(
+            children: [
+              Expanded(
+                child: _ScannerModeButton(
+                  key: const ValueKey('attendant-check-in-mode'),
+                  label: 'Xe vao',
+                  isSelected: _scannerFlow == _AttendantScannerFlow.checkIn,
+                  onPressed: () =>
+                      _selectScannerFlow(_AttendantScannerFlow.checkIn),
                 ),
-              );
-            },
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _ScannerModeButton(
+                  key: const ValueKey('attendant-check-out-mode'),
+                  label: 'Xe ra',
+                  isSelected: _scannerFlow == _AttendantScannerFlow.checkOut,
+                  onPressed: () =>
+                      _selectScannerFlow(_AttendantScannerFlow.checkOut),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (_mode == _AttendantGateMode.scanner &&
+            _scannerFlow == _AttendantScannerFlow.checkIn) ...[
+          FilledButton.icon(
+            key: const ValueKey('walk-in-entry-button'),
+            onPressed: _isBusy ? null : _openWalkInMode,
+            icon: const Icon(Icons.camera_alt_outlined),
+            label: const Text('Xe vang lai'),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (_errorMessage != null)
+          _FeedbackCard(
+            title: 'Quét thất bại',
+            message: _errorMessage!,
+            color: colorScheme.errorContainer,
+            foregroundColor: colorScheme.onErrorContainer,
+          ),
+        if (_lastCheckInResult != null)
+          _FeedbackCard(
+            title: 'Check-in thành công',
+            message:
+                '${_lastCheckInResult!.licensePlate}\n${_vehicleTypeLabel(_lastCheckInResult!.vehicleType)}\nCòn ${_lastCheckInResult!.currentAvailable} chỗ trong bãi',
+            color: const Color(0xFF003B1F),
+            foregroundColor: const Color(0xFFB9F6CA),
+          ),
+        if (_lastCheckOutPreview != null &&
+            !(_mode == _AttendantGateMode.scanner &&
+                _scannerFlow == _AttendantScannerFlow.checkOut))
+          _CheckOutPreviewCard(
+            preview: _lastCheckOutPreview!,
+            vehicleTypeLabel: _vehicleTypeLabel,
+            formatCurrency: _formatCurrency,
+          ),
+        if (_lastCheckOutFinalize != null)
+          _FeedbackCard(
+            title: 'Hoan tat xe ra',
+            message:
+                '${_lastCheckOutFinalize!.licensePlate}\n${_paymentMethodLabel(_lastCheckOutFinalize!.paymentMethod)}\nCon ${_lastCheckOutFinalize!.currentAvailable} cho trong bai',
+            color: const Color(0xFF003B1F),
+            foregroundColor: const Color(0xFFB9F6CA),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          key: const ValueKey('shift-handover-button'),
+          onPressed: _openShiftHandover,
+          icon: const Icon(Icons.qr_code_2_outlined),
+          label: const Text('Ban giao ca'),
+        ),
+        OutlinedButton.icon(
+          key: const ValueKey('active-session-management-button'),
+          onPressed: _openActiveSessionManagement,
+          icon: const Icon(Icons.fact_check_outlined),
+          label: const Text('Phien ton'),
+        ),
+        if (widget.onSignOut != null)
+          OutlinedButton.icon(
+            onPressed: widget.onSignOut,
+            icon: const Icon(Icons.logout),
+            label: const Text('Đăng xuất'),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildOperationSurface(BuildContext context, ColorScheme colorScheme) {
+    if (_mode == _AttendantGateMode.scanner) {
+      if (_scannerFlow == _AttendantScannerFlow.checkOut &&
+          _lastCheckOutPreview != null) {
+        return _CheckOutSettlementZone(
+          key: const ValueKey('attendant-check-out-settlement-zone'),
+          preview: _lastCheckOutPreview!,
+          isBusy: _isBusy,
+          dragOffset: _settlementDragOffset,
+          onDragStart: _handleSettlementDragStart,
+          onDragUpdate: _handleSettlementDragUpdate,
+          onDragEnd: _handleSettlementDragEnd,
+          vehicleTypeLabel: _vehicleTypeLabel,
+          formatCurrency: _formatCurrency,
+        );
+      }
+
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: _errorMessage == null
+                ? colorScheme.primary
+                : colorScheme.error,
+            width: 2,
           ),
         ),
-      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: widget.scannerBuilder(context, _handleScan, _isBusy),
+        ),
+      );
+    }
+
+    return _WalkInPanel(
+      isBusy: _isBusy,
+      vehicleType: _walkInVehicleType,
+      overviewImagePath: _overviewImagePath,
+      plateImagePath: _plateImagePath,
+      onVehicleTypeChanged: (value) {
+        setState(() {
+          _walkInVehicleType = value;
+        });
+      },
+      onCaptureOverviewImage: _captureOverviewImage,
+      onCapturePlateImage: _capturePlateImage,
+      onSubmit: _submitWalkIn,
+      onBack: _returnToScannerMode,
     );
   }
 

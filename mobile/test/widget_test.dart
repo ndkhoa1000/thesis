@@ -121,16 +121,21 @@ class FakeVehicleService implements VehicleService {
 }
 
 class FakeAttendantCheckInService implements AttendantCheckInService {
-  FakeAttendantCheckInService({this.result, this.errorMessage});
+  FakeAttendantCheckInService({
+    this.result,
+    this.errorMessage,
+    this.parkingLotName = 'Bãi xe Quận 1',
+  });
 
   final AttendantCheckInResult? result;
   final String? errorMessage;
+  final String parkingLotName;
 
   @override
   Future<AttendantOccupancySummary> getOccupancySummary() async {
-    return const AttendantOccupancySummary(
+    return AttendantOccupancySummary(
       parkingLotId: 13,
-      parkingLotName: 'Bai xe Quan 1',
+      parkingLotName: parkingLotName,
       hasActiveCapacityConfig: true,
       totalCapacity: 12,
       freeCount: 4,
@@ -1017,11 +1022,56 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Quét mã check-in'), findsOneWidget);
+    expect(find.text('BÃI XE — Bãi xe Quận 1'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('attendant-shell-header')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('attendant-shell-top-zone')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('attendant-shell-bottom-zone')),
+      findsOneWidget,
+    );
+    expect(find.text('Sẵn sàng quét xe vào bãi'), findsOneWidget);
+    expect(find.text('Đăng xuất'), findsOneWidget);
     final attendantTheme = Theme.of(
-      tester.element(find.text('Quét mã check-in')),
+      tester.element(find.byKey(const ValueKey('attendant-shell-header'))),
     );
     expect(attendantTheme.scaffoldBackgroundColor, const Color(0xFF121212));
+  });
+
+  testWidgets('Attendant shell keeps honest fallback lot header', (
+    WidgetTester tester,
+  ) async {
+    final attendantService = FakeAttendantCheckInService(parkingLotName: '');
+
+    await tester.pumpWidget(
+      MyApp(
+        authService: FakeAuthService(
+          session: const AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            role: 'ATTENDANT',
+            capabilities: {
+              'driver': false,
+              'lot_owner': false,
+              'operator': false,
+              'attendant': true,
+              'admin': false,
+              'public_account': false,
+            },
+          ),
+        ),
+        attendantCheckInServiceFactory: (_) => attendantService,
+        attendantScannerBuilder: _fakeAttendantScannerBuilder,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('BÃI XE — CHƯA GÁN'), findsOneWidget);
   });
 
   testWidgets('ParkingApp routes admin session to approvals dashboard', (
@@ -1122,8 +1172,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(OperatorLotManagementScreen), findsOneWidget);
+    expect(find.text('Bãi xe'), findsOneWidget);
+    expect(find.text('Nhân viên'), findsOneWidget);
+    expect(find.text('Doanh thu'), findsWidgets);
     expect(find.text('Điều hành bãi xe'), findsOneWidget);
     expect(find.text('Bai xe Le Thanh Ton'), findsOneWidget);
+
+    await tester.tap(find.text('Nhân viên'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Nhân viên trực đang gắn với từng bãi xe'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Doanh thu').last);
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Doanh thu operator hiện mở theo từng bãi xe'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -1159,6 +1226,12 @@ void main() {
       expect(find.byType(MapDiscoveryScreen), findsOneWidget);
       expect(find.textContaining('chế độ fallback'), findsOneWidget);
       expect(find.byType(OperatorLotManagementScreen), findsNothing);
+
+      await tester.tap(find.text('Cá nhân'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Không gian Operator'), findsOneWidget);
+      expect(find.text('Nộp hồ sơ Operator'), findsNothing);
     },
   );
 
@@ -1206,8 +1279,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ParkingLotRegistrationScreen), findsOneWidget);
+    expect(find.text('Bãi của tôi'), findsOneWidget);
+    expect(find.text('Hợp đồng'), findsOneWidget);
+    expect(find.text('Cá nhân'), findsOneWidget);
     expect(find.text('Bãi xe của tôi'), findsOneWidget);
     expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
+
+    await tester.tap(find.text('Hợp đồng'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Hợp đồng vẫn được khởi tạo từ từng bãi đã duyệt'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -1251,9 +1334,90 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ParkingLotRegistrationScreen), findsOneWidget);
+      expect(find.text('Bãi của tôi'), findsOneWidget);
       expect(find.text('Bãi xe của tôi'), findsOneWidget);
       expect(find.text('Chọn không gian làm việc'), findsNothing);
       expect(find.widgetWithText(FilledButton, 'Operator'), findsNothing);
+
+      await tester.tap(find.text('Cá nhân'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mở không gian Operator'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Multi-capability public account can deliberately enter operator shell',
+    (WidgetTester tester) async {
+      final parkingLotService = FakeParkingLotService(
+        initialLots: const [
+          ParkingLotRegistration(
+            id: 7,
+            lotOwnerId: 1,
+            name: 'Bai xe Nguyen Hue',
+            address: '1 Nguyen Hue, Quan 1',
+            latitude: 10.7732,
+            longitude: 106.7041,
+            currentAvailable: 0,
+            status: 'APPROVED',
+          ),
+        ],
+      );
+      final lotManagementService = FakeOperatorLotManagementService(
+        initialLots: const [
+          OperatorManagedParkingLot(
+            id: 11,
+            leaseId: 3,
+            lotOwnerId: 7,
+            name: 'Bai xe Le Thanh Ton',
+            address: '8 Le Thanh Ton, Quan 1',
+            latitude: 10.777,
+            longitude: 106.705,
+            currentAvailable: 16,
+            status: 'APPROVED',
+            occupiedCount: 4,
+            totalCapacity: 20,
+            openingTime: '06:00',
+            closingTime: '22:00',
+            pricingMode: 'HOURLY',
+            priceAmount: 15000,
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        MyApp(
+          authService: FakeAuthService(
+            session: const AuthSession(
+              accessToken: 'access',
+              refreshToken: 'refresh',
+              role: 'LOT_OWNER',
+              capabilities: {
+                'driver': true,
+                'lot_owner': true,
+                'operator': true,
+                'attendant': false,
+                'admin': false,
+                'public_account': true,
+              },
+            ),
+          ),
+          parkingLotServiceFactory: (_) => parkingLotService,
+          operatorLotManagementServiceFactory: (_) => lotManagementService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bãi xe của tôi'), findsOneWidget);
+
+      await tester.tap(find.text('Cá nhân'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Mở không gian Operator'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Bãi xe'), findsOneWidget);
+      expect(find.text('Nhân viên'), findsOneWidget);
+      expect(find.text('Doanh thu'), findsWidgets);
+      expect(find.text('Bai xe Le Thanh Ton'), findsOneWidget);
     },
   );
 

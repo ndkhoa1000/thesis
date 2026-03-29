@@ -1,6 +1,6 @@
 # Story 9.3: Attendant Workspace Shell
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that the correct high-contrast, edge-to-edge Dark UI is in place for all Epic
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create the Attendant shell container (AC: 1, 2, 3, 4, 5)
-  - [ ] Introduce a dedicated attendant shell widget and route destination under the new app routing foundation.
-  - [ ] Apply `AppTheme.dark()` with `#121212` scaffold surface and edge-to-edge system UI treatment.
-  - [ ] Provide a header area for the lot label and a 50/50 operational layout split using `Expanded`, `Flex`, or equivalent.
+- [x] Task 1: Create the Attendant shell container (AC: 1, 2, 3, 4, 5)
+  - [x] Introduce a dedicated attendant shell widget and route destination under the new app routing foundation.
+  - [x] Apply `AppTheme.dark()` with `#121212` scaffold surface and edge-to-edge system UI treatment.
+  - [x] Provide a header area for the lot label and a 50/50 operational layout split using `Expanded`, `Flex`, or equivalent.
 
-- [ ] Task 2: Rehost the existing gate workflow inside the shell (AC: 3, 5, 6)
-  - [ ] Mount the current attendant scanning/check-in screen inside the shell without changing API contracts.
-  - [ ] Preserve scanner, walk-in upload, checkout preview, and logout actions.
-  - [ ] Ensure current operational flows still fit the new layout without introducing nested navigation confusion.
+- [x] Task 2: Rehost the existing gate workflow inside the shell (AC: 3, 5, 6)
+  - [x] Mount the current attendant scanning/check-in screen inside the shell without changing API contracts.
+  - [x] Preserve scanner, walk-in upload, checkout preview, and logout actions.
+  - [x] Ensure current operational flows still fit the new layout without introducing nested navigation confusion.
 
-- [ ] Task 3: Normalize attendant-specific operational presentation (AC: 1, 2, 3, 4)
-  - [ ] Use oversized typography and high-contrast treatment consistent with the attendant UX direction.
-  - [ ] Remove wasted padding and bright public-theme widgets from the workspace entry path.
-  - [ ] Keep the top visual zone structurally ready for the camera/viewfinder even when the scanner is idle.
+- [x] Task 3: Normalize attendant-specific operational presentation (AC: 1, 2, 3, 4)
+  - [x] Use oversized typography and high-contrast treatment consistent with the attendant UX direction.
+  - [x] Remove wasted padding and bright public-theme widgets from the workspace entry path.
+  - [x] Keep the top visual zone structurally ready for the camera/viewfinder even when the scanner is idle.
 
-- [ ] Task 4: Add regression coverage (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Add Flutter tests for attendant route landing, dark theme application, and shell layout rendering.
-  - [ ] Assert that the gate flow remains reachable and the header label logic behaves honestly.
-  - [ ] Verify with `cd mobile && flutter test`.
+- [x] Task 4: Add regression coverage (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Add Flutter tests for attendant route landing, dark theme application, and shell layout rendering.
+  - [x] Assert that the gate flow remains reachable and the header label logic behaves honestly.
+  - [x] Verify with `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -116,11 +116,22 @@ GPT-5.4
 
 - Story context anchored on Epic 9's dark-shell acceptance criteria and the current direct `AttendantCheckInScreen` workspace entry.
 - Added guardrails to keep shell layout work separate from gate workflow logic and multipart upload behavior.
+- Added `AttendantWorkspaceShell` with edge-to-edge dark chrome, a dynamic `BÃI XE — ...` header, and an honest `CHƯA GÁN` fallback when lot data is unavailable.
+- Rehosted the gate workflow through an embedded 50/50 attendant layout so scanner, walk-in, checkout preview, active-session, shift handover, and logout actions remain available without nested navigation.
+- Extended widget coverage for attendant shell rendering and fallback header logic, then validated `flutter test test/widget_test.dart -r expanded`, `flutter test test/attendant_check_in_screen_test.dart`, and the full `flutter test` suite.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/9-3-attendant-workspace-shell.md`
-- `mobile/lib/src/app/app_router.dart`
+- `mobile/lib/src/app/app.dart`
+- `mobile/lib/src/features/attendant_workspace/presentation/attendant_workspace_shell.dart`
 - `mobile/lib/src/features/attendant_workspace/`
 - `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
-- `mobile/test/`
+- `mobile/test/widget_test.dart`
+- `mobile/test/attendant_check_in_screen_test.dart`
+
+### Change Log
+
+- Added a dedicated attendant workspace shell and routed attendant sessions through it from the shared app composition layer.
+- Updated `AttendantCheckInScreen` to support embedded shell mode, lot-name reporting, and a preserved standalone test viewport.
+- Added attendant shell widget tests and kept full mobile regression coverage green.

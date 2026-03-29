@@ -10,6 +10,8 @@ class DriverWorkspaceShell extends StatefulWidget {
     required this.onOpenDriverCheckIn,
     required this.onOpenVehicles,
     required this.onSignOut,
+    this.onOpenLotOwnerWorkspace,
+    this.onOpenOperatorWorkspace,
     this.onOpenLotOwnerApplication,
     this.onOpenOperatorApplication,
   });
@@ -19,6 +21,8 @@ class DriverWorkspaceShell extends StatefulWidget {
   final Future<void> Function() onOpenDriverCheckIn;
   final Future<void> Function() onOpenVehicles;
   final Future<void> Function() onSignOut;
+  final VoidCallback? onOpenLotOwnerWorkspace;
+  final VoidCallback? onOpenOperatorWorkspace;
   final VoidCallback? onOpenLotOwnerApplication;
   final VoidCallback? onOpenOperatorApplication;
 
@@ -37,6 +41,8 @@ class _DriverWorkspaceShellState extends State<DriverWorkspaceShell> {
       _DriverProfileTab(
         onOpenDriverCheckIn: widget.onOpenDriverCheckIn,
         onOpenVehicles: widget.onOpenVehicles,
+        onOpenLotOwnerWorkspace: widget.onOpenLotOwnerWorkspace,
+        onOpenOperatorWorkspace: widget.onOpenOperatorWorkspace,
         onOpenLotOwnerApplication: widget.onOpenLotOwnerApplication,
         onOpenOperatorApplication: widget.onOpenOperatorApplication,
         onSignOut: widget.onSignOut,
@@ -82,6 +88,8 @@ class _DriverProfileTab extends StatelessWidget {
     required this.onOpenDriverCheckIn,
     required this.onOpenVehicles,
     required this.onSignOut,
+    this.onOpenLotOwnerWorkspace,
+    this.onOpenOperatorWorkspace,
     this.onOpenLotOwnerApplication,
     this.onOpenOperatorApplication,
   });
@@ -89,6 +97,8 @@ class _DriverProfileTab extends StatelessWidget {
   final Future<void> Function() onOpenDriverCheckIn;
   final Future<void> Function() onOpenVehicles;
   final Future<void> Function() onSignOut;
+  final VoidCallback? onOpenLotOwnerWorkspace;
+  final VoidCallback? onOpenOperatorWorkspace;
   final VoidCallback? onOpenLotOwnerApplication;
   final VoidCallback? onOpenOperatorApplication;
 
@@ -124,6 +134,22 @@ class _DriverProfileTab extends StatelessWidget {
                 icon: const Icon(Icons.directions_car_outlined),
                 label: const Text('Xe của tôi'),
               ),
+              if (onOpenLotOwnerWorkspace != null) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: onOpenLotOwnerWorkspace,
+                  icon: const Icon(Icons.storefront_outlined),
+                  label: const Text('Không gian Chủ bãi'),
+                ),
+              ],
+              if (onOpenOperatorWorkspace != null) ...[
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: onOpenOperatorWorkspace,
+                  icon: const Icon(Icons.settings_suggest_outlined),
+                  label: const Text('Không gian Operator'),
+                ),
+              ],
               if (onOpenLotOwnerApplication != null) ...[
                 const SizedBox(height: 12),
                 FilledButton.tonalIcon(
