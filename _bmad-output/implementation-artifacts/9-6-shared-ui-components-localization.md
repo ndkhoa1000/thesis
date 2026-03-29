@@ -115,8 +115,9 @@ GPT-5.4
 - Added shared `LoadingView`, `ErrorView`, and `EmptyView` under `mobile/lib/src/shared/presentation/state_views.dart` with adaptive, light, and dark presentation support.
 - Replaced repeated loading, error, and empty-state rendering in Driver (`MapDiscoveryScreen`), Attendant (`AttendantCheckInScreen` occupancy panel), Operator (`OperatorLotManagementScreen`), Lot Owner (`ParkingLotRegistrationScreen`), and Admin (`AdminApprovalsScreen`).
 - Normalized visible workspace and role copy from lingering English/ASCII placeholders to Vietnamese across driver profile actions, management placeholders, admin approvals, operator application flow, parking-lot leasing labels, and revenue dashboards.
+- Added direct widget coverage for `LoadingView`, `ErrorView`, and `EmptyView` in both light/adaptive and dark-tone scenarios.
 - Updated attendant, workspace, admin, lease, and revenue widget tests to match the shared-state adoption and localized copy.
-- Validation passed with `flutter test test/widget_test.dart -r expanded`, `flutter test test/attendant_walk_in_check_in_test.dart -r expanded`, and full `flutter test`.
+- Validation passed with `flutter test test/state_views_test.dart -r expanded`, `flutter test test/widget_test.dart -r expanded`, `flutter test test/attendant_walk_in_check_in_test.dart -r expanded`, and full `flutter test`.
 
 ### File List
 
@@ -134,9 +135,14 @@ GPT-5.4
 - `mobile/lib/src/features/management_workspace/presentation/management_workspace_shell.dart`
 - `mobile/lib/src/features/driver_workspace/presentation/driver_workspace_shell.dart`
 - `mobile/test/widget_test.dart`
+- `mobile/test/state_views_test.dart`
 - `mobile/test/attendant_walk_in_check_in_test.dart`
 - `mobile/test/attendant_check_in_screen_test.dart`
 - `mobile/test/attendant_check_out_screen_test.dart`
 - `mobile/test/attendant_check_out_finalize_test.dart`
 - `mobile/test/shift_handover_test.dart`
 - `mobile/test/final_shift_close_out_test.dart`
+
+## Change Log
+
+- 2026-03-29: Completed Story 9.6 shared state views rollout, Vietnamese copy normalization, regression updates, and direct shared-widget test coverage.
