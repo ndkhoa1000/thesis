@@ -90,7 +90,7 @@ development_status:
   9-4-management-workspace-shells: review
   9-5-admin-workspace-shell: review
   9-6-shared-ui-components-localization: review
-  9-7-media-storage-backend-infrastructure: ready-for-dev
+  9-7-media-storage-backend-infrastructure: review
   epic-9-retrospective: optional
   epic-10: backlog
   10-1-system-push-notifications: backlog

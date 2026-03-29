@@ -8,7 +8,10 @@ from typing import Annotated, Any
 from fastapi import (
     APIRouter,
     Depends,
+    File,
+    Form,
     Request,
+    UploadFile,
     WebSocket,
     WebSocketDisconnect,
     status,
@@ -69,12 +72,21 @@ from ...schemas.parking_lot import (
     ParkingLotStatusUpdate,
 )
 from ...schemas.user import UserCreateInternal
+from ...services.cloudinary_service import cloudinary_service
 
 router = APIRouter(tags=["lots"])
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+async def _upload_parking_lot_cover_image(upload: UploadFile) -> tuple[str, str]:
+    media = await cloudinary_service.upload_image(
+        upload,
+        folder="parking-lots/cover-images",
+    )
+    return media.secure_url, media.public_id
 
 
 async def _expire_lease_and_contract_if_needed(db: AsyncSession, lease: LotLease) -> LotLease:
@@ -1021,11 +1033,30 @@ async def remove_operator_lot_attendant(
 @router.post("/user/me/parking-lots", response_model=ParkingLotRead, status_code=201)
 async def create_my_parking_lot(
     request: Request,
-    payload: ParkingLotCreate,
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
+    name: Annotated[str, Form(...)],
+    address: Annotated[str, Form(...)],
+    latitude: Annotated[float, Form(...)],
+    longitude: Annotated[float, Form(...)],
+    description: Annotated[str | None, Form()] = None,
+    cover_image: Annotated[str | None, Form()] = None,
+    cover_image_file: Annotated[UploadFile | None, File()] = None,
 ) -> ParkingLotRead:
     lot_owner = await _require_lot_owner_profile(db, current_user)
+    payload = ParkingLotCreate(
+        name=name,
+        address=address,
+        latitude=latitude,
+        longitude=longitude,
+        description=description,
+        cover_image=cover_image,
+    )
+
+    cover_image_url = payload.cover_image
+    cover_image_public_id = None
+    if cover_image_file is not None:
+        cover_image_url, cover_image_public_id = await _upload_parking_lot_cover_image(cover_image_file)
 
     parking_lot = ParkingLot(
         lot_owner_id=lot_owner.id,
@@ -1034,7 +1065,8 @@ async def create_my_parking_lot(
         latitude=payload.latitude,
         longitude=payload.longitude,
         description=payload.description,
-        cover_image=payload.cover_image,
+        cover_image=cover_image_url,
+        cover_image_public_id=cover_image_public_id,
         current_available=0,
         status=ParkingLotStatus.PENDING.value,
     )

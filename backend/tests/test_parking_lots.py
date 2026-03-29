@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
+from fastapi import UploadFile
+from starlette.datastructures import Headers
 
 from src.app.api.v1.lots import (
     create_my_parking_lot,
@@ -21,7 +23,8 @@ from src.app.models.notifications import ParkingLotAnnouncement
 from src.app.models.parking import ParkingLot, ParkingLotConfig, ParkingLotFeature, ParkingLotTag, Pricing
 from src.app.models.user import User
 from src.app.models.users import LotOwner, Manager
-from src.app.schemas.parking_lot import ParkingLotAdminRead, ParkingLotCreate, ParkingLotRead, ParkingLotReview
+from src.app.schemas.parking_lot import ParkingLotAdminRead, ParkingLotRead, ParkingLotReview
+from src.app.services.cloudinary_service import MediaUploadResult
 
 
 def _public_user(user_id: int = 1, role: str = "LOT_OWNER") -> dict:
@@ -89,9 +92,22 @@ def _parking_lot(
     parking_lot.status = status
     parking_lot.description = "Gan trung tam"
     parking_lot.cover_image = None
+    parking_lot.cover_image_public_id = None
     parking_lot.created_at = datetime.now(UTC)
     parking_lot.updated_at = None
     return parking_lot
+
+
+def _make_upload(
+    *,
+    filename: str = 'cover.jpg',
+    content_type: str = 'image/jpeg',
+) -> UploadFile:
+    return UploadFile(
+        file=Mock(read=AsyncMock(return_value=b'cover-image-bytes')),
+        filename=filename,
+        headers=Headers({'content-type': content_type}),
+    )
 
 
 def _lease(lease_id: int = 21, parking_lot_id: int = 7, manager_id: int = 4) -> LotLease:
@@ -425,20 +441,56 @@ class TestLotOwnerParkingLots:
         mock_db.commit = AsyncMock()
         mock_db.refresh = AsyncMock(side_effect=lambda parking_lot: setattr(parking_lot, "id", 17))
 
-        payload = ParkingLotCreate(
+        result = await create_my_parking_lot(
+            Mock(),
+            _public_user(),
+            mock_db,
             name="Bai xe Ben Thanh",
             address="45 Le Loi, Quan 1",
             latitude=10.7729,
             longitude=106.6983,
             description="Co camera va che mua",
             cover_image=None,
+            cover_image_file=None,
         )
-
-        result = await create_my_parking_lot(Mock(), payload, _public_user(), mock_db)
 
         assert result.lot_owner_id == 3
         assert result.status == ParkingLotStatus.PENDING.value
         mock_db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_create_my_parking_lot_uploads_cover_image(self, mock_db):
+        owner_result = MagicMock()
+        owner_result.scalar_one_or_none.return_value = _lot_owner_profile()
+        mock_db.execute = AsyncMock(return_value=owner_result)
+        created_records = []
+        mock_db.add = Mock(side_effect=lambda parking_lot: created_records.append(parking_lot))
+        mock_db.commit = AsyncMock()
+        mock_db.refresh = AsyncMock(side_effect=lambda parking_lot: setattr(parking_lot, "id", 18))
+
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            async def _upload_cover(_: UploadFile) -> tuple[str, str]:
+                return (
+                    'https://media.example/parking-lots/cover.jpg',
+                    'parking-lots/cover-123',
+                )
+
+            monkeypatch.setattr('src.app.api.v1.lots._upload_parking_lot_cover_image', _upload_cover)
+            result = await create_my_parking_lot(
+                Mock(),
+                _public_user(),
+                mock_db,
+                name="Bai xe Ben Thanh",
+                address="45 Le Loi, Quan 1",
+                latitude=10.7729,
+                longitude=106.6983,
+                description="Co camera va che mua",
+                cover_image=None,
+                cover_image_file=_make_upload(),
+            )
+
+        assert result.cover_image == 'https://media.example/parking-lots/cover.jpg'
+        assert created_records[0].cover_image_public_id == 'parking-lots/cover-123'
 
     @pytest.mark.asyncio
     async def test_create_requires_lot_owner_capability(self, mock_db):
@@ -446,15 +498,19 @@ class TestLotOwnerParkingLots:
         owner_result.scalar_one_or_none.return_value = None
         mock_db.execute = AsyncMock(return_value=owner_result)
 
-        payload = ParkingLotCreate(
-            name="Bai xe Ben Thanh",
-            address="45 Le Loi, Quan 1",
-            latitude=10.7729,
-            longitude=106.6983,
-        )
-
         with pytest.raises(ForbiddenException, match="Lot owner capability"):
-            await create_my_parking_lot(Mock(), payload, _public_user(), mock_db)
+            await create_my_parking_lot(
+                Mock(),
+                _public_user(),
+                mock_db,
+                name="Bai xe Ben Thanh",
+                address="45 Le Loi, Quan 1",
+                latitude=10.7729,
+                longitude=106.6983,
+                description=None,
+                cover_image=None,
+                cover_image_file=None,
+            )
 
     @pytest.mark.asyncio
     async def test_list_available_operators_returns_verified_profiles(self, mock_db):

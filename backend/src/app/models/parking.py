@@ -25,6 +25,7 @@ class ParkingLot(Base):
     status: Mapped[str] = mapped_column(String(20), default=ParkingLotStatus.PENDING.value)
     description: Mapped[str | None] = mapped_column(Text, default=None)
     cover_image: Mapped[str | None] = mapped_column(String(255), default=None)
+    cover_image_public_id: Mapped[str | None] = mapped_column(String(255), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default_factory=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 

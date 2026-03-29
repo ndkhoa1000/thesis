@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../shared/media/media_picker_service.dart';
 import '../../lease_contract/data/lease_contract_models.dart';
 
 class ParkingLotRegistration {
@@ -121,6 +122,7 @@ abstract class ParkingLotService {
     required double latitude,
     required double longitude,
     String? description,
+    SelectedMediaFile? coverImageFile,
     String? coverImage,
   });
 }
@@ -220,19 +222,27 @@ class BackendParkingLotService implements ParkingLotService {
     required double latitude,
     required double longitude,
     String? description,
+    SelectedMediaFile? coverImageFile,
     String? coverImage,
   }) async {
     try {
+      final formData = FormData.fromMap({
+        'name': name,
+        'address': address,
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+        if (description != null) 'description': description,
+        if (coverImage != null) 'cover_image': coverImage,
+        if (coverImageFile != null)
+          'cover_image_file': await MultipartFile.fromFile(
+            coverImageFile.path,
+            filename: coverImageFile.fileName,
+          ),
+      });
+
       final response = await _dio.post<dynamic>(
         '/user/me/parking-lots',
-        data: {
-          'name': name,
-          'address': address,
-          'latitude': latitude,
-          'longitude': longitude,
-          'description': description,
-          'cover_image': coverImage,
-        },
+        data: formData,
         options: _authOptions,
       );
       final raw = response.data;

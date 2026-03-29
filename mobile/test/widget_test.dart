@@ -24,6 +24,7 @@ import 'package:parking_app/src/features/operator_lot_management/presentation/op
 import 'package:parking_app/src/features/owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart';
 import 'package:parking_app/src/features/parking_lot_registration/data/parking_lot_service.dart';
 import 'package:parking_app/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
+import 'package:parking_app/src/shared/media/media_picker_service.dart';
 import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
 import 'package:parking_app/src/features/vehicles/presentation/vehicle_screen.dart';
 
@@ -489,6 +490,7 @@ class FakeParkingLotService implements ParkingLotService {
     : _parkingLots = List<ParkingLotRegistration>.from(initialLots ?? const []);
 
   final List<ParkingLotRegistration> _parkingLots;
+  SelectedMediaFile? lastCoverImageFile;
   final List<AvailableOperatorOption> _operators = <AvailableOperatorOption>[
     const AvailableOperatorOption(
       managerId: 4,
@@ -510,8 +512,10 @@ class FakeParkingLotService implements ParkingLotService {
     required double latitude,
     required double longitude,
     String? description,
+    SelectedMediaFile? coverImageFile,
     String? coverImage,
   }) async {
+    lastCoverImageFile = coverImageFile;
     final parkingLot = ParkingLotRegistration(
       id: _nextId++,
       lotOwnerId: 1,
@@ -522,7 +526,7 @@ class FakeParkingLotService implements ParkingLotService {
       currentAvailable: 0,
       status: 'PENDING',
       description: description,
-      coverImage: coverImage,
+      coverImage: coverImage ?? coverImageFile?.fileName,
     );
     _parkingLots.insert(0, parkingLot);
     return parkingLot;
@@ -592,6 +596,15 @@ class FakeParkingLotService implements ParkingLotService {
       generatedAt: DateTime(2026, 3, 28),
     );
   }
+}
+
+class FakeMediaPickerService implements MediaPickerService {
+  FakeMediaPickerService(this.result);
+
+  final SelectedMediaFile? result;
+
+  @override
+  Future<SelectedMediaFile?> pickCompressedImage() async => result;
 }
 
 class FakeOwnerRevenueDashboardService implements OwnerRevenueDashboardService {
@@ -1980,6 +1993,9 @@ void main() {
   ) async {
     final parkingLotService = FakeParkingLotService();
     final ownerRevenueDashboardService = FakeOwnerRevenueDashboardService();
+    final mediaPickerService = FakeMediaPickerService(
+      const SelectedMediaFile(path: '/tmp/cover.jpg', fileName: 'cover.jpg'),
+    );
 
     await tester.pumpWidget(
       MaterialApp(
@@ -1987,6 +2003,7 @@ void main() {
           parkingLotService: parkingLotService,
           ownerRevenueDashboardService: ownerRevenueDashboardService,
           onSignOut: () async {},
+          mediaPickerService: mediaPickerService,
         ),
       ),
     );
@@ -2017,12 +2034,22 @@ void main() {
       find.widgetWithText(TextFormField, 'Mô tả'),
       'Co camera va che mua',
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Gửi đăng ký'));
+    expect(
+      find.widgetWithText(TextFormField, 'Link ảnh đại diện'),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('pickCoverImageButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Đã chọn: cover.jpg'), findsOneWidget);
+    final submitButton = find.widgetWithText(FilledButton, 'Gửi đăng ký');
+    await tester.ensureVisible(submitButton);
+    await tester.tap(submitButton);
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.text('Bai xe Ben Thanh'), findsOneWidget);
     expect(find.text('Đang chờ duyệt'), findsOneWidget);
+    expect(parkingLotService.lastCoverImageFile?.fileName, 'cover.jpg');
   });
 
   testWidgets('Lot owner workspace can create a lease contract draft', (

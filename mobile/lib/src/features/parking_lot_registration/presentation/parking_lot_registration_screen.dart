@@ -2,22 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
+import '../../../shared/media/media_picker_service.dart';
 import '../../../shared/presentation/state_views.dart';
 import '../../owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart';
 import '../../owner_revenue_dashboard/presentation/owner_revenue_dashboard_sheet.dart';
 import '../data/parking_lot_service.dart';
 
 class ParkingLotRegistrationScreen extends StatefulWidget {
-  const ParkingLotRegistrationScreen({
+  ParkingLotRegistrationScreen({
     super.key,
     required this.parkingLotService,
     required this.ownerRevenueDashboardService,
     required this.onSignOut,
-  });
+    MediaPickerService? mediaPickerService,
+  }) : mediaPickerService = mediaPickerService ?? DeviceMediaPickerService();
 
   final ParkingLotService parkingLotService;
   final OwnerRevenueDashboardService ownerRevenueDashboardService;
   final Future<void> Function() onSignOut;
+  final MediaPickerService mediaPickerService;
 
   @override
   State<ParkingLotRegistrationScreen> createState() =>
@@ -52,6 +55,7 @@ class _ParkingLotRegistrationScreenState
               required latitude,
               required longitude,
               description,
+              coverImageFile,
               coverImage,
             }) async {
               await widget.parkingLotService.createParkingLot(
@@ -60,9 +64,11 @@ class _ParkingLotRegistrationScreenState
                 latitude: latitude,
                 longitude: longitude,
                 description: description,
+                coverImageFile: coverImageFile,
                 coverImage: coverImage,
               );
             },
+        mediaPickerService: widget.mediaPickerService,
       ),
     );
 
@@ -595,7 +601,10 @@ class _PickedLotLocation {
 }
 
 class _ParkingLotRegistrationForm extends StatefulWidget {
-  const _ParkingLotRegistrationForm({required this.onSubmit});
+  _ParkingLotRegistrationForm({
+    required this.onSubmit,
+    required this.mediaPickerService,
+  });
 
   final Future<void> Function({
     required String name,
@@ -603,9 +612,11 @@ class _ParkingLotRegistrationForm extends StatefulWidget {
     required double latitude,
     required double longitude,
     String? description,
+    SelectedMediaFile? coverImageFile,
     String? coverImage,
   })
   onSubmit;
+  final MediaPickerService mediaPickerService;
 
   @override
   State<_ParkingLotRegistrationForm> createState() =>
@@ -618,9 +629,9 @@ class _ParkingLotRegistrationFormState
   final _nameController = TextEditingController();
   final _addressController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _coverImageController = TextEditingController();
 
   _PickedLotLocation? _selectedLocation;
+  SelectedMediaFile? _selectedCoverImage;
   bool _isSubmitting = false;
 
   @override
@@ -628,7 +639,6 @@ class _ParkingLotRegistrationFormState
     _nameController.dispose();
     _addressController.dispose();
     _descriptionController.dispose();
-    _coverImageController.dispose();
     super.dispose();
   }
 
@@ -644,6 +654,16 @@ class _ParkingLotRegistrationFormState
     }
     setState(() {
       _selectedLocation = selected;
+    });
+  }
+
+  Future<void> _pickCoverImage() async {
+    final selected = await widget.mediaPickerService.pickCompressedImage();
+    if (selected == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _selectedCoverImage = selected;
     });
   }
 
@@ -669,7 +689,8 @@ class _ParkingLotRegistrationFormState
         latitude: location.latitude,
         longitude: location.longitude,
         description: _emptyToNull(_descriptionController.text),
-        coverImage: _emptyToNull(_coverImageController.text),
+        coverImageFile: _selectedCoverImage,
+        coverImage: null,
       );
 
       if (!mounted) {
@@ -803,10 +824,57 @@ class _ParkingLotRegistrationFormState
                   decoration: const InputDecoration(labelText: 'Mô tả'),
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _coverImageController,
-                  decoration: const InputDecoration(
-                    labelText: 'Link ảnh đại diện',
+                Text(
+                  'Ảnh đại diện',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedCoverImage == null
+                            ? 'Chưa chọn ảnh. Hệ thống sẽ nén ảnh phù hợp trước khi tải lên máy chủ.'
+                            : 'Đã chọn: ${_selectedCoverImage!.fileName}',
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            key: const ValueKey('pickCoverImageButton'),
+                            onPressed: _isSubmitting ? null : _pickCoverImage,
+                            icon: const Icon(Icons.image_outlined),
+                            label: Text(
+                              _selectedCoverImage == null
+                                  ? 'Chọn ảnh đại diện'
+                                  : 'Chọn lại ảnh đại diện',
+                            ),
+                          ),
+                          if (_selectedCoverImage != null)
+                            TextButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _selectedCoverImage = null;
+                                      });
+                                    },
+                              child: const Text('Bỏ ảnh đã chọn'),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 20),

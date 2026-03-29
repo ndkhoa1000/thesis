@@ -1,6 +1,6 @@
 # Story 9.7: Media Storage & Backend Infrastructure
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -26,25 +26,25 @@ so that all business forms that require file or image paths can correctly upload
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add backend Cloudinary infrastructure (AC: 2, 3, 4)
-  - [ ] Implement or complete `backend/src/app/services/cloudinary_service.py` and backend configuration for `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`.
-  - [ ] Add a reusable backend upload helper or endpoint layer that validates content type, size, and authorization before handing off to Cloudinary.
-  - [ ] Persist returned `secure_url`, `public_id`, and any required metadata in the correct entity fields.
+- [x] Task 1: Add backend Cloudinary infrastructure (AC: 2, 3, 4)
+  - [x] Implement or complete `backend/src/app/services/cloudinary_service.py` and backend configuration for `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`.
+  - [x] Add a reusable backend upload helper or endpoint layer that validates content type, size, and authorization before handing off to Cloudinary.
+  - [x] Persist returned `secure_url`, `public_id`, and any required metadata in the correct entity fields.
 
-- [ ] Task 2: Reuse and evolve the current multipart pattern (AC: 1, 2, 4)
-  - [ ] Refactor the current walk-in upload handling in `sessions.py` away from local disk storage toward the shared media service.
-  - [ ] Keep existing walk-in contracts functional while changing the storage backend.
-  - [ ] Standardize request and response patterns so future media forms can reuse the same infrastructure.
+- [x] Task 2: Reuse and evolve the current multipart pattern (AC: 1, 2, 4)
+  - [x] Refactor the current walk-in upload handling in `sessions.py` away from local disk storage toward the shared media service.
+  - [x] Keep existing walk-in contracts functional while changing the storage backend.
+  - [x] Standardize request and response patterns so future media forms can reuse the same infrastructure.
 
-- [ ] Task 3: Integrate at least one real mobile form with the new upload flow (AC: 1, 3, 4)
-  - [ ] Update a current form such as parking-lot registration cover image to use native file selection and multipart upload instead of a manual URL field.
-  - [ ] Add a mobile-side media helper/service that performs file selection and upload through FastAPI, not directly to Cloudinary.
-  - [ ] Keep the mobile client thin and avoid embedding Cloudinary secrets or signature logic in Flutter.
+- [x] Task 3: Integrate at least one real mobile form with the new upload flow (AC: 1, 3, 4)
+  - [x] Update a current form such as parking-lot registration cover image to use native file selection and multipart upload instead of a manual URL field.
+  - [x] Add a mobile-side media helper/service that performs file selection and upload through FastAPI, not directly to Cloudinary.
+  - [x] Keep the mobile client thin and avoid embedding Cloudinary secrets or signature logic in Flutter.
 
-- [ ] Task 4: Add regression coverage and configuration checks (AC: 1, 2, 3, 4)
-  - [ ] Add backend tests for authorization, content-type validation, Cloudinary service integration boundaries, and persistence of returned URLs.
-  - [ ] Add Flutter tests for upload-service error handling and the selected integrated form.
-  - [ ] Verify with `cd backend && docker compose run --rm pytest` and `cd mobile && flutter test`.
+- [x] Task 4: Add regression coverage and configuration checks (AC: 1, 2, 3, 4)
+  - [x] Add backend tests for authorization, content-type validation, Cloudinary service integration boundaries, and persistence of returned URLs.
+  - [x] Add Flutter tests for upload-service error handling and the selected integrated form.
+  - [x] Verify with `cd backend && docker compose run --rm pytest` and `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -121,16 +121,30 @@ GPT-5.4
 
 - Story context anchored on architecture and tech-design Cloudinary requirements, the current local-disk walk-in upload implementation, and the still-manual `cover_image` string workflow in lot registration.
 - Added guardrails to force backend-brokered media flow and to avoid direct mobile Cloudinary access.
+- Added shared backend Cloudinary media infrastructure, `public_id` persistence fields, and a migration so walk-in uploads and parking-lot cover images now store Cloudinary-backed references instead of local-disk paths or manual text URLs.
+- Reworked the parking-lot registration form to use a native compressed image picker and multipart upload flow through FastAPI, backed by focused service/widget tests.
+- Validation completed with `cd backend && docker compose run --rm pytest` passing 201 tests and `cd mobile && flutter test` passing 85 tests.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/9-7-media-storage-backend-infrastructure.md`
+- `backend/pyproject.toml`
+- `backend/uv.lock`
 - `backend/src/app/core/config.py`
 - `backend/src/app/services/cloudinary_service.py`
+- `backend/src/app/models/parking.py`
+- `backend/src/app/models/sessions.py`
 - `backend/src/app/api/v1/sessions.py`
-- `backend/tests/`
-- `mobile/lib/src/features/attendant_check_in/data/attendant_check_in_service.dart`
+- `backend/src/app/api/v1/lots.py`
+- `backend/src/migrations/versions/e7c9a1b2d3f4_add_media_public_ids.py`
+- `backend/tests/test_walk_in_check_in.py`
+- `backend/tests/test_parking_lots.py`
 - `mobile/lib/src/features/parking_lot_registration/data/parking_lot_service.dart`
 - `mobile/lib/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart`
-- `mobile/lib/src/shared/`
-- `mobile/test/`
+- `mobile/lib/src/shared/media/media_picker_service.dart`
+- `mobile/test/widget_test.dart`
+- `mobile/test/parking_lot_service_test.dart`
+
+### Change Log
+
+- 2026-03-29: Completed Story 9.7 by adding Cloudinary-backed media storage infrastructure, migrating walk-in and parking-lot cover-image uploads to the shared multipart pipeline, persisting Cloudinary public IDs, and validating with full backend/mobile regression suites.

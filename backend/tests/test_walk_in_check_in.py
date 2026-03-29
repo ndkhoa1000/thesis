@@ -12,6 +12,7 @@ from src.app.core.exceptions.http_exceptions import BadRequestException, Forbidd
 from src.app.models.parking import ParkingLot
 from src.app.models.sessions import ParkingSession
 from src.app.models.users import Attendant
+from src.app.services.cloudinary_service import MediaUploadResult
 
 
 def _attendant_user(user_id: int = 51) -> dict:
@@ -77,7 +78,11 @@ class TestAttendantWalkInCheckIn:
 
         with patch(
             'src.app.api.v1.sessions._store_walk_in_image',
-            return_value='walk-in://plate.jpg',
+            return_value=MediaUploadResult(
+                secure_url='https://media.example/walk-in/plate.jpg',
+                public_id='walk-in/plate-123',
+                resource_type='image',
+            ),
         ):
             result = await attendant_check_in_walk_in_vehicle(
                 Mock(),
@@ -94,7 +99,8 @@ class TestAttendantWalkInCheckIn:
         assert result.license_plate.startswith('WALK-IN-')
         assert len(created_sessions) == 1
         assert created_sessions[0].driver_id is None
-        assert created_sessions[0].checkin_image == 'walk-in://plate.jpg'
+        assert created_sessions[0].checkin_image == 'https://media.example/walk-in/plate.jpg'
+        assert created_sessions[0].checkin_image_public_id == 'walk-in/plate-123'
         assert lot.current_available == 4
         mock_db.commit.assert_awaited_once()
 

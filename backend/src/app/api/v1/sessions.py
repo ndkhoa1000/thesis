@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime, timedelta
 from math import ceil
-from pathlib import Path
 from secrets import token_urlsafe
 from typing import Annotated, Any
 
@@ -55,12 +54,12 @@ from ...schemas.session import (
     DriverParkingHistoryItemRead,
 )
 from ...schemas.vehicle import VehicleRead
+from ...services.cloudinary_service import MediaUploadResult, cloudinary_service
 
 router = APIRouter(tags=["sessions"])
 DRIVER_CHECK_IN_TOKEN_TTL = timedelta(minutes=5)
 DRIVER_CHECK_OUT_TOKEN_TTL = timedelta(minutes=5)
 CHECK_OUT_UNDO_WINDOW = timedelta(seconds=3)
-WALK_IN_IMAGE_DIR = Path(__file__).resolve().parents[2] / "uploads" / "walk_in_check_in"
 
 
 def _utcnow() -> datetime:
@@ -385,21 +384,11 @@ def _calculate_session_duration_minutes(session: ParkingSession) -> int:
     return int(elapsed_seconds // 60)
 
 
-async def _store_walk_in_image(upload: UploadFile) -> str:
-    content_type = upload.content_type or ""
-    if not content_type.startswith("image/"):
-        raise BadRequestException("Walk-in photo upload must be an image")
-
-    payload = await upload.read()
-    if not payload:
-        raise BadRequestException("Walk-in plate photo is required")
-
-    suffix = Path(upload.filename or "walk-in.jpg").suffix or ".jpg"
-    WALK_IN_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-    stored_name = f"{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}-{token_urlsafe(6)}{suffix}"
-    stored_path = WALK_IN_IMAGE_DIR / stored_name
-    stored_path.write_bytes(payload)
-    return stored_path.relative_to(Path(__file__).resolve().parents[2]).as_posix()
+async def _store_walk_in_image(upload: UploadFile) -> MediaUploadResult:
+    return await cloudinary_service.upload_image(
+        upload,
+        folder="parking-sessions/walk-in-check-in",
+    )
 
 
 @router.get("/sessions", status_code=200)
@@ -1062,7 +1051,6 @@ async def attendant_check_in_walk_in_vehicle(
         raise BadRequestException("A plate photo is required for walk-in check-in")
 
     normalized_vehicle_type = _normalize_walk_in_vehicle_type(vehicle_type)
-    plate_image_path = await _store_walk_in_image(plate_image)
     if overview_image is not None:
         content_type = overview_image.content_type or ""
         if not content_type.startswith("image/"):
@@ -1071,13 +1059,16 @@ async def attendant_check_in_walk_in_vehicle(
     if parking_lot.current_available <= 0:
         raise BadRequestException("Lot is full - no available spots.")
 
+    plate_image_upload = await _store_walk_in_image(plate_image)
+
     previous_current_available = parking_lot.current_available
     created_session = ParkingSession(
         parking_lot_id=parking_lot.id,
         license_plate=_build_walk_in_license_plate(),
         attendant_checkin_id=attendant.id,
         vehicle_type=normalized_vehicle_type,
-        checkin_image=plate_image_path,
+        checkin_image=plate_image_upload.secure_url,
+        checkin_image_public_id=plate_image_upload.public_id,
     )
     parking_lot.current_available -= 1
     db.add(created_session)

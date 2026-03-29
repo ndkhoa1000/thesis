@@ -175,6 +175,16 @@ class CORSSettings(BaseSettings):
     CORS_HEADERS: list[str] = ["*"]
 
 
+class CloudinarySettings(BaseSettings):
+    CLOUDINARY_CLOUD_NAME: str | None = None
+    CLOUDINARY_API_KEY: str | None = None
+    CLOUDINARY_API_SECRET: SecretStr | None = None
+
+
+class MediaUploadSettings(BaseSettings):
+    MEDIA_UPLOAD_MAX_BYTES: int = 5 * 1024 * 1024
+
+
 class Settings(
     AppSettings,
     SQLiteSettings,
@@ -190,6 +200,8 @@ class Settings(
     CRUDAdminSettings,
     EnvironmentSettings,
     CORSSettings,
+    CloudinarySettings,
+    MediaUploadSettings,
     FileLoggerSettings,
     ConsoleLoggerSettings,
 ):
