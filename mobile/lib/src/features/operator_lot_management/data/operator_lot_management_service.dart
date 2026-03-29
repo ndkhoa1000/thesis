@@ -273,10 +273,125 @@ class OperatorFinalShiftCloseOutDetail {
   }
 }
 
+class OperatorRevenueVehicleBreakdown {
+  const OperatorRevenueVehicleBreakdown({
+    required this.vehicleType,
+    required this.sessionCount,
+  });
+
+  final String vehicleType;
+  final int sessionCount;
+
+  factory OperatorRevenueVehicleBreakdown.fromJson(Map<String, dynamic> json) {
+    return OperatorRevenueVehicleBreakdown(
+      vehicleType: json['vehicle_type'] as String,
+      sessionCount: json['session_count'] as int? ?? 0,
+    );
+  }
+}
+
+enum OperatorRevenuePeriod {
+  day('DAY', 'Ngày'),
+  week('WEEK', 'Tuần'),
+  month('MONTH', 'Tháng');
+
+  const OperatorRevenuePeriod(this.apiValue, this.label);
+
+  final String apiValue;
+  final String label;
+}
+
+class OperatorRevenueSummary {
+  const OperatorRevenueSummary({
+    required this.parkingLotId,
+    required this.parkingLotName,
+    required this.period,
+    required this.rangeStart,
+    required this.rangeEnd,
+    required this.completedPaymentCount,
+    required this.completedSessionCount,
+    required this.hasData,
+    required this.vehicleTypeBreakdown,
+    this.leaseStatus,
+    this.ownerName,
+    this.revenueSharePercentage,
+    this.leaseStartDate,
+    this.leaseEndDate,
+    this.totalCapacity,
+    this.occupancyRatePercentage,
+    this.grossRevenue,
+    this.ownerShare,
+    this.operatorShare,
+    this.emptyReason,
+    this.emptyMessage,
+  });
+
+  final int parkingLotId;
+  final String parkingLotName;
+  final OperatorRevenuePeriod period;
+  final DateTime rangeStart;
+  final DateTime rangeEnd;
+  final String? leaseStatus;
+  final String? ownerName;
+  final double? revenueSharePercentage;
+  final DateTime? leaseStartDate;
+  final DateTime? leaseEndDate;
+  final int? totalCapacity;
+  final double? occupancyRatePercentage;
+  final int completedPaymentCount;
+  final int completedSessionCount;
+  final bool hasData;
+  final double? grossRevenue;
+  final double? ownerShare;
+  final double? operatorShare;
+  final List<OperatorRevenueVehicleBreakdown> vehicleTypeBreakdown;
+  final String? emptyReason;
+  final String? emptyMessage;
+
+  factory OperatorRevenueSummary.fromJson(Map<String, dynamic> json) {
+    return OperatorRevenueSummary(
+      parkingLotId: json['parking_lot_id'] as int,
+      parkingLotName: json['parking_lot_name'] as String,
+      period: OperatorRevenuePeriod.values.firstWhere(
+        (item) => item.apiValue == json['period'],
+      ),
+      rangeStart: DateTime.parse(json['range_start'] as String),
+      rangeEnd: DateTime.parse(json['range_end'] as String),
+      leaseStatus: json['lease_status'] as String?,
+      ownerName: json['owner_name'] as String?,
+      revenueSharePercentage: (json['revenue_share_percentage'] as num?)
+          ?.toDouble(),
+      leaseStartDate: _parseDateTime(json['lease_start_date']),
+      leaseEndDate: _parseDateTime(json['lease_end_date']),
+      totalCapacity: json['total_capacity'] as int?,
+      occupancyRatePercentage: (json['occupancy_rate_percentage'] as num?)
+          ?.toDouble(),
+      completedPaymentCount: json['completed_payment_count'] as int? ?? 0,
+      completedSessionCount: json['completed_session_count'] as int? ?? 0,
+      hasData: json['has_data'] as bool? ?? false,
+      grossRevenue: (json['gross_revenue'] as num?)?.toDouble(),
+      ownerShare: (json['owner_share'] as num?)?.toDouble(),
+      operatorShare: (json['operator_share'] as num?)?.toDouble(),
+      vehicleTypeBreakdown:
+          (json['vehicle_type_breakdown'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .map(OperatorRevenueVehicleBreakdown.fromJson)
+              .toList(growable: false),
+      emptyReason: json['empty_reason'] as String?,
+      emptyMessage: json['empty_message'] as String?,
+    );
+  }
+}
+
 abstract class OperatorLotManagementService {
   Future<List<OperatorManagedParkingLot>> getManagedParkingLots();
 
   Future<List<LeaseContractSummary>> getLeaseContracts();
+
+  Future<OperatorRevenueSummary> getRevenueSummary({
+    required int parkingLotId,
+    required OperatorRevenuePeriod period,
+  });
 
   Future<LeaseContractSummary> acceptLeaseContract({required int leaseId});
 
@@ -408,7 +523,32 @@ class BackendOperatorLotManagementService
   }
 
   @override
-  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId}) async {
+  Future<OperatorRevenueSummary> getRevenueSummary({
+    required int parkingLotId,
+    required OperatorRevenuePeriod period,
+  }) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/reports/operator/parking-lots/$parkingLotId/revenue',
+        queryParameters: {'period': period.apiValue},
+        options: _authOptions,
+      );
+      final raw = response.data;
+      if (raw is! Map<String, dynamic>) {
+        throw const OperatorLotManagementException(
+          'Phản hồi dashboard doanh thu operator không hợp lệ.',
+        );
+      }
+      return OperatorRevenueSummary.fromJson(raw);
+    } on DioException catch (error) {
+      throw OperatorLotManagementException(_extractMessage(error));
+    }
+  }
+
+  @override
+  Future<LeaseContractSummary> acceptLeaseContract({
+    required int leaseId,
+  }) async {
     try {
       final response = await _dio.post<dynamic>(
         '/leases/operator/contracts/$leaseId/accept',

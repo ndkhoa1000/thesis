@@ -670,6 +670,7 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
     List<LeaseContractSummary>? initialContracts,
     Map<int, List<OperatorManagedAttendant>>? attendantsByLot,
     Map<int, List<OperatorLotAnnouncement>>? announcementsByLot,
+    Map<int, Map<OperatorRevenuePeriod, OperatorRevenueSummary>>? revenueByLot,
   }) : _parkingLots = List<OperatorManagedParkingLot>.from(
          initialLots ?? const [],
        ),
@@ -689,12 +690,15 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
                      const <int, List<OperatorLotAnnouncement>>{})
                  .entries)
            entry.key: List<OperatorLotAnnouncement>.from(entry.value),
-       };
+       },
+       _revenueByLot = revenueByLot ?? const {};
 
   final List<OperatorManagedParkingLot> _parkingLots;
   final List<LeaseContractSummary> _contracts;
   final Map<int, List<OperatorManagedAttendant>> _attendantsByLot;
   final Map<int, List<OperatorLotAnnouncement>> _announcementsByLot;
+  final Map<int, Map<OperatorRevenuePeriod, OperatorRevenueSummary>>
+  _revenueByLot;
   int _nextAttendantId = 200;
   int _nextAnnouncementId = 300;
 
@@ -706,6 +710,34 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   @override
   Future<List<LeaseContractSummary>> getLeaseContracts() async {
     return List<LeaseContractSummary>.from(_contracts);
+  }
+
+  @override
+  Future<OperatorRevenueSummary> getRevenueSummary({
+    required int parkingLotId,
+    required OperatorRevenuePeriod period,
+  }) async {
+    final lotReports = _revenueByLot[parkingLotId];
+    if (lotReports != null && lotReports.containsKey(period)) {
+      return lotReports[period]!;
+    }
+
+    return OperatorRevenueSummary(
+      parkingLotId: parkingLotId,
+      parkingLotName: 'Bai xe Nguyen Hue',
+      period: period,
+      rangeStart: DateTime(2026, 3, 29),
+      rangeEnd: DateTime(2026, 3, 29),
+      leaseStatus: 'ACTIVE',
+      ownerName: 'Nguyen Van A',
+      completedPaymentCount: 0,
+      completedSessionCount: 0,
+      hasData: false,
+      vehicleTypeBreakdown: const [],
+      emptyReason: 'NO_COMPLETED_PAYMENTS',
+      emptyMessage:
+          'Không có phiên hoàn tất đã thanh toán trong khoảng thời gian đã chọn.',
+    );
   }
 
   @override
@@ -2115,6 +2147,190 @@ void main() {
 
     expect(find.text('Hợp đồng chờ xác nhận'), findsNothing);
     expect(find.text('Bai xe Nguyen Hue'), findsOneWidget);
+  });
+
+  testWidgets('Operator revenue dashboard shows metrics and period switching', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 7,
+          leaseId: 88,
+          lotOwnerId: 1,
+          name: 'Bai xe Nguyen Hue',
+          address: '1 Nguyen Hue, Quan 1',
+          latitude: 10.7732,
+          longitude: 106.7041,
+          currentAvailable: 5,
+          status: 'APPROVED',
+          occupiedCount: 3,
+          totalCapacity: 20,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'HOURLY',
+          priceAmount: 15000,
+        ),
+      ],
+      revenueByLot: {
+        7: {
+          OperatorRevenuePeriod.day: OperatorRevenueSummary(
+            parkingLotId: 7,
+            parkingLotName: 'Bai xe Nguyen Hue',
+            period: OperatorRevenuePeriod.day,
+            rangeStart: DateTime(2026, 3, 29),
+            rangeEnd: DateTime(2026, 3, 29),
+            leaseStatus: 'ACTIVE',
+            ownerName: 'Nguyen Van A',
+            revenueSharePercentage: 35,
+            totalCapacity: 20,
+            occupancyRatePercentage: 5.0,
+            completedPaymentCount: 2,
+            completedSessionCount: 2,
+            hasData: true,
+            grossRevenue: 400000,
+            ownerShare: 140000,
+            operatorShare: 260000,
+            vehicleTypeBreakdown: const [
+              OperatorRevenueVehicleBreakdown(
+                vehicleType: 'CAR',
+                sessionCount: 1,
+              ),
+              OperatorRevenueVehicleBreakdown(
+                vehicleType: 'MOTORBIKE',
+                sessionCount: 1,
+              ),
+            ],
+          ),
+          OperatorRevenuePeriod.week: OperatorRevenueSummary(
+            parkingLotId: 7,
+            parkingLotName: 'Bai xe Nguyen Hue',
+            period: OperatorRevenuePeriod.week,
+            rangeStart: DateTime(2026, 3, 23),
+            rangeEnd: DateTime(2026, 3, 29),
+            leaseStatus: 'ACTIVE',
+            ownerName: 'Nguyen Van A',
+            revenueSharePercentage: 35,
+            totalCapacity: 20,
+            occupancyRatePercentage: 14.0,
+            completedPaymentCount: 5,
+            completedSessionCount: 5,
+            hasData: true,
+            grossRevenue: 900000,
+            ownerShare: 315000,
+            operatorShare: 585000,
+            vehicleTypeBreakdown: const [
+              OperatorRevenueVehicleBreakdown(
+                vehicleType: 'CAR',
+                sessionCount: 3,
+              ),
+              OperatorRevenueVehicleBreakdown(
+                vehicleType: 'MOTORBIKE',
+                sessionCount: 2,
+              ),
+            ],
+          ),
+        },
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Doanh thu'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Dashboard operator'), findsOneWidget);
+    expect(find.text('260000 VND'), findsOneWidget);
+    expect(find.text('5.0%'), findsOneWidget);
+    expect(find.text('CAR'), findsOneWidget);
+
+    await tester.tap(find.text('Tuần'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('585000 VND'), findsOneWidget);
+    expect(find.text('14.0%'), findsOneWidget);
+    expect(find.text('3 phiên'), findsOneWidget);
+  });
+
+  testWidgets('Operator revenue dashboard shows empty state for expired lease', (
+    WidgetTester tester,
+  ) async {
+    final lotManagementService = FakeOperatorLotManagementService(
+      initialLots: const [
+        OperatorManagedParkingLot(
+          id: 9,
+          leaseId: 91,
+          lotOwnerId: 1,
+          name: 'Bai xe Ben Thanh',
+          address: '45 Le Loi, Quan 1',
+          latitude: 10.7719,
+          longitude: 106.6983,
+          currentAvailable: 8,
+          status: 'APPROVED',
+          occupiedCount: 0,
+          totalCapacity: 10,
+          openingTime: '06:00',
+          closingTime: '22:00',
+          pricingMode: 'SESSION',
+          priceAmount: 12000,
+        ),
+      ],
+      revenueByLot: {
+        9: {
+          OperatorRevenuePeriod.day: OperatorRevenueSummary(
+            parkingLotId: 9,
+            parkingLotName: 'Bai xe Ben Thanh',
+            period: OperatorRevenuePeriod.day,
+            rangeStart: DateTime(2026, 3, 29),
+            rangeEnd: DateTime(2026, 3, 29),
+            leaseStatus: 'EXPIRED',
+            ownerName: 'Nguyen Van A',
+            revenueSharePercentage: 35,
+            totalCapacity: 10,
+            completedPaymentCount: 0,
+            completedSessionCount: 0,
+            hasData: false,
+            vehicleTypeBreakdown: const [],
+            emptyReason: 'NO_COMPLETED_PAYMENTS',
+            emptyMessage:
+                'Không có phiên hoàn tất đã thanh toán trong khoảng thời gian đã chọn.',
+          ),
+        },
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OperatorLotManagementScreen(
+          lotManagementService: lotManagementService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Doanh thu'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('EXPIRED'), findsOneWidget);
+    expect(find.text('Chưa có dữ liệu vận hành'), findsOneWidget);
+    expect(
+      find.text(
+        'Không có phiên hoàn tất đã thanh toán trong khoảng thời gian đã chọn.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Admin dashboard can approve a pending parking lot', (

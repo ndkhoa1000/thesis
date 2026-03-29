@@ -81,7 +81,7 @@ development_status:
   epic-8: in-progress
   8-1-create-lease-contract: review
   8-2-owner-revenue-dashboard: review
-  8-3-operator-revenue-dashboard: ready-for-dev
+  8-3-operator-revenue-dashboard: review
   epic-8-retrospective: optional
   epic-9: backlog
   9-1-app-routing-foundation-dual-theme-system: backlog

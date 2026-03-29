@@ -1,6 +1,6 @@
 # Story 8.3: Operator Revenue Dashboard
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that I know how much my business makes.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add operator-scoped backend reporting endpoints (AC: 1, 2, 4, 5)
-  - [ ] Implement or extend a backend reporting module, preferably `backend/src/app/api/v1/reports.py`, for operator revenue/performance reads filtered by lot and reporting period.
-  - [ ] Return a typed summary including gross revenue, operator share, owner share, completed session count, occupancy-rate context, vehicle-type breakdown, and lease status.
-  - [ ] Enforce operator scoping through accepted lease ownership rather than loose role checks or client-submitted lot IDs.
+- [x] Task 1: Add operator-scoped backend reporting endpoints (AC: 1, 2, 4, 5)
+  - [x] Implement or extend a backend reporting module, preferably `backend/src/app/api/v1/reports.py`, for operator revenue/performance reads filtered by lot and reporting period.
+  - [x] Return a typed summary including gross revenue, operator share, owner share, completed session count, occupancy-rate context, vehicle-type breakdown, and lease status.
+  - [x] Enforce operator scoping through accepted lease ownership rather than loose role checks or client-submitted lot IDs.
 
-- [ ] Task 2: Reuse authoritative operational and financial data sources (AC: 1, 2, 3, 5)
-  - [ ] Aggregate finalized `Payment` records and completed `ParkingSession` data instead of recomputing business totals from UI state.
-  - [ ] Reuse occupancy/reporting patterns already established in attendant and parking-history stories where appropriate.
-  - [ ] Ensure historical reads remain available after lease expiration while exposing the inactive lease state explicitly.
+- [x] Task 2: Reuse authoritative operational and financial data sources (AC: 1, 2, 3, 5)
+  - [x] Aggregate finalized `Payment` records and completed `ParkingSession` data instead of recomputing business totals from UI state.
+  - [x] Reuse occupancy/reporting patterns already established in attendant and parking-history stories where appropriate.
+  - [x] Ensure historical reads remain available after lease expiration while exposing the inactive lease state explicitly.
 
-- [ ] Task 3: Add an operator-facing revenue dashboard surface in the mobile app (AC: 1, 2, 3, 5)
-  - [ ] Add a dedicated operator revenue feature or a clearly separated operator reporting surface compatible with the current `OperatorLotManagementScreen` reachability.
-  - [ ] Support period switching, multi-metric summary rendering, vehicle-type breakdown presentation, and honest empty/error states.
-  - [ ] Keep the UX aligned with the current bright MD3 management experience rather than importing attendant-style operational layouts.
+- [x] Task 3: Add an operator-facing revenue dashboard surface in the mobile app (AC: 1, 2, 3, 5)
+  - [x] Add a dedicated operator revenue feature or a clearly separated operator reporting surface compatible with the current `OperatorLotManagementScreen` reachability.
+  - [x] Support period switching, multi-metric summary rendering, vehicle-type breakdown presentation, and honest empty/error states.
+  - [x] Keep the UX aligned with the current bright MD3 management experience rather than importing attendant-style operational layouts.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for operator-only scoping, period aggregation, session-count and vehicle-breakdown correctness, expired-lease visibility, and no-data ranges.
-  - [ ] Add Flutter tests for dashboard loading, period switching, empty-state handling, and rendering of operator-share metrics.
-  - [ ] Verify with backend Docker tests and local `flutter test` for the touched reporting surfaces.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for operator-only scoping, period aggregation, session-count and vehicle-breakdown correctness, expired-lease visibility, and no-data ranges.
+  - [x] Add Flutter tests for dashboard loading, period switching, empty-state handling, and rendering of operator-share metrics.
+  - [x] Verify with backend Docker tests and local `flutter test` for the touched reporting surfaces.
 
 ## Dev Notes
 
@@ -149,11 +149,24 @@ GPT-5.4
 
 - Story context anchored on Epic 8 lease truth, PRD operator-reporting requirements, existing operator lot-management patterns, and backend-owned financial/occupancy aggregation.
 - Added explicit guardrails that operator reporting must depend on accepted lease access and backend-readable split terms, not bootstrap shortcuts or contract HTML parsing.
+- Implemented an operator-only reports endpoint in `reports.py` that aggregates completed session payments for historical or active managed lots, computes operator and owner shares from canonical lease terms, derives period occupancy context from session overlap, and returns explicit `EXPIRED` lease visibility plus honest empty states.
+- Added a dedicated operator revenue dashboard sheet reachable from each managed lot card, with backend-driven day/week/month switching, operator-share metrics, and vehicle-type breakdown rendering inside the current operator workspace.
+- Validation completed with `cd backend && docker compose run --rm pytest python -m pytest tests/test_operator_revenue_reports.py tests/test_owner_revenue_reports.py tests/test_operator_lot_management.py`, `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/widget_test.dart`, and `cd mobile && flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/8-3-operator-revenue-dashboard.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/reports.py`
+- `backend/src/app/schemas/report.py`
+- `backend/tests/test_operator_revenue_reports.py`
+- `mobile/lib/src/features/operator_lot_management/data/operator_lot_management_service.dart`
+- `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
+- `mobile/lib/src/features/operator_revenue_dashboard/presentation/operator_revenue_dashboard_sheet.dart`
+- `mobile/test/final_shift_close_out_test.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 8.3 implementation artifact for operator-scoped revenue and performance reporting derived from accepted lease terms, finalized payments, and completed session data.
+- 2026-03-29: Implemented Story 8.3 with backend-owned operator revenue/performance reporting, operator workspace dashboard access, and focused plus full backend/mobile regression validation.

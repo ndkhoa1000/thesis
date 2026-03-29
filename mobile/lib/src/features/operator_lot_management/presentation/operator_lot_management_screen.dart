@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../lease_contract/data/lease_contract_models.dart';
+import '../../operator_revenue_dashboard/presentation/operator_revenue_dashboard_sheet.dart';
 import '../data/operator_lot_management_service.dart';
 
 String _formatAnnouncementDateTime(DateTime value) {
@@ -91,12 +92,18 @@ class _OperatorLotManagementScreenState
 
   Future<void> _acceptLeaseContract(LeaseContractSummary contract) async {
     try {
-      await widget.lotManagementService.acceptLeaseContract(leaseId: contract.leaseId);
+      await widget.lotManagementService.acceptLeaseContract(
+        leaseId: contract.leaseId,
+      );
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã chấp nhận hợp đồng cho ${contract.parkingLotName}.')),
+        SnackBar(
+          content: Text(
+            'Đã chấp nhận hợp đồng cho ${contract.parkingLotName}.',
+          ),
+        ),
       );
       _reload();
     } on OperatorLotManagementException catch (error) {
@@ -169,6 +176,17 @@ class _OperatorLotManagementScreenState
       context: context,
       isScrollControlled: true,
       builder: (context) => _OperatorAnnouncementManagementSheet(
+        parkingLot: lot,
+        lotManagementService: widget.lotManagementService,
+      ),
+    );
+  }
+
+  Future<void> _openRevenueDashboard(OperatorManagedParkingLot lot) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => OperatorRevenueDashboardSheet(
         parkingLot: lot,
         lotManagementService: widget.lotManagementService,
       ),
@@ -260,7 +278,9 @@ class _OperatorLotManagementScreenState
                     parkingLot: lot,
                     onConfigure: () => _openForm(lot),
                     onManageAttendants: () => _openAttendantManagement(lot),
-                    onManageAnnouncements: () => _openAnnouncementManagement(lot),
+                    onManageAnnouncements: () =>
+                        _openAnnouncementManagement(lot),
+                    onViewRevenue: () => _openRevenueDashboard(lot),
                   ),
                 ),
               ),
@@ -346,10 +366,7 @@ class _PendingLeaseContractCard extends StatelessWidget {
               label: 'Tỷ lệ doanh thu cho chủ bãi',
               value: '${contract.revenueSharePercentage.toStringAsFixed(0)}%',
             ),
-            _InfoRow(
-              label: 'Thời hạn',
-              value: '${contract.termMonths} tháng',
-            ),
+            _InfoRow(label: 'Thời hạn', value: '${contract.termMonths} tháng'),
             if ((contract.content ?? '').isNotEmpty)
               _InfoRow(label: 'Điều khoản', value: contract.content!),
             const SizedBox(height: 12),
@@ -384,12 +401,14 @@ class _ManagedLotCard extends StatelessWidget {
     required this.onConfigure,
     required this.onManageAttendants,
     required this.onManageAnnouncements,
+    required this.onViewRevenue,
   });
 
   final OperatorManagedParkingLot parkingLot;
   final VoidCallback onConfigure;
   final VoidCallback onManageAttendants;
   final VoidCallback onManageAnnouncements;
+  final VoidCallback onViewRevenue;
 
   @override
   Widget build(BuildContext context) {
@@ -437,6 +456,11 @@ class _ManagedLotCard extends StatelessWidget {
               runSpacing: 12,
               alignment: WrapAlignment.end,
               children: [
+                OutlinedButton.icon(
+                  onPressed: onViewRevenue,
+                  icon: const Icon(Icons.insights_outlined),
+                  label: const Text('Doanh thu'),
+                ),
                 OutlinedButton.icon(
                   onPressed: onManageAttendants,
                   icon: const Icon(Icons.badge_outlined),

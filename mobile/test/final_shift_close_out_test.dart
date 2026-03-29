@@ -114,7 +114,32 @@ class FakeFinalShiftCloseOutOperatorService
   }
 
   @override
-  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId}) async {
+  Future<OperatorRevenueSummary> getRevenueSummary({
+    required int parkingLotId,
+    required OperatorRevenuePeriod period,
+  }) async {
+    return OperatorRevenueSummary(
+      parkingLotId: parkingLotId,
+      parkingLotName: 'Bai xe Nguyen Du',
+      period: period,
+      rangeStart: DateTime(2026, 3, 28),
+      rangeEnd: DateTime(2026, 3, 28),
+      leaseStatus: 'ACTIVE',
+      ownerName: 'Nguyen Van A',
+      completedPaymentCount: 0,
+      completedSessionCount: 0,
+      hasData: false,
+      vehicleTypeBreakdown: const [],
+      emptyReason: 'NO_COMPLETED_PAYMENTS',
+      emptyMessage:
+          'Không có phiên hoàn tất đã thanh toán trong khoảng thời gian đã chọn.',
+    );
+  }
+
+  @override
+  Future<LeaseContractSummary> acceptLeaseContract({
+    required int leaseId,
+  }) async {
     throw UnimplementedError();
   }
 
