@@ -12,6 +12,7 @@ import '../features/auth/presentation/auth_gate.dart';
 import '../features/driver_booking/data/driver_booking_service.dart';
 import '../features/driver_check_in/data/driver_check_in_service.dart';
 import '../features/driver_check_in/presentation/driver_check_in_screen.dart';
+import '../features/driver_workspace/presentation/driver_workspace_shell.dart';
 import '../features/lot_details/data/lot_details_service.dart';
 import '../features/lot_owner_application/data/lot_owner_application_service.dart';
 import '../features/lot_owner_application/presentation/lot_owner_application_screen.dart';
@@ -653,18 +654,59 @@ class AuthenticatedHome extends StatelessWidget {
 
     return Theme(
       data: AppTheme.light(),
-      child: MapDiscoveryScreen(
-        mapDiscoveryService: mapDiscoveryServiceFactory(session.accessToken),
-        lotDetailsService: lotDetailsServiceFactory(session.accessToken),
-        driverBookingService: driverBookingServiceFactory(session.accessToken),
-        vehicleService: vehicleServiceFactory(session.accessToken),
-        onOpenParkingHistory: () => openParkingHistory(
-          context,
-          session,
-          parkingHistoryServiceFactory: parkingHistoryServiceFactory,
+      child: DriverWorkspaceShell(
+        mapTab: MapDiscoveryScreen(
+          mapDiscoveryService: mapDiscoveryServiceFactory(session.accessToken),
+          lotDetailsService: lotDetailsServiceFactory(session.accessToken),
+          driverBookingService: driverBookingServiceFactory(
+            session.accessToken,
+          ),
+          vehicleService: vehicleServiceFactory(session.accessToken),
+          onOpenParkingHistory: () => openParkingHistory(
+            context,
+            session,
+            parkingHistoryServiceFactory: parkingHistoryServiceFactory,
+          ),
+          locationPermissionService: mapLocationPermissionService,
+          mapCanvasBuilder: mapCanvasBuilder,
+          onOpenDriverCheckIn: () => openDriverCheckIn(
+            context,
+            session,
+            vehicleServiceFactory: vehicleServiceFactory,
+            driverCheckInServiceFactory: driverCheckInServiceFactory,
+          ),
+          onOpenVehicles: () => openVehicleManagement(
+            context,
+            session,
+            vehicleServiceFactory: vehicleServiceFactory,
+          ),
+          onOpenLotOwnerApplication: () => openLotOwnerApplication(
+            context,
+            session,
+            authService: authService,
+            onSessionUpdated: onSessionUpdated,
+            applicationServiceFactory: applicationServiceFactory,
+          ),
+          onOpenOperatorApplication: () => openOperatorApplication(
+            context,
+            session,
+            authService: authService,
+            onSessionUpdated: onSessionUpdated,
+            applicationServiceFactory: operatorApplicationServiceFactory,
+          ),
+          onSignOut: onSignOut,
+          showParkingHistoryAction: false,
+          showDriverCheckInAction: false,
+          showVehicleAction: false,
+          showLotOwnerApplicationAction: false,
+          showOperatorApplicationAction: false,
+          showSignOutAction: false,
         ),
-        locationPermissionService: mapLocationPermissionService,
-        mapCanvasBuilder: mapCanvasBuilder,
+        historyTab: ParkingHistoryScreen(
+          parkingHistoryService: parkingHistoryServiceFactory(
+            session.accessToken,
+          ),
+        ),
         onOpenDriverCheckIn: () => openDriverCheckIn(
           context,
           session,

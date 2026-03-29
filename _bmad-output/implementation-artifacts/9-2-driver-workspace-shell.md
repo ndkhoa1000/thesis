@@ -1,6 +1,6 @@
 # Story 9.2: Driver Workspace Shell
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that I can access all driving features predictably without hidden icon-bar ac
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create the Driver shell scaffold (AC: 1, 2, 3)
-  - [ ] Introduce a dedicated driver shell widget under a workspace/shell layer instead of embedding navigation logic inside `MapDiscoveryScreen`.
-  - [ ] Add 3-tab bottom navigation: `Bản đồ`, `Lịch sử`, `Cá nhân`.
-  - [ ] Apply `AppTheme.light()` consistently through the routed driver workspace.
+- [x] Task 1: Create the Driver shell scaffold (AC: 1, 2, 3)
+  - [x] Introduce a dedicated driver shell widget under a workspace/shell layer instead of embedding navigation logic inside `MapDiscoveryScreen`.
+  - [x] Add 3-tab bottom navigation: `Bản đồ`, `Lịch sử`, `Cá nhân`.
+  - [x] Apply `AppTheme.light()` consistently through the routed driver workspace.
 
-- [ ] Task 2: Integrate current driver features without logic rewrites (AC: 4, 5, 6)
-  - [ ] Mount `MapDiscoveryScreen` as the Bản đồ tab with its current booking, lot-details, and driver check-in callbacks intact.
-  - [ ] Mount `ParkingHistoryScreen` or a valid shell placeholder under Lịch sử depending on current feature readiness.
-  - [ ] Create a profile/personal tab that exposes vehicle management plus existing lot-owner/operator application shortcuts.
+- [x] Task 2: Integrate current driver features without logic rewrites (AC: 4, 5, 6)
+  - [x] Mount `MapDiscoveryScreen` as the Bản đồ tab with its current booking, lot-details, and driver check-in callbacks intact.
+  - [x] Mount `ParkingHistoryScreen` or a valid shell placeholder under Lịch sử depending on current feature readiness.
+  - [x] Create a profile/personal tab that exposes vehicle management plus existing lot-owner/operator application shortcuts.
 
-- [ ] Task 3: Normalize bottom-thumb-zone actions (AC: 3, 4, 6)
-  - [ ] Move hidden or ad hoc action entry points into clear bottom-positioned actions within the shell or child tabs.
-  - [ ] Keep map-centric behavior and avoid shrinking the core map surface below the UX intent.
-  - [ ] Ensure shell navigation does not break the current lot-details and booking flows.
+- [x] Task 3: Normalize bottom-thumb-zone actions (AC: 3, 4, 6)
+  - [x] Move hidden or ad hoc action entry points into clear bottom-positioned actions within the shell or child tabs.
+  - [x] Keep map-centric behavior and avoid shrinking the core map surface below the UX intent.
+  - [x] Ensure shell navigation does not break the current lot-details and booking flows.
 
-- [ ] Task 4: Add regression coverage (AC: 1, 2, 4, 5, 6)
-  - [ ] Add Flutter tests for driver route landing, tab switching, and preservation of current feature callbacks.
-  - [ ] Assert that `MapDiscoveryScreen` still renders and that vehicle/application shortcuts remain reachable.
-  - [ ] Verify with `cd mobile && flutter test`.
+- [x] Task 4: Add regression coverage (AC: 1, 2, 4, 5, 6)
+  - [x] Add Flutter tests for driver route landing, tab switching, and preservation of current feature callbacks.
+  - [x] Assert that `MapDiscoveryScreen` still renders and that vehicle/application shortcuts remain reachable.
+  - [x] Verify with `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -117,13 +117,21 @@ GPT-5.4
 
 - Story context anchored on the existing direct `MapDiscoveryScreen` entry path and Epic 9's requirement to formalize the Driver workspace into a bottom-navigation shell.
 - Added guardrails to keep shell composition separate from booking, map, and parking-history business logic.
+- Implemented a dedicated `DriverWorkspaceShell` with 3 bottom tabs: `Bản đồ`, `Lịch sử`, and `Cá nhân`, while keeping the driver route on the light MD3 theme from Story 9.1.
+- Rehomed driver quick actions out of the map app bar and into the `Cá nhân` tab using full-width buttons for check-in, vehicle management, capability applications, and logout.
+- Embedded `MapDiscoveryScreen` as the map tab and `ParkingHistoryScreen` as the history tab without changing their backend contracts or data-loading logic.
+- Added configurability to `MapDiscoveryScreen` so shell-managed driver routes can hide icon-bar actions while non-shell use cases continue to work.
+- Validation completed with `cd /home/khoa/thesis/app/mobile && TERM=dumb flutter test test/widget_test.dart -r expanded` and `cd /home/khoa/thesis/app/mobile && TERM=dumb flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/9-2-driver-workspace-shell.md`
-- `mobile/lib/src/app/app_router.dart`
-- `mobile/lib/src/features/driver_workspace/`
+- `mobile/lib/src/app/app.dart`
+- `mobile/lib/src/features/driver_workspace/presentation/driver_workspace_shell.dart`
 - `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
 - `mobile/lib/src/features/parking_history/presentation/parking_history_screen.dart`
-- `mobile/lib/src/features/vehicles/presentation/vehicle_screen.dart`
-- `mobile/test/`
+- `mobile/test/widget_test.dart`
+
+### Change Log
+
+- 2026-03-29: Added the Driver workspace shell with bottom navigation, moved personal driver actions into a dedicated profile tab, and updated widget regression coverage for the new navigation model.

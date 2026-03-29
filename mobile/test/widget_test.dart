@@ -1149,8 +1149,9 @@ void main() {
           mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
           lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
           parkingHistoryServiceFactory: (_) => FakeParkingHistoryService(),
-          mapLocationPermissionService:
-              const FakeMapLocationPermissionService(true),
+          mapLocationPermissionService: const FakeMapLocationPermissionService(
+            true,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -1295,26 +1296,29 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('Bản đồ'), findsOneWidget);
+      expect(find.text('Lịch sử'), findsOneWidget);
+      expect(find.text('Cá nhân'), findsOneWidget);
       expect(find.textContaining('chế độ fallback'), findsOneWidget);
-      expect(find.byTooltip('Xe của tôi'), findsOneWidget);
-      expect(find.byTooltip('Lịch sử gửi xe'), findsOneWidget);
-      expect(find.byTooltip('Chủ bãi'), findsOneWidget);
-      expect(find.byTooltip('Operator'), findsOneWidget);
-      expect(find.byTooltip('Đăng xuất'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Lịch sử gửi xe'));
+      await tester.tap(find.text('Lịch sử'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(ParkingHistoryScreen), findsOneWidget);
       expect(
         find.textContaining('Chưa có lượt gửi xe đã hoàn tất'),
         findsOneWidget,
       );
 
-      await tester.pageBack();
+      await tester.tap(find.text('Cá nhân'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Xe của tôi'));
+      expect(find.text('Mã check-in'), findsOneWidget);
+      expect(find.text('Xe của tôi'), findsOneWidget);
+      expect(find.text('Nộp hồ sơ Chủ bãi'), findsOneWidget);
+      expect(find.text('Nộp hồ sơ Operator'), findsOneWidget);
+      expect(find.text('Đăng xuất'), findsOneWidget);
+
+      await tester.tap(find.text('Xe của tôi'));
       await tester.pumpAndSettle();
 
       expect(find.byType(VehicleScreen), findsOneWidget);
@@ -1424,8 +1428,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byTooltip('Đăng xuất'), findsOneWidget);
-    await tester.tap(find.byTooltip('Đăng xuất'));
+    await tester.tap(find.text('Cá nhân'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đăng xuất'), findsOneWidget);
+    await tester.tap(find.text('Đăng xuất'));
     await tester.pumpAndSettle();
 
     expect(authService.signOutCalled, isTrue);
@@ -1467,7 +1474,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Chủ bãi').first);
+    await tester.tap(find.text('Cá nhân'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nộp hồ sơ Chủ bãi').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(LotOwnerApplicationScreen), findsOneWidget);
@@ -1565,12 +1575,60 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Operator').first);
+    await tester.tap(find.text('Cá nhân'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nộp hồ sơ Operator').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(OperatorApplicationScreen), findsOneWidget);
     expect(find.text('Nộp hồ sơ Operator'), findsWidgets);
   });
+
+  testWidgets(
+    'Driver workspace shell switches between map history and profile tabs',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MyApp(
+          authService: FakeAuthService(
+            session: const AuthSession(
+              accessToken: 'access',
+              refreshToken: 'refresh',
+              role: 'DRIVER',
+              capabilities: {
+                'driver': true,
+                'lot_owner': false,
+                'operator': false,
+                'attendant': false,
+                'admin': false,
+                'public_account': true,
+              },
+            ),
+          ),
+          mapDiscoveryServiceFactory: (_) => FakeMapDiscoveryService(),
+          lotDetailsServiceFactory: (_) => FakeLotDetailsService(),
+          parkingHistoryServiceFactory: (_) => FakeParkingHistoryService(),
+          mapLocationPermissionService: const FakeMapLocationPermissionService(
+            true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MapDiscoveryScreen), findsOneWidget);
+      expect(find.byTooltip('Lịch sử gửi xe'), findsNothing);
+      expect(find.byTooltip('Xe của tôi'), findsNothing);
+
+      await tester.tap(find.text('Lịch sử'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ParkingHistoryScreen), findsOneWidget);
+
+      await tester.tap(find.text('Cá nhân'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mã check-in'), findsOneWidget);
+      expect(find.text('Xe của tôi'), findsOneWidget);
+    },
+  );
 
   testWidgets('Operator application screen submits and shows pending status', (
     WidgetTester tester,

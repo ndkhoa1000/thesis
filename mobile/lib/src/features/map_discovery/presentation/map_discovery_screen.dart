@@ -75,6 +75,12 @@ class MapDiscoveryScreen extends StatefulWidget {
     required this.onSignOut,
     this.onOpenLotOwnerApplication,
     this.onOpenOperatorApplication,
+    this.showParkingHistoryAction = true,
+    this.showDriverCheckInAction = true,
+    this.showVehicleAction = true,
+    this.showLotOwnerApplicationAction = true,
+    this.showOperatorApplicationAction = true,
+    this.showSignOutAction = true,
     this.locationPermissionService = const DeviceMapLocationPermissionService(),
     this.mapCanvasBuilder = defaultDriverMapCanvasBuilder,
   });
@@ -89,6 +95,12 @@ class MapDiscoveryScreen extends StatefulWidget {
   final Future<void> Function() onSignOut;
   final VoidCallback? onOpenLotOwnerApplication;
   final VoidCallback? onOpenOperatorApplication;
+  final bool showParkingHistoryAction;
+  final bool showDriverCheckInAction;
+  final bool showVehicleAction;
+  final bool showLotOwnerApplicationAction;
+  final bool showOperatorApplicationAction;
+  final bool showSignOutAction;
   final MapLocationPermissionService locationPermissionService;
   final DriverMapCanvasBuilder mapCanvasBuilder;
 
@@ -246,38 +258,44 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
       appBar: AppBar(
         title: const Text('Bản đồ bãi xe'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.receipt_long_outlined),
-            tooltip: 'Lịch sử gửi xe',
-            onPressed: widget.onOpenParkingHistory,
-          ),
-          IconButton(
-            icon: const Icon(Icons.qr_code_2_outlined),
-            tooltip: 'Mã check-in',
-            onPressed: widget.onOpenDriverCheckIn,
-          ),
-          IconButton(
-            icon: const Icon(Icons.directions_car_outlined),
-            tooltip: 'Xe của tôi',
-            onPressed: widget.onOpenVehicles,
-          ),
-          if (widget.onOpenLotOwnerApplication != null)
+          if (widget.showParkingHistoryAction)
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: 'Lịch sử gửi xe',
+              onPressed: widget.onOpenParkingHistory,
+            ),
+          if (widget.showDriverCheckInAction)
+            IconButton(
+              icon: const Icon(Icons.qr_code_2_outlined),
+              tooltip: 'Mã check-in',
+              onPressed: widget.onOpenDriverCheckIn,
+            ),
+          if (widget.showVehicleAction)
+            IconButton(
+              icon: const Icon(Icons.directions_car_outlined),
+              tooltip: 'Xe của tôi',
+              onPressed: widget.onOpenVehicles,
+            ),
+          if (widget.showLotOwnerApplicationAction &&
+              widget.onOpenLotOwnerApplication != null)
             IconButton(
               icon: const Icon(Icons.storefront_outlined),
               tooltip: 'Chủ bãi',
               onPressed: widget.onOpenLotOwnerApplication,
             ),
-          if (widget.onOpenOperatorApplication != null)
+          if (widget.showOperatorApplicationAction &&
+              widget.onOpenOperatorApplication != null)
             IconButton(
               icon: const Icon(Icons.settings_suggest_outlined),
               tooltip: 'Operator',
               onPressed: widget.onOpenOperatorApplication,
             ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Đăng xuất',
-            onPressed: widget.onSignOut,
-          ),
+          if (widget.showSignOutAction)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Đăng xuất',
+              onPressed: widget.onSignOut,
+            ),
         ],
       ),
       body: _errorMessage != null
