@@ -31,16 +31,16 @@ class _OperatorWorkspaceShellState extends State<OperatorWorkspaceShell> {
         message:
             'Các luồng tạo và gỡ Attendant hiện vẫn mở trực tiếp từ từng bãi trong tab Bãi xe. Shell này giữ chỗ cho không gian nhân sự riêng khi feature đó được tách thành màn hình độc lập.',
         onOpenAlternateWorkspace: widget.onOpenLotOwnerWorkspace,
-        alternateWorkspaceLabel: 'Mở không gian Chủ bãi',
+        alternateWorkspaceLabel: 'Mở không gian chủ bãi xe',
         onSignOut: widget.onSignOut,
       ),
       _ManagementPlaceholderScreen(
         title: 'Doanh thu',
-        headline: 'Doanh thu operator hiện mở theo từng bãi xe',
+        headline: 'Doanh thu vận hành hiện mở theo từng bãi xe',
         message:
             'Dashboard doanh thu vẫn sống trong từng thẻ bãi xe để bám đúng dữ liệu lease và vận hành hiện có. Tab này là điểm neo lâu dài cho màn doanh thu tổng hợp sau này.',
         onOpenAlternateWorkspace: widget.onOpenLotOwnerWorkspace,
-        alternateWorkspaceLabel: 'Mở không gian Chủ bãi',
+        alternateWorkspaceLabel: 'Mở không gian chủ bãi xe',
         onSignOut: widget.onSignOut,
       ),
     ];
@@ -106,9 +106,9 @@ class _LotOwnerWorkspaceShellState extends State<LotOwnerWorkspaceShell> {
         title: 'Hợp đồng',
         headline: 'Hợp đồng vẫn được khởi tạo từ từng bãi đã duyệt',
         message:
-            'Luồng tạo lease đang bám vào từng bãi trong tab Bãi của tôi để dùng đúng dữ liệu operator khả dụng. Tab này giữ chỗ cho màn hợp đồng tổng hợp khi feature đó sẵn sàng.',
+            'Luồng tạo lease đang bám vào từng bãi trong tab Bãi của tôi để dùng đúng dữ liệu vận hành khả dụng. Tab này giữ chỗ cho màn hợp đồng tổng hợp khi feature đó sẵn sàng.',
         onOpenAlternateWorkspace: widget.onOpenOperatorWorkspace,
-        alternateWorkspaceLabel: 'Mở không gian Operator',
+        alternateWorkspaceLabel: 'Mở không gian vận hành',
         onSignOut: widget.onSignOut,
       ),
       _ManagementPlaceholderScreen(
@@ -117,7 +117,7 @@ class _LotOwnerWorkspaceShellState extends State<LotOwnerWorkspaceShell> {
         message:
             'Trong giai đoạn này bạn vẫn quản lý bãi, tạo lease và xem doanh thu từ tab Bãi của tôi. Tab Cá nhân giữ chỗ cho thiết lập hồ sơ và điều hướng capability sau này.',
         onOpenAlternateWorkspace: widget.onOpenOperatorWorkspace,
-        alternateWorkspaceLabel: 'Mở không gian Operator',
+        alternateWorkspaceLabel: 'Mở không gian vận hành',
         onSignOut: widget.onSignOut,
       ),
     ];

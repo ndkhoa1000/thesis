@@ -34,14 +34,14 @@ class AdminApprovalItem {
   bool get isPending => status == 'PENDING';
 
   String get title => switch (type) {
-    ApprovalSubjectType.lotOwner => 'Hồ sơ Chủ bãi',
-    ApprovalSubjectType.operator => 'Hồ sơ Operator',
+    ApprovalSubjectType.lotOwner => 'Hồ sơ chủ bãi xe',
+    ApprovalSubjectType.operator => 'Hồ sơ vận hành',
     ApprovalSubjectType.parkingLot => 'Đăng ký bãi xe',
   };
 
   String get typeLabel => switch (type) {
-    ApprovalSubjectType.lotOwner => 'Chủ bãi',
-    ApprovalSubjectType.operator => 'Operator',
+    ApprovalSubjectType.lotOwner => 'Chủ bãi xe',
+    ApprovalSubjectType.operator => 'Vận hành',
     ApprovalSubjectType.parkingLot => 'Bãi xe',
   };
 
@@ -112,11 +112,11 @@ class AdminManagedUser {
   final bool isSuperuser;
 
   String get roleLabel => switch (role) {
-    'ADMIN' => 'Admin',
-    'ATTENDANT' => 'Attendant',
-    'MANAGER' => 'Operator',
-    'LOT_OWNER' => 'Chủ bãi',
-    _ => 'Driver',
+    'ADMIN' => 'Quản trị viên',
+    'ATTENDANT' => 'Nhân viên cổng',
+    'MANAGER' => 'Vận hành',
+    'LOT_OWNER' => 'Chủ bãi xe',
+    _ => 'Tài xế',
   };
 
   factory AdminManagedUser.fromJson(Map<String, dynamic> json) {

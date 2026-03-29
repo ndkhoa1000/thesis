@@ -1205,7 +1205,7 @@ void main() {
     await tester.tap(find.text('Doanh thu').last);
     await tester.pumpAndSettle();
     expect(
-      find.text('Doanh thu operator hiện mở theo từng bãi xe'),
+      find.text('Doanh thu vận hành hiện mở theo từng bãi xe'),
       findsOneWidget,
     );
   });
@@ -1247,8 +1247,8 @@ void main() {
       await tester.tap(find.text('Cá nhân'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Không gian Operator'), findsOneWidget);
-      expect(find.text('Nộp hồ sơ Operator'), findsNothing);
+      expect(find.text('Không gian vận hành'), findsOneWidget);
+      expect(find.text('Nộp hồ sơ vận hành'), findsNothing);
     },
   );
 
@@ -1358,7 +1358,7 @@ void main() {
 
       await tester.tap(find.text('Cá nhân'));
       await tester.pumpAndSettle();
-      expect(find.text('Mở không gian Operator'), findsOneWidget);
+      expect(find.text('Mở không gian vận hành'), findsOneWidget);
     },
   );
 
@@ -1428,7 +1428,7 @@ void main() {
 
       await tester.tap(find.text('Cá nhân'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Mở không gian Operator'));
+      await tester.tap(find.text('Mở không gian vận hành'));
       await tester.pumpAndSettle();
 
       expect(find.text('Bãi xe'), findsOneWidget);
@@ -1496,7 +1496,7 @@ void main() {
       expect(find.text('Mã check-in'), findsOneWidget);
       expect(find.text('Xe của tôi'), findsOneWidget);
       expect(find.text('Nộp hồ sơ Chủ bãi'), findsOneWidget);
-      expect(find.text('Nộp hồ sơ Operator'), findsOneWidget);
+      expect(find.text('Nộp hồ sơ vận hành'), findsOneWidget);
       expect(find.text('Đăng xuất'), findsOneWidget);
 
       await tester.tap(find.text('Xe của tôi'));
@@ -1759,11 +1759,11 @@ void main() {
     await tester.tap(find.text('Cá nhân'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Nộp hồ sơ Operator').first);
+    await tester.tap(find.text('Nộp hồ sơ vận hành').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(OperatorApplicationScreen), findsOneWidget);
-    expect(find.text('Nộp hồ sơ Operator'), findsWidgets);
+    expect(find.text('Nộp hồ sơ vận hành'), findsWidgets);
   });
 
   testWidgets(
@@ -1840,7 +1840,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Nộp hồ sơ Operator').first);
+    await tester.tap(find.text('Nộp hồ sơ vận hành').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -1896,7 +1896,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Nộp hồ sơ Operator').first);
+      await tester.tap(find.text('Nộp hồ sơ vận hành').first);
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -1962,7 +1962,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Operator'));
+    await tester.tap(find.text('Vận hành'));
     await tester.pumpAndSettle();
 
     expect(find.text('Tran Thi B'), findsOneWidget);
@@ -1972,7 +1972,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Tran Thi B'), findsNothing);
-    expect(find.text('Không có hồ sơ Operator chờ duyệt'), findsOneWidget);
+    expect(find.text('Không có hồ sơ vận hành chờ duyệt'), findsOneWidget);
   });
 
   testWidgets('Lot owner workspace can submit a new parking lot', (
@@ -2073,12 +2073,12 @@ void main() {
       '6',
     );
     await tester.tap(
-      find.widgetWithText(FilledButton, 'Gửi hợp đồng cho operator'),
+      find.widgetWithText(FilledButton, 'Gửi hợp đồng cho đơn vị vận hành'),
     );
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Operator đang phụ trách'), findsOneWidget);
+    expect(find.text('Đơn vị vận hành phụ trách'), findsOneWidget);
     expect(find.text('Tran Thi B'), findsWidgets);
     expect(find.text('Lease'), findsOneWidget);
     expect(find.text('PENDING'), findsOneWidget);
@@ -2395,7 +2395,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('Dashboard operator'), findsOneWidget);
+    expect(find.text('Bảng doanh thu vận hành'), findsOneWidget);
     expect(find.text('260000 VND'), findsOneWidget);
     expect(find.text('5.0%'), findsOneWidget);
     expect(find.text('CAR'), findsOneWidget);

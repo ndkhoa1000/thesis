@@ -75,7 +75,7 @@ class _OperatorApplicationScreenState extends State<OperatorApplicationScreen> {
 
     if (submitted == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã gửi hồ sơ operator thành công.')),
+        const SnackBar(content: Text('Đã gửi hồ sơ vận hành thành công.')),
       );
       _reload();
     }
@@ -85,7 +85,7 @@ class _OperatorApplicationScreenState extends State<OperatorApplicationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Hồ sơ Operator'),
+        title: const Text('Hồ sơ vận hành'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -160,20 +160,20 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Nâng cấp tài khoản thành Operator',
+              'Nâng cấp tài khoản thành vận hành',
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             const Text(
-              'Gửi thông tin doanh nghiệp để được duyệt capability Operator trên chính tài khoản hiện tại của bạn.',
+              'Gửi thông tin doanh nghiệp để được duyệt quyền vận hành trên chính tài khoản hiện tại của bạn.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onApply,
               icon: const Icon(Icons.assignment_outlined),
-              label: const Text('Nộp hồ sơ Operator'),
+              label: const Text('Nộp hồ sơ vận hành'),
             ),
           ],
         ),
@@ -200,7 +200,7 @@ class _ApplicationStatusView extends StatelessWidget {
         Colors.green,
         Icons.verified_outlined,
         'Đã được duyệt',
-        'Tài khoản của bạn đã được cấp capability Operator.',
+        'Tài khoản của bạn đã được cấp quyền vận hành.',
       ),
       'REJECTED' => (
         Colors.red,
@@ -212,7 +212,7 @@ class _ApplicationStatusView extends StatelessWidget {
         Colors.orange,
         Icons.hourglass_top,
         'Đang chờ duyệt',
-        'Hồ sơ của bạn đã được gửi và đang chờ Admin xem xét.',
+        'Hồ sơ của bạn đã được gửi và đang chờ quản trị viên xem xét.',
       ),
     };
 
@@ -468,8 +468,8 @@ class _OperatorApplicationFormState extends State<_OperatorApplicationForm> {
             children: [
               Text(
                 widget.existing == null
-                    ? 'Nộp hồ sơ Operator'
-                    : 'Cập nhật hồ sơ Operator',
+                    ? 'Nộp hồ sơ vận hành'
+                    : 'Cập nhật hồ sơ vận hành',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),

@@ -82,7 +82,7 @@ class _OwnerRevenueDashboardSheetState
       if (summary.leaseStatus != null)
         _InfoRow(label: 'Lease', value: summary.leaseStatus!),
       if (summary.operatorName != null)
-        _InfoRow(label: 'Operator', value: summary.operatorName!),
+        _InfoRow(label: 'Đơn vị vận hành', value: summary.operatorName!),
       if (summary.revenueSharePercentage != null)
         _InfoRow(
           label: 'Tỷ lệ chủ bãi',
@@ -164,7 +164,7 @@ class _OwnerRevenueDashboardSheetState
             ),
             _buildMetricTile(
               context: context,
-              label: 'Phần operator',
+              label: 'Phần vận hành',
               value: _formatCurrency(summary.operatorShare ?? 0),
             ),
             _buildMetricTile(

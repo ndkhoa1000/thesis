@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/state_views.dart';
 import '../data/admin_approvals_service.dart';
 
 class AdminApprovalsScreen extends StatefulWidget {
@@ -181,8 +182,8 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
           bottom: const TabBar(
             isScrollable: true,
             tabs: [
-              Tab(text: 'Chủ bãi'),
-              Tab(text: 'Operator'),
+              Tab(text: 'Chủ bãi xe'),
+              Tab(text: 'Vận hành'),
               Tab(text: 'Bãi xe'),
               Tab(text: 'Người dùng'),
               Tab(text: 'Vận hành bãi'),
@@ -205,7 +206,11 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
           future: _dashboardFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView(
+                title: 'Đang tải bảng điều phối hệ thống',
+                message:
+                    'Hệ thống đang đồng bộ hồ sơ chờ duyệt, tài khoản và bãi xe cần quản lý.',
+              );
             }
 
             if (snapshot.hasError) {
@@ -237,9 +242,9 @@ class _AdminApprovalsScreenState extends State<AdminApprovalsScreen> {
                 _ApprovalsList(
                   items: dashboard.operatorApplications,
                   pendingActionKeys: _pendingActions,
-                  emptyTitle: 'Không có hồ sơ Operator chờ duyệt',
+                  emptyTitle: 'Không có hồ sơ vận hành chờ duyệt',
                   emptyMessage:
-                      'Danh sách này sẽ hiển thị các hồ sơ Operator đang chờ Admin xét duyệt.',
+                      'Danh sách này sẽ hiển thị các hồ sơ vận hành đang chờ quản trị viên xét duyệt.',
                   onApprove: _approve,
                   onReject: _reject,
                 ),
@@ -558,28 +563,10 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.fact_check_outlined,
-              size: 72,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
+    return EmptyView(
+      icon: Icons.fact_check_outlined,
+      title: title,
+      message: message,
     );
   }
 }
@@ -592,20 +579,10 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-          ],
-        ),
-      ),
+    return ErrorView(
+      title: 'Không tải được dữ liệu điều phối',
+      message: message,
+      onRetry: () async => onRetry(),
     );
   }
 }

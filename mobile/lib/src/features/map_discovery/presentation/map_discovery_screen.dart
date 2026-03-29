@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../../shared/presentation/state_views.dart';
 import '../../driver_booking/data/driver_booking_service.dart';
 import '../../lot_details/data/lot_details_service.dart';
 import '../../lot_details/presentation/lot_details_sheet.dart';
@@ -280,14 +281,14 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
               widget.onOpenLotOwnerApplication != null)
             IconButton(
               icon: const Icon(Icons.storefront_outlined),
-              tooltip: 'Chủ bãi',
+              tooltip: 'Chủ bãi xe',
               onPressed: widget.onOpenLotOwnerApplication,
             ),
           if (widget.showOperatorApplicationAction &&
               widget.onOpenOperatorApplication != null)
             IconButton(
               icon: const Icon(Icons.settings_suggest_outlined),
-              tooltip: 'Operator',
+              tooltip: 'Vận hành',
               onPressed: widget.onOpenOperatorApplication,
             ),
           if (widget.showSignOutAction)
@@ -299,7 +300,8 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
         ],
       ),
       body: _errorMessage != null
-          ? _MapDiscoveryErrorState(
+          ? ErrorView(
+              title: 'Không tải được bản đồ bãi xe',
               message: _errorMessage!,
               onRetry: _bootstrap,
             )
@@ -343,7 +345,12 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
                   ),
                 ),
                 if (_lots.isEmpty && !_isLoading)
-                  const Center(child: _MapDiscoveryEmptyState()),
+                  const EmptyView(
+                    icon: Icons.map_outlined,
+                    title: 'Chưa có bãi xe đang hoạt động',
+                    message:
+                        'Hiện chưa có bãi xe khả dụng để hiển thị trên bản đồ.',
+                  ),
                 if (_lots.isNotEmpty)
                   Positioned(
                     left: 0,
@@ -370,9 +377,12 @@ class _MapDiscoveryScreenState extends State<MapDiscoveryScreen> {
                   ),
                 if (_isLoading)
                   const Positioned.fill(
-                    child: ColoredBox(
-                      color: Color(0x66000000),
-                      child: Center(child: CircularProgressIndicator()),
+                    child: LoadingView(
+                      title: 'Đang tải bản đồ bãi xe',
+                      message:
+                          'Hệ thống đang đồng bộ danh sách bãi đang hoạt động.',
+                      tone: StateViewTone.dark,
+                      backgroundColor: Color(0x66000000),
                     ),
                   ),
               ],
@@ -475,46 +485,6 @@ class _MapDiscoveryNotice extends StatelessWidget {
           border: Border.all(color: borderColor),
         ),
         child: Text(message),
-      ),
-    );
-  }
-}
-
-class _MapDiscoveryEmptyState extends StatelessWidget {
-  const _MapDiscoveryEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Text(
-        'Hiện chưa có bãi xe đang hoạt động để hiển thị trên bản đồ.',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
-    );
-  }
-}
-
-class _MapDiscoveryErrorState extends StatelessWidget {
-  const _MapDiscoveryErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
-          ],
-        ),
       ),
     );
   }

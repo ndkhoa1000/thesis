@@ -154,7 +154,7 @@ class _OperatorRevenueDashboardSheetState
             ),
             _buildMetricTile(
               context: context,
-              label: 'Phần operator',
+              label: 'Phần vận hành',
               value: _formatCurrency(summary.operatorShare ?? 0),
             ),
             _buildMetricTile(
@@ -207,7 +207,7 @@ class _OperatorRevenueDashboardSheetState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Dashboard operator',
+                          'Bảng doanh thu vận hành',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 4),

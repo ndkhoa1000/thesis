@@ -1,6 +1,6 @@
 # Story 9.6: Shared UI Components & Localization
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that the UI feels coherent and polished for the thesis demo.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create shared state widgets (AC: 1, 2, 3)
-  - [ ] Introduce `LoadingView`, `ErrorView`, and `EmptyView` in a shared presentation layer.
-  - [ ] Support light and dark variants, either through theme-aware rendering or explicit configuration.
-  - [ ] Keep the widgets flexible enough for title, description, retry action, and icon treatment without overengineering.
+- [x] Task 1: Create shared state widgets (AC: 1, 2, 3)
+  - [x] Introduce `LoadingView`, `ErrorView`, and `EmptyView` in a shared presentation layer.
+  - [x] Support light and dark variants, either through theme-aware rendering or explicit configuration.
+  - [x] Keep the widgets flexible enough for title, description, retry action, and icon treatment without overengineering.
 
-- [ ] Task 2: Replace repeated inline state rendering in key workspaces (AC: 1, 2, 3, 6)
-  - [ ] Integrate the shared widgets into at least one Driver, Attendant, Operator, Lot Owner, and Admin screen.
-  - [ ] Prioritize screens currently using inline `CircularProgressIndicator` or ad hoc placeholder text.
-  - [ ] Preserve existing retry or refresh actions where they already exist.
+- [x] Task 2: Replace repeated inline state rendering in key workspaces (AC: 1, 2, 3, 6)
+  - [x] Integrate the shared widgets into at least one Driver, Attendant, Operator, Lot Owner, and Admin screen.
+  - [x] Prioritize screens currently using inline `CircularProgressIndicator` or ad hoc placeholder text.
+  - [x] Preserve existing retry or refresh actions where they already exist.
 
-- [ ] Task 3: Normalize Vietnamese labels and placeholder copy (AC: 4, 5)
-  - [ ] Replace remaining visible English workspace labels or placeholder copy with Vietnamese text.
-  - [ ] Standardize role display names: `Tài xế`, `Nhân viên`, `Vận hành viên`, `Chủ bãi xe`, `Quản trị viên`.
-  - [ ] Standardize navigation tab labels from Stories 9.2 to 9.5 and align error strings where the repo currently exposes English placeholders.
+- [x] Task 3: Normalize Vietnamese labels and placeholder copy (AC: 4, 5)
+  - [x] Replace remaining visible English workspace labels or placeholder copy with Vietnamese text.
+  - [x] Standardize role display names: `Tài xế`, `Nhân viên`, `Vận hành viên`, `Chủ bãi xe`, `Quản trị viên`.
+  - [x] Standardize navigation tab labels from Stories 9.2 to 9.5 and align error strings where the repo currently exposes English placeholders.
 
-- [ ] Task 4: Add regression coverage (AC: 1, 2, 3, 4, 5, 6)
-  - [ ] Add Flutter tests for shared state widgets in both light and dark contexts.
-  - [ ] Add targeted tests proving at least one screen per workspace adopts the shared widgets.
-  - [ ] Verify with `cd mobile && flutter test`.
+- [x] Task 4: Add regression coverage (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Add Flutter tests for shared state widgets in both light and dark contexts.
+  - [x] Add targeted tests proving at least one screen per workspace adopts the shared widgets.
+  - [x] Verify with `cd mobile && flutter test`.
 
 ## Dev Notes
 
@@ -112,16 +112,31 @@ GPT-5.4
 
 ### Completion Notes List
 
-- Story context anchored on Epic 9's shared-components acceptance criteria and the current repeated inline loading-state patterns across mobile feature screens.
-- Added guardrails to keep localization scope pragmatic and dual-theme compatible.
+- Added shared `LoadingView`, `ErrorView`, and `EmptyView` under `mobile/lib/src/shared/presentation/state_views.dart` with adaptive, light, and dark presentation support.
+- Replaced repeated loading, error, and empty-state rendering in Driver (`MapDiscoveryScreen`), Attendant (`AttendantCheckInScreen` occupancy panel), Operator (`OperatorLotManagementScreen`), Lot Owner (`ParkingLotRegistrationScreen`), and Admin (`AdminApprovalsScreen`).
+- Normalized visible workspace and role copy from lingering English/ASCII placeholders to Vietnamese across driver profile actions, management placeholders, admin approvals, operator application flow, parking-lot leasing labels, and revenue dashboards.
+- Updated attendant, workspace, admin, lease, and revenue widget tests to match the shared-state adoption and localized copy.
+- Validation passed with `flutter test test/widget_test.dart -r expanded`, `flutter test test/attendant_walk_in_check_in_test.dart -r expanded`, and full `flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/9-6-shared-ui-components-localization.md`
-- `mobile/lib/src/shared/`
+- `mobile/lib/src/shared/presentation/state_views.dart`
 - `mobile/lib/src/features/admin_approvals/presentation/admin_approvals_screen.dart`
+- `mobile/lib/src/features/admin_approvals/data/admin_approvals_service.dart`
 - `mobile/lib/src/features/attendant_check_in/presentation/attendant_check_in_screen.dart`
 - `mobile/lib/src/features/map_discovery/presentation/map_discovery_screen.dart`
+- `mobile/lib/src/features/operator_application/presentation/operator_application_screen.dart`
 - `mobile/lib/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart`
+- `mobile/lib/src/features/operator_revenue_dashboard/presentation/operator_revenue_dashboard_sheet.dart`
+- `mobile/lib/src/features/owner_revenue_dashboard/presentation/owner_revenue_dashboard_sheet.dart`
 - `mobile/lib/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart`
-- `mobile/test/`
+- `mobile/lib/src/features/management_workspace/presentation/management_workspace_shell.dart`
+- `mobile/lib/src/features/driver_workspace/presentation/driver_workspace_shell.dart`
+- `mobile/test/widget_test.dart`
+- `mobile/test/attendant_walk_in_check_in_test.dart`
+- `mobile/test/attendant_check_in_screen_test.dart`
+- `mobile/test/attendant_check_out_screen_test.dart`
+- `mobile/test/attendant_check_out_finalize_test.dart`
+- `mobile/test/shift_handover_test.dart`
+- `mobile/test/final_shift_close_out_test.dart`

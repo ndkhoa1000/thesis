@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
+import '../../../shared/presentation/state_views.dart';
 import '../../owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart';
 import '../../owner_revenue_dashboard/presentation/owner_revenue_dashboard_sheet.dart';
 import '../data/parking_lot_service.dart';
@@ -86,7 +87,7 @@ class _ParkingLotRegistrationScreenState
     if (created == true && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Đã tạo hợp đồng thuê và gửi cho operator.'),
+          content: Text('Đã tạo hợp đồng thuê và gửi cho đơn vị vận hành.'),
         ),
       );
       _reload();
@@ -126,7 +127,11 @@ class _ParkingLotRegistrationScreenState
         future: _parkingLotsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingView(
+              title: 'Đang tải danh sách bãi xe',
+              message:
+                  'Hệ thống đang đồng bộ hồ sơ bãi xe và trạng thái phê duyệt mới nhất.',
+            );
           }
 
           if (snapshot.hasError) {
@@ -176,37 +181,13 @@ class _ParkingLotEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.local_parking_outlined,
-              size: 72,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có bãi xe nào được khai báo',
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Khai báo bãi xe mới để gửi lên hệ thống và chờ Admin xét duyệt.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.add_business_outlined),
-              label: const Text('Tạo hồ sơ bãi xe'),
-            ),
-          ],
-        ),
-      ),
+    return EmptyView(
+      icon: Icons.local_parking_outlined,
+      title: 'Chưa có bãi xe nào được khai báo',
+      message:
+          'Khai báo bãi xe mới để gửi lên hệ thống và chờ quản trị viên xét duyệt.',
+      actionLabel: 'Tạo hồ sơ bãi xe',
+      onAction: onCreate,
     );
   }
 }
@@ -292,7 +273,7 @@ class _ParkingLotCard extends StatelessWidget {
               ),
             if (parkingLot.activeOperatorName != null)
               _ParkingLotInfoRow(
-                label: 'Operator đang phụ trách',
+                label: 'Đơn vị vận hành phụ trách',
                 value: parkingLot.activeOperatorName!,
               ),
             if (parkingLot.activeLeaseStatus != null)
@@ -367,9 +348,9 @@ class _LeaseContractSheetState extends State<_LeaseContractSheet> {
   Future<void> _submit() async {
     final operator = _selectedOperator;
     if (operator == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn operator.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng chọn đơn vị vận hành.')),
+      );
       return;
     }
 
@@ -479,7 +460,7 @@ class _LeaseContractSheetState extends State<_LeaseContractSheet> {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      'Chưa có operator đã được duyệt để gán thử nghiệm.',
+                      'Chưa có đơn vị vận hành đã được duyệt để gán thử nghiệm.',
                     ),
                   )
                 else
@@ -552,7 +533,7 @@ class _LeaseContractSheetState extends State<_LeaseContractSheet> {
                     child: Text(
                       _isSubmitting
                           ? 'Đang tạo hợp đồng...'
-                          : 'Gửi hợp đồng cho operator',
+                          : 'Gửi hợp đồng cho đơn vị vận hành',
                     ),
                   ),
                 ),
@@ -595,24 +576,10 @@ class _ParkingLotErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      ),
+    return ErrorView(
+      title: 'Không tải được danh sách bãi xe',
+      message: message,
+      onRetry: () async => onRetry(),
     );
   }
 }

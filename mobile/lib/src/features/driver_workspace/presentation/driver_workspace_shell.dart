@@ -147,7 +147,7 @@ class _DriverProfileTab extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: onOpenOperatorWorkspace,
                   icon: const Icon(Icons.settings_suggest_outlined),
-                  label: const Text('Không gian Operator'),
+                  label: const Text('Không gian vận hành'),
                 ),
               ],
               if (onOpenLotOwnerApplication != null) ...[
@@ -163,7 +163,7 @@ class _DriverProfileTab extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: onOpenOperatorApplication,
                   icon: const Icon(Icons.settings_suggest_outlined),
-                  label: const Text('Nộp hồ sơ Operator'),
+                  label: const Text('Nộp hồ sơ vận hành'),
                 ),
               ],
               const SizedBox(height: 12),

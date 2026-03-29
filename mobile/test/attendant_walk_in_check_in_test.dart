@@ -153,7 +153,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Xe vang lai'), findsOneWidget);
+    expect(find.text('Xe vãng lai'), findsOneWidget);
   });
 
   testWidgets('submits a successful walk-in check-in after capturing photos', (
@@ -174,19 +174,34 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.ensureVisible(
-      find.widgetWithText(FilledButton, 'Chup anh toan canh'),
+      find.widgetWithText(FilledButton, 'Chụp ảnh toàn cảnh'),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Chup anh toan canh'));
+    tester
+        .widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Chụp ảnh toàn cảnh'),
+        )
+        .onPressed!
+        .call();
     await tester.pumpAndSettle();
     await tester.ensureVisible(
-      find.widgetWithText(FilledButton, 'Chup anh bien so'),
+      find.widgetWithText(FilledButton, 'Chụp ảnh biển số'),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Chup anh bien so'));
+    tester
+        .widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Chụp ảnh biển số'),
+        )
+        .onPressed!
+        .call();
     await tester.pumpAndSettle();
     await tester.ensureVisible(
-      find.widgetWithText(FilledButton, 'Tao phien walk-in'),
+      find.widgetWithText(FilledButton, 'Tạo phiên vãng lai'),
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Tao phien walk-in'));
+    tester
+        .widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Tạo phiên vãng lai'),
+        )
+        .onPressed!
+        .call();
     await tester.pumpAndSettle();
 
     expect(service.lastVehicleType, 'MOTORBIKE');
@@ -204,15 +219,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('Tao phien walk-in'),
+      find.text('Tạo phiên vãng lai'),
       200,
       scrollable: find.byType(Scrollable).last,
     );
-    await tester.tap(find.text('Tao phien walk-in'));
+    await tester.tap(find.text('Tạo phiên vãng lai'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Can chup anh bien so truoc khi tao phien walk-in.'),
+      find.text('Cần chụp ảnh biển số trước khi tạo phiên vãng lai.'),
       findsOneWidget,
     );
   });

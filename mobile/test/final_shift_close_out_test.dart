@@ -318,7 +318,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(service.requestCloseOutCalls, 1);
-    expect(find.text('Da gui dong ca cuoi ngay'), findsOneWidget);
+    expect(find.text('Đã gửi đóng ca cuối ngày'), findsOneWidget);
     expect(find.textContaining('85.000 VND'), findsOneWidget);
   });
 

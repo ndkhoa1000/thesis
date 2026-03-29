@@ -152,8 +152,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('attendant-check-out-mode')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Quet ma check-out'), findsOneWidget);
-    expect(find.text('San sang quet xe ra bai'), findsOneWidget);
+    expect(find.text('Quét mã xe ra'), findsOneWidget);
+    expect(find.text('Sẵn sàng quét xe ra bãi'), findsOneWidget);
   });
 
   testWidgets('renders oversized checkout summary after scan', (tester) async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/presentation/state_views.dart';
 import '../../lease_contract/data/lease_contract_models.dart';
 import '../../operator_revenue_dashboard/presentation/operator_revenue_dashboard_sheet.dart';
 import '../data/operator_lot_management_service.dart';
@@ -231,7 +232,11 @@ class _OperatorLotManagementScreenState
         future: _workspaceFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingView(
+              title: 'Đang tải không gian vận hành',
+              message:
+                  'Hệ thống đang đồng bộ hợp đồng thuê và danh sách bãi được bàn giao.',
+            );
           }
 
           if (snapshot.hasError) {
@@ -297,31 +302,11 @@ class _OperatorLotEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.local_parking_outlined,
-              size: 72,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có bãi xe đang vận hành',
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Operator chỉ có thể cấu hình các bãi xe đang có lease ACTIVE. Khi có bãi xe được bàn giao, danh sách sẽ xuất hiện ở đây.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+    return const EmptyView(
+      icon: Icons.local_parking_outlined,
+      title: 'Chưa có bãi xe đang vận hành',
+      message:
+          'Không gian vận hành chỉ hiển thị các bãi xe đã có hợp đồng thuê còn hiệu lực.',
     );
   }
 }
@@ -863,24 +848,10 @@ class _OperatorLotErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Thử lại'),
-            ),
-          ],
-        ),
-      ),
+    return ErrorView(
+      title: 'Không tải được không gian vận hành',
+      message: message,
+      onRetry: () async => onRetry(),
     );
   }
 }

@@ -183,7 +183,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(service.paymentMethods, <String>['CASH']);
-    expect(find.text('San sang quet xe ra bai'), findsOneWidget);
+    expect(find.text('Sẵn sàng quét xe ra bãi'), findsOneWidget);
     expect(find.text('Hoan tat xe ra'), findsOneWidget);
     expect(find.text('Hoan tac'), findsOneWidget);
   });

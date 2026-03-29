@@ -185,7 +185,7 @@ void main() {
 
     expect(service.prepareCallCount, 1);
     expect(service.finalizeCallCount, 1);
-    expect(find.text('Ban giao ca thanh cong'), findsOneWidget);
+    expect(find.text('Bàn giao ca thành công'), findsOneWidget);
   });
 
   testWidgets('cash mismatch triggers hard-blocking discrepancy flow', (
@@ -239,6 +239,6 @@ void main() {
 
     expect(service.finalizeCallCount, 2);
     expect(service.lastFinalizeReason, 'Lech quy sau khi doi tien mat dau ca.');
-    expect(find.text('Da khoa ca va bao cao chenh lech'), findsOneWidget);
+    expect(find.text('Đã khóa ca và báo cáo chênh lệch'), findsOneWidget);
   });
 }

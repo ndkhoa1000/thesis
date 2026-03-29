@@ -171,14 +171,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Quét mã check-in'), findsOneWidget);
+    expect(find.text('Quét mã xe vào'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('fake-attendant-scan-button')),
       findsOneWidget,
     );
     expect(find.text('Sẵn sàng quét xe vào bãi'), findsOneWidget);
     expect(find.text('Bai xe Quan 1'), findsOneWidget);
-    expect(find.byKey(const ValueKey('occupancy-fact-Da gui')), findsOneWidget);
+    expect(find.byKey(const ValueKey('occupancy-fact-Đã gửi')), findsOneWidget);
     expect(find.text('8/12'), findsOneWidget);
     expect(find.text('Xe máy: 6'), findsOneWidget);
     expect(find.text('Ô tô: 2'), findsOneWidget);
@@ -210,7 +210,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Bai xe Chua Cau hinh'), findsOneWidget);
-    expect(find.text('Chua cau hinh suc chua dang hoat dong'), findsOneWidget);
+    expect(find.text('Chưa cấu hình sức chứa đang hoạt động'), findsOneWidget);
     expect(find.text('Xe máy: 2'), findsOneWidget);
   });
 

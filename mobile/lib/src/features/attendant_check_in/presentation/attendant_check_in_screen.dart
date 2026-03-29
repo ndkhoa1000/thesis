@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../../shared/presentation/state_views.dart';
 import '../data/attendant_check_in_service.dart';
 
 typedef AttendantScannerBuilder =
@@ -318,7 +319,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
       setState(() {
         _lastCheckInResult = null;
         _lastCheckOutPreview = null;
-        _errorMessage = 'Can chup anh bien so truoc khi tao phien walk-in.';
+        _errorMessage = 'Cần chụp ảnh biển số trước khi tạo phiên vãng lai.';
       });
       return;
     }
@@ -425,29 +426,29 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
   String get _statusLabel {
     if (_isBusy) {
       if (_mode == _AttendantGateMode.walkIn) {
-        return 'Dang tao phien walk-in...';
+        return 'Đang tạo phiên vãng lai...';
       }
       if (_scannerFlow == _AttendantScannerFlow.checkOut &&
           _lastCheckOutFinalize != null) {
-        return 'Dang hoan tac giao dich...';
+        return 'Đang hoàn tác giao dịch...';
       }
       if (_scannerFlow == _AttendantScannerFlow.checkOut &&
           _lastCheckOutPreview != null) {
-        return 'Dang chot thanh toan...';
+        return 'Đang chốt thanh toán...';
       }
       return _scannerFlow == _AttendantScannerFlow.checkOut
-          ? 'Dang tinh phi check-out...'
-          : 'Dang xac nhan ma check-in...';
+          ? 'Đang tính phí xe ra...'
+          : 'Đang xác nhận mã xe vào...';
     }
     if (_mode == _AttendantGateMode.walkIn) {
-      return 'San sang tao phien walk-in';
+      return 'Sẵn sàng tạo phiên vãng lai';
     }
     if (_scannerFlow == _AttendantScannerFlow.checkOut &&
         _lastCheckOutPreview != null) {
-      return 'Vuot trai hoac phai de chot thanh toan';
+      return 'Vuốt trái hoặc phải để chốt thanh toán';
     }
     return _scannerFlow == _AttendantScannerFlow.checkOut
-        ? 'San sang quet xe ra bai'
+        ? 'Sẵn sàng quét xe ra bãi'
         : 'Sẵn sàng quét xe vào bãi';
   }
 
@@ -475,22 +476,22 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
             appBar: AppBar(
               title: Text(
                 _mode == _AttendantGateMode.walkIn
-                    ? 'Walk-in check-in'
+                    ? 'Check-in vãng lai'
                     : _scannerFlow == _AttendantScannerFlow.checkOut
-                    ? 'Quet ma check-out'
-                    : 'Quét mã check-in',
+                    ? 'Quét mã xe ra'
+                    : 'Quét mã xe vào',
               ),
               actions: [
                 IconButton(
                   key: const ValueKey('shift-handover-button'),
                   icon: const Icon(Icons.qr_code_2_outlined),
-                  tooltip: 'Ban giao ca',
+                  tooltip: 'Bàn giao ca',
                   onPressed: _openShiftHandover,
                 ),
                 IconButton(
                   key: const ValueKey('active-session-management-button'),
                   icon: const Icon(Icons.fact_check_outlined),
-                  tooltip: 'Phien ton',
+                  tooltip: 'Phiên tồn',
                   onPressed: _openActiveSessionManagement,
                 ),
                 if (widget.onSignOut != null)
@@ -617,7 +618,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
               Expanded(
                 child: _ScannerModeButton(
                   key: const ValueKey('attendant-check-in-mode'),
-                  label: 'Xe vao',
+                  label: 'Xe vào',
                   isSelected: _scannerFlow == _AttendantScannerFlow.checkIn,
                   onPressed: () =>
                       _selectScannerFlow(_AttendantScannerFlow.checkIn),
@@ -643,7 +644,7 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
             key: const ValueKey('walk-in-entry-button'),
             onPressed: _isBusy ? null : _openWalkInMode,
             icon: const Icon(Icons.camera_alt_outlined),
-            label: const Text('Xe vang lai'),
+            label: const Text('Xe vãng lai'),
           ),
           const SizedBox(height: 12),
         ],
@@ -691,13 +692,13 @@ class _AttendantCheckInScreenState extends State<AttendantCheckInScreen> {
           key: const ValueKey('shift-handover-button'),
           onPressed: _openShiftHandover,
           icon: const Icon(Icons.qr_code_2_outlined),
-          label: const Text('Ban giao ca'),
+          label: const Text('Bàn giao ca'),
         ),
         OutlinedButton.icon(
           key: const ValueKey('active-session-management-button'),
           onPressed: _openActiveSessionManagement,
           icon: const Icon(Icons.fact_check_outlined),
-          label: const Text('Phien ton'),
+          label: const Text('Phiên tồn'),
         ),
         if (widget.onSignOut != null)
           OutlinedButton.icon(
@@ -830,32 +831,26 @@ class _OccupancySummaryPanel extends StatelessWidget {
       return const Card(
         child: Padding(
           padding: EdgeInsets.all(16),
-          child: Center(child: CircularProgressIndicator()),
+          child: LoadingView(
+            title: 'Đang tải thống kê bãi xe',
+            message: 'Sức chứa hiện tại sẽ được cập nhật sau ít giây.',
+            tone: StateViewTone.dark,
+            padding: EdgeInsets.zero,
+          ),
         ),
       );
     }
 
     if (summary == null) {
       return Card(
-        color: Theme.of(context).colorScheme.errorContainer,
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                errorMessage ?? 'Khong the tai thong ke bai xe.',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onErrorContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () => onRefresh(),
-                child: const Text('Thu lai thong ke'),
-              ),
-            ],
+          child: ErrorView(
+            title: 'Không tải được thống kê bãi xe',
+            message: errorMessage ?? 'Không thể tải thống kê bãi xe.',
+            onRetry: onRefresh,
+            tone: StateViewTone.dark,
+            padding: EdgeInsets.zero,
           ),
         ),
       );
@@ -879,7 +874,7 @@ class _OccupancySummaryPanel extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: () => onRefresh(showLoading: false),
-                  tooltip: 'Lam moi thong ke',
+                  tooltip: 'Làm mới thống kê',
                   icon: const Icon(Icons.refresh),
                 ),
               ],
@@ -887,14 +882,14 @@ class _OccupancySummaryPanel extends StatelessWidget {
             const SizedBox(height: 12),
             if (!summary!.hasActiveCapacityConfig) ...[
               Text(
-                'Chua cau hinh suc chua dang hoat dong',
+                'Chưa cấu hình sức chứa đang hoạt động',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
               Text(
-                'Thong ke chi hien so xe dang gui theo loai cho den khi suc chua duoc cau hinh.',
+                'Thống kê hiện chỉ hiển thị số xe đang gửi theo loại cho đến khi sức chứa được cấu hình.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ] else ...[
@@ -903,16 +898,16 @@ class _OccupancySummaryPanel extends StatelessWidget {
                 runSpacing: 12,
                 children: [
                   _OccupancyFact(
-                    label: 'Da gui',
+                    label: 'Đã gửi',
                     value:
                         '${summary!.occupiedCount}/${summary!.totalCapacity}',
                   ),
                   _OccupancyFact(
-                    label: 'Con cho',
+                    label: 'Còn chỗ',
                     value: '${summary!.freeCount}',
                   ),
                   _OccupancyFact(
-                    label: 'Tong suc chua',
+                    label: 'Tổng sức chứa',
                     value: '${summary!.totalCapacity}',
                   ),
                 ],
@@ -1090,12 +1085,12 @@ class _ActiveSessionManagementSheetState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Phien dang gui',
+                'Phiên đang gửi',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               Text(
-                'Khu vuc xu ly phien ton va timeout thu cong cho bai xe hien tai.',
+                'Khu vực xử lý phiên tồn và timeout thủ công cho bãi xe hiện tại.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -1104,7 +1099,7 @@ class _ActiveSessionManagementSheetState
                 child: OutlinedButton.icon(
                   onPressed: _reload,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Lam moi danh sach'),
+                  label: const Text('Làm mới danh sách'),
                 ),
               ),
               Expanded(
@@ -1504,10 +1499,10 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Ban giao ca', style: panelTheme.textTheme.titleLarge),
+                Text('Bàn giao ca', style: panelTheme.textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Text(
-                  'Khu vuc quan tri ca truc tach rieng giao ca QR va dong ca cuoi ngay.',
+                  'Khu vực quản trị ca trực tách riêng giao ca QR và đóng ca cuối ngày.',
                   style: panelTheme.textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
@@ -1518,12 +1513,12 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Dong ca cuoi ngay',
+                          'Đóng ca cuối ngày',
                           style: panelTheme.textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Chi dung cho ca cuoi cung trong ngay. He thong se khoa ca, doi chieu tien mat va gui operator xac nhan ket thuc ngay van hanh.',
+                          'Chỉ dùng cho ca cuối cùng trong ngày. Hệ thống sẽ khóa ca, đối chiếu tiền mặt và gửi đơn vị vận hành xác nhận kết thúc ngày vận hành.',
                         ),
                         const SizedBox(height: 12),
                         FilledButton.icon(
@@ -1536,8 +1531,8 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
                           icon: const Icon(Icons.nightlight_round),
                           label: Text(
                             _isCloseOutSubmitting
-                                ? 'Dang gui dong ca...'
-                                : 'Gui dong ca cuoi ngay',
+                                ? 'Đang gửi đóng ca...'
+                                : 'Gửi đóng ca cuối ngày',
                           ),
                         ),
                       ],
@@ -1547,9 +1542,9 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
                 if (_closeOutResult != null) ...[
                   const SizedBox(height: 16),
                   _FeedbackCard(
-                    title: 'Da gui dong ca cuoi ngay',
+                    title: 'Đã gửi đóng ca cuối ngày',
                     message:
-                        'Tien mat doi chieu ${widget.formatCurrency(_closeOutResult!.expectedCash)}\nDang cho operator xac nhan ket thuc ngay van hanh.',
+                        'Tiền mặt đối chiếu ${widget.formatCurrency(_closeOutResult!.expectedCash)}\nĐang chờ đơn vị vận hành xác nhận kết thúc ngày vận hành.',
                     color: const Color(0xFF102A43),
                     foregroundColor: const Color(0xFFDCEEFB),
                   ),
@@ -1671,7 +1666,7 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 16),
                   _FeedbackCard(
-                    title: 'Ban giao ca that bai',
+                    title: 'Bàn giao ca thất bại',
                     message: _errorMessage!,
                     color: panelTheme.colorScheme.errorContainer,
                     foregroundColor: panelTheme.colorScheme.onErrorContainer,
@@ -1681,8 +1676,8 @@ class _ShiftHandoverSheetState extends State<_ShiftHandoverSheet> {
                   const SizedBox(height: 16),
                   _FeedbackCard(
                     title: _finalizeResult!.discrepancyFlagged
-                        ? 'Da khoa ca va bao cao chenh lech'
-                        : 'Ban giao ca thanh cong',
+                        ? 'Đã khóa ca và báo cáo chênh lệch'
+                        : 'Bàn giao ca thành công',
                     message:
                         'Expected ${widget.formatCurrency(_finalizeResult!.expectedCash)}\nActual ${widget.formatCurrency(_finalizeResult!.actualCash)}',
                     color: _finalizeResult!.discrepancyFlagged
@@ -1912,7 +1907,7 @@ class _WalkInPanel extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            'Walk-in check-in',
+            'Check-in vãng lai',
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -1921,8 +1916,8 @@ class _WalkInPanel extends StatelessWidget {
           const SizedBox(height: 16),
           SegmentedButton<String>(
             segments: const [
-              ButtonSegment(value: 'MOTORBIKE', label: Text('Xe may')),
-              ButtonSegment(value: 'CAR', label: Text('O to')),
+              ButtonSegment(value: 'MOTORBIKE', label: Text('Xe máy')),
+              ButtonSegment(value: 'CAR', label: Text('Ô tô')),
             ],
             selected: {vehicleType},
             onSelectionChanged: isBusy
@@ -1934,8 +1929,8 @@ class _WalkInPanel extends StatelessWidget {
             onPressed: isBusy ? null : onCaptureOverviewImage,
             child: Text(
               overviewImagePath == null
-                  ? 'Chup anh toan canh'
-                  : 'Da chup anh toan canh',
+                  ? 'Chụp ảnh toàn cảnh'
+                  : 'Đã chụp ảnh toàn cảnh',
             ),
           ),
           const SizedBox(height: 12),
@@ -1943,19 +1938,19 @@ class _WalkInPanel extends StatelessWidget {
             onPressed: isBusy ? null : onCapturePlateImage,
             child: Text(
               plateImagePath == null
-                  ? 'Chup anh bien so'
-                  : 'Da chup anh bien so',
+                  ? 'Chụp ảnh biển số'
+                  : 'Đã chụp ảnh biển số',
             ),
           ),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: isBusy ? null : onSubmit,
-            child: const Text('Tao phien walk-in'),
+            child: const Text('Tạo phiên vãng lai'),
           ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: isBusy ? null : onBack,
-            child: const Text('Quay lai quet QR'),
+            child: const Text('Quay lại quét QR'),
           ),
         ],
       ),
