@@ -82,7 +82,7 @@ development_status:
   8-1-create-lease-contract: done
   8-2-owner-revenue-dashboard: done
   8-3-operator-revenue-dashboard: done
-  epic-8-retrospective: optional
+  epic-8-retrospective: done
   epic-9: backlog
   9-1-app-routing-foundation-dual-theme-system: backlog
   9-2-driver-workspace-shell: backlog
