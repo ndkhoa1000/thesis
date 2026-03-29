@@ -1,0 +1,116 @@
+# Story 9.5: Admin Workspace Shell
+
+Status: ready-for-dev
+
+<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+
+## Story
+
+As an Admin,
+I want a clear workspace structure organized by administrative function,
+so that approvals, user management, and lot suspension are navigable from one place.
+
+## Acceptance Criteria
+
+1. Given I am authenticated as an Admin, when the workspace loads, then a tab structure is shown with `Duyệt hồ sơ`, `Người dùng`, `Bãi xe`.
+2. Given I open `Duyệt hồ sơ`, when the Admin shell renders, then the existing `AdminApprovalsScreen` integrates with no functional changes.
+3. Given I open `Người dùng` or `Bãi xe` before those flows are fully integrated, when the shell renders, then honest placeholder content appears.
+4. Given the Admin shell exists, when routing resolves an admin session, then `AdminApprovalsScreen` is no longer the standalone workspace entry and is instead reached through `AdminShell`.
+5. Given the Admin workspace renders, when the shell appears, then the light theme applies consistently.
+
+## Implementation Clarifications
+
+- This story is shell structure only. It does not implement new admin business features beyond organizing reachability.
+- `AdminApprovalsScreen` should remain functionally intact and become the first tab under the shell.
+- Placeholder tabs must remain honest; do not imply user management or lot suspension functionality if those integrations are not yet wired.
+- Keep admin as a separate-account route, not part of public multi-capability navigation.
+
+## Tasks / Subtasks
+
+- [ ] Task 1: Create the Admin shell (AC: 1, 4, 5)
+  - [ ] Introduce a dedicated admin shell with tabs `Duyệt hồ sơ`, `Người dùng`, `Bãi xe`.
+  - [ ] Route admin sessions into the shell instead of directly into `AdminApprovalsScreen`.
+  - [ ] Apply the light theme consistently.
+
+- [ ] Task 2: Integrate existing approvals flow and honest placeholders (AC: 2, 3)
+  - [ ] Mount `AdminApprovalsScreen` as the `Duyệt hồ sơ` tab content.
+  - [ ] Create shell placeholders for `Người dùng` and `Bãi xe` using the shared placeholder pattern from Story 9.6.
+  - [ ] Preserve sign-out and approval-refresh behavior.
+
+- [ ] Task 3: Add regression coverage (AC: 1, 2, 3, 4, 5)
+  - [ ] Add Flutter tests for admin route landing, tab switching, and continued `AdminApprovalsScreen` rendering under the shell.
+  - [ ] Verify placeholder honesty and light-theme usage.
+  - [ ] Verify with `cd mobile && flutter test`.
+
+## Dev Notes
+
+### Story Foundation
+
+- Admin already has a working approvals surface from Epic 2; Epic 9 formalizes its workspace structure for demo readiness.
+- This shell aligns Admin with the same role-aware workspace framework as the other actors without changing admin business rules.
+
+### Current Codebase Signals
+
+- `AuthenticatedHome` currently returns `AdminApprovalsScreen` directly for admin sessions.
+- No admin shell or shared placeholder system exists yet.
+- Admin sign-out currently lives at the screen boundary and must remain visible after shell introduction.
+
+### Architecture Guardrails
+
+- Keep Admin as a separate-account flow.
+- Do not move admin approval fetching or mutation logic into shell code.
+- Reuse the light-theme profile from Story 9.1 and the shared state/placeholder widgets from Story 9.6.
+
+### File Structure Requirements
+
+- Expected mobile touch points:
+  - `mobile/lib/src/app/app_router.dart`
+  - `mobile/lib/src/features/admin_approvals/presentation/admin_approvals_screen.dart`
+  - `mobile/lib/src/features/admin_workspace/` (new shell folder)
+  - shared widgets from Story 9.6
+  - `mobile/test/`
+
+### Testing Requirements
+
+- Test admin route landing into the shell and continued rendering of the approvals tab.
+- Test tab labels and placeholder tabs.
+- Keep verification to `cd mobile && flutter test`.
+
+### Implementation Risks To Avoid
+
+- Do not bury the approvals workflow behind extra navigation hops that slow the core admin action.
+- Do not imply unimplemented admin management surfaces are complete.
+- Do not duplicate approvals state loading at both shell and tab levels.
+
+### References
+
+- [epics.md](../planning-artifacts/epics.md) - Epic 9 / Story 9.5
+- [epics-distillate.md](../planning-artifacts/epics-distillate.md) - Admin shell summary
+- [architecture.md](../architecture.md) - role-aware mobile routing and thin-client guidance
+- [2-2-admin-dashboard-pending-approvals.md](./2-2-admin-dashboard-pending-approvals.md)
+- [2-3-admin-system-management-lot-suspension.md](./2-3-admin-system-management-lot-suspension.md)
+
+## Dev Agent Record
+
+### Agent Model Used
+
+GPT-5.4
+
+### Implementation Plan
+
+- Introduce an Admin shell with clear tabs and light-theme composition.
+- Route current admin entry through the shell while preserving the approvals workflow.
+- Validate route landing and placeholder honesty with Flutter tests.
+
+### Completion Notes List
+
+- Story context anchored on the current direct `AdminApprovalsScreen` entry path and Epic 9's requirement to organize Admin by administrative function.
+- Added guardrails to keep the shell lightweight and separate from approval business logic.
+
+### File List
+
+- `_bmad-output/implementation-artifacts/9-5-admin-workspace-shell.md`
+- `mobile/lib/src/app/app_router.dart`
+- `mobile/lib/src/features/admin_workspace/`
+- `mobile/lib/src/features/admin_approvals/presentation/admin_approvals_screen.dart`
+- `mobile/test/`

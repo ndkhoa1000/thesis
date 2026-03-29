@@ -83,14 +83,14 @@ development_status:
   8-2-owner-revenue-dashboard: done
   8-3-operator-revenue-dashboard: done
   epic-8-retrospective: done
-  epic-9: backlog
-  9-1-app-routing-foundation-dual-theme-system: backlog
-  9-2-driver-workspace-shell: backlog
-  9-3-attendant-workspace-shell: backlog
-  9-4-management-workspace-shells: backlog
-  9-5-admin-workspace-shell: backlog
-  9-6-shared-ui-components-localization: backlog
-  9-7-media-storage-backend-infrastructure: backlog
+  epic-9: in-progress
+  9-1-app-routing-foundation-dual-theme-system: ready-for-dev
+  9-2-driver-workspace-shell: ready-for-dev
+  9-3-attendant-workspace-shell: ready-for-dev
+  9-4-management-workspace-shells: ready-for-dev
+  9-5-admin-workspace-shell: ready-for-dev
+  9-6-shared-ui-components-localization: ready-for-dev
+  9-7-media-storage-backend-infrastructure: ready-for-dev
   epic-9-retrospective: optional
   epic-10: backlog
   10-1-system-push-notifications: backlog
