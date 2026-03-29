@@ -1,6 +1,6 @@
 # Story 8.2: Owner Revenue Dashboard
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,25 +28,25 @@ so that I can track my income.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Add owner-scoped backend revenue reporting contracts (AC: 1, 2, 4, 5)
-  - [ ] Introduce or extend a backend reports surface, preferably `backend/src/app/api/v1/reports.py`, for Lot Owner revenue summaries filtered by lot and period.
-  - [ ] Aggregate authoritative settled payment data plus accepted lease terms to return gross revenue, owner share, operator share, and lease status in one typed response.
-  - [ ] Enforce strict ownership scoping so a Lot Owner can only read revenue for lots they own.
+- [x] Task 1: Add owner-scoped backend revenue reporting contracts (AC: 1, 2, 4, 5)
+  - [x] Introduce or extend a backend reports surface, preferably `backend/src/app/api/v1/reports.py`, for Lot Owner revenue summaries filtered by lot and period.
+  - [x] Aggregate authoritative settled payment data plus accepted lease terms to return gross revenue, owner share, operator share, and lease status in one typed response.
+  - [x] Enforce strict ownership scoping so a Lot Owner can only read revenue for lots they own.
 
-- [ ] Task 2: Preserve lease-term and financial truth in the reporting model (AC: 1, 2, 4)
-  - [ ] Reuse the accepted-lease lifecycle from Story 8.1 as the source of reporting eligibility and lease status.
-  - [ ] Ensure the revenue split percentage is stored in an explicit backend-readable field or equivalent canonical structure; do not rely on contract-body parsing.
-  - [ ] Keep historical revenue readable after lease expiration while making expired-state visibility explicit.
+- [x] Task 2: Preserve lease-term and financial truth in the reporting model (AC: 1, 2, 4)
+  - [x] Reuse the accepted-lease lifecycle from Story 8.1 as the source of reporting eligibility and lease status.
+  - [x] Ensure the revenue split percentage is stored in an explicit backend-readable field or equivalent canonical structure; do not rely on contract-body parsing.
+  - [x] Keep historical revenue readable after lease expiration while making expired-state visibility explicit.
 
-- [ ] Task 3: Add the Lot Owner revenue dashboard to the mobile workspace (AC: 1, 2, 3, 4)
-  - [ ] Add a dedicated owner revenue feature or a clearly separated owner-reporting surface rather than overloading parking-lot registration form code with dense financial logic.
-  - [ ] Make the dashboard reachable from the current Lot Owner workspace patterns, likely from the lot card or a follow-on owner management surface, without waiting for Epic 9 shell work.
-  - [ ] Render summary metrics, period switching, honest empty state, and explicit expired-lease messaging using the same lightweight Dio-backed service pattern already used in owner/operator features.
+- [x] Task 3: Add the Lot Owner revenue dashboard to the mobile workspace (AC: 1, 2, 3, 4)
+  - [x] Add a dedicated owner revenue feature or a clearly separated owner-reporting surface rather than overloading parking-lot registration form code with dense financial logic.
+  - [x] Make the dashboard reachable from the current Lot Owner workspace patterns, likely from the lot card or a follow-on owner management surface, without waiting for Epic 9 shell work.
+  - [x] Render summary metrics, period switching, honest empty state, and explicit expired-lease messaging using the same lightweight Dio-backed service pattern already used in owner/operator features.
 
-- [ ] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
-  - [ ] Add backend tests for owner-only scoping, period filtering, split-based revenue calculation, expired-lease visibility, and honest no-data responses.
-  - [ ] Add Flutter tests for dashboard loading, period switching, empty-state rendering, and expired-lease labeling.
-  - [ ] Verify with backend Docker tests and local `flutter test` on the affected revenue-dashboard surfaces.
+- [x] Task 4: Add focused regression coverage and verification (AC: 1, 2, 3, 4, 5)
+  - [x] Add backend tests for owner-only scoping, period filtering, split-based revenue calculation, expired-lease visibility, and honest no-data responses.
+  - [x] Add Flutter tests for dashboard loading, period switching, empty-state rendering, and expired-lease labeling.
+  - [x] Verify with backend Docker tests and local `flutter test` on the affected revenue-dashboard surfaces.
 
 ## Dev Notes
 
@@ -147,11 +147,25 @@ GPT-5.4
 
 - Story context anchored on Epic 8 lease lifecycle dependencies, owner-facing revenue visibility, finalized payment truth, and current Lot Owner workspace reachability.
 - Added explicit guardrails that the revenue split must be stored in backend-readable lease data rather than inferred from generated contract content.
+- Implemented an owner-only reports endpoint that aggregates completed session payments against accepted lease terms, preserves explicit `EXPIRED` lease visibility, and returns honest empty states when there is no accepted lease or no settled revenue in range.
+- Added a dedicated Flutter owner revenue dashboard feature reachable from approved lot cards, with backend-driven day/week/month switching and empty-state messaging instead of client-side zero-metric math.
+- Validation completed with `cd backend && docker compose run --rm pytest python -m pytest tests/test_owner_revenue_reports.py tests/test_leases.py`, `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/widget_test.dart`, and `cd mobile && flutter test`.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/8-2-owner-revenue-dashboard.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `backend/src/app/api/v1/__init__.py`
+- `backend/src/app/api/v1/reports.py`
+- `backend/src/app/schemas/report.py`
+- `backend/tests/test_owner_revenue_reports.py`
+- `mobile/lib/main.dart`
+- `mobile/lib/src/features/owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart`
+- `mobile/lib/src/features/owner_revenue_dashboard/presentation/owner_revenue_dashboard_sheet.dart`
+- `mobile/lib/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart`
+- `mobile/test/widget_test.dart`
 
 ### Change Log
 
 - 2026-03-28: Created Story 8.2 implementation artifact for owner-scoped revenue reporting derived from accepted lease terms and finalized payment data.
+- 2026-03-29: Implemented Story 8.2 with backend-owned owner revenue reporting, dedicated mobile dashboard access from the Lot Owner workspace, and focused plus full regression validation.

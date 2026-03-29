@@ -2,16 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
+import '../../owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart';
+import '../../owner_revenue_dashboard/presentation/owner_revenue_dashboard_sheet.dart';
 import '../data/parking_lot_service.dart';
 
 class ParkingLotRegistrationScreen extends StatefulWidget {
   const ParkingLotRegistrationScreen({
     super.key,
     required this.parkingLotService,
+    required this.ownerRevenueDashboardService,
     required this.onSignOut,
   });
 
   final ParkingLotService parkingLotService;
+  final OwnerRevenueDashboardService ownerRevenueDashboardService;
   final Future<void> Function() onSignOut;
 
   @override
@@ -89,6 +93,17 @@ class _ParkingLotRegistrationScreenState
     }
   }
 
+  Future<void> _openRevenueDashboard(ParkingLotRegistration parkingLot) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => OwnerRevenueDashboardSheet(
+        parkingLot: parkingLot,
+        ownerRevenueDashboardService: widget.ownerRevenueDashboardService,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,6 +147,9 @@ class _ParkingLotRegistrationScreenState
               final parkingLot = parkingLots[index];
               return _ParkingLotCard(
                 parkingLot: parkingLot,
+                onViewRevenue: parkingLot.isApproved
+                    ? () => _openRevenueDashboard(parkingLot)
+                    : null,
                 onBootstrapLease: parkingLot.isApproved
                     ? () => _openLeaseBootstrap(parkingLot)
                     : null,
@@ -194,17 +212,22 @@ class _ParkingLotEmptyState extends StatelessWidget {
 }
 
 class _ParkingLotCard extends StatelessWidget {
-  const _ParkingLotCard({required this.parkingLot, this.onBootstrapLease});
+  const _ParkingLotCard({
+    required this.parkingLot,
+    this.onBootstrapLease,
+    this.onViewRevenue,
+  });
 
   final ParkingLotRegistration parkingLot;
   final VoidCallback? onBootstrapLease;
+  final VoidCallback? onViewRevenue;
 
   @override
   Widget build(BuildContext context) {
     final canCreateLeaseContract =
-      parkingLot.isApproved &&
-      (parkingLot.activeLeaseStatus == null ||
-        !{'PENDING', 'ACTIVE'}.contains(parkingLot.activeLeaseStatus));
+        parkingLot.isApproved &&
+        (parkingLot.activeLeaseStatus == null ||
+            !{'PENDING', 'ACTIVE'}.contains(parkingLot.activeLeaseStatus));
 
     final (color, icon, title, message) = switch (parkingLot.status) {
       'APPROVED' => (
@@ -277,11 +300,24 @@ class _ParkingLotCard extends StatelessWidget {
                 label: 'Lease',
                 value: parkingLot.activeLeaseStatus!,
               ),
-            if (canCreateLeaseContract) ...[
+            if (canCreateLeaseContract || onViewRevenue != null) ...[
               const SizedBox(height: 8),
-              FilledButton(
-                onPressed: onBootstrapLease,
-                child: const Text('Tạo hợp đồng thuê'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (canCreateLeaseContract)
+                    FilledButton(
+                      onPressed: onBootstrapLease,
+                      child: const Text('Tạo hợp đồng thuê'),
+                    ),
+                  if (onViewRevenue != null)
+                    OutlinedButton.icon(
+                      onPressed: onViewRevenue,
+                      icon: const Icon(Icons.query_stats_outlined),
+                      label: const Text('Xem doanh thu'),
+                    ),
+                ],
               ),
             ],
           ],
@@ -348,13 +384,17 @@ class _LeaseContractSheetState extends State<_LeaseContractSheet> {
     }
     if (revenueShare == null || revenueShare <= 0 || revenueShare > 100) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tỷ lệ chia doanh thu phải từ 0 đến 100.')),
+        const SnackBar(
+          content: Text('Tỷ lệ chia doanh thu phải từ 0 đến 100.'),
+        ),
       );
       return;
     }
     if (termMonths == null || termMonths <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Thời hạn hợp đồng phải lớn hơn 0 tháng.')),
+        const SnackBar(
+          content: Text('Thời hạn hợp đồng phải lớn hơn 0 tháng.'),
+        ),
       );
       return;
     }
@@ -463,7 +503,9 @@ class _LeaseContractSheetState extends State<_LeaseContractSheet> {
                       TextField(
                         controller: _monthlyFeeController,
                         enabled: !_isSubmitting,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Phí thuê hàng tháng (VND)',
                         ),
@@ -472,7 +514,9 @@ class _LeaseContractSheetState extends State<_LeaseContractSheet> {
                       TextField(
                         controller: _revenueShareController,
                         enabled: !_isSubmitting,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
                         decoration: const InputDecoration(
                           labelText: 'Tỷ lệ doanh thu cho chủ bãi (%)',
                         ),

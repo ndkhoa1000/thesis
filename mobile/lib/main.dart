@@ -24,6 +24,7 @@ import 'src/features/operator_application/data/operator_application_service.dart
 import 'src/features/operator_application/presentation/operator_application_screen.dart';
 import 'src/features/operator_lot_management/data/operator_lot_management_service.dart';
 import 'src/features/operator_lot_management/presentation/operator_lot_management_screen.dart';
+import 'src/features/owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart';
 import 'src/features/parking_lot_registration/data/parking_lot_service.dart';
 import 'src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
 import 'src/features/vehicles/data/vehicle_service.dart';
@@ -38,6 +39,8 @@ typedef AdminApprovalsServiceFactory =
     AdminApprovalsService Function(String accessToken);
 typedef ParkingLotServiceFactory =
     ParkingLotService Function(String accessToken);
+typedef OwnerRevenueDashboardServiceFactory =
+    OwnerRevenueDashboardService Function(String accessToken);
 typedef OperatorLotManagementServiceFactory =
     OperatorLotManagementService Function(String accessToken);
 typedef DriverCheckInServiceFactory =
@@ -89,6 +92,16 @@ AdminApprovalsService defaultAdminApprovalsServiceFactory(String accessToken) {
 ParkingLotService defaultParkingLotServiceFactory(String accessToken) {
   final apiClient = ApiClient();
   return BackendParkingLotService(
+    dio: apiClient.client,
+    accessToken: accessToken,
+  );
+}
+
+OwnerRevenueDashboardService defaultOwnerRevenueDashboardServiceFactory(
+  String accessToken,
+) {
+  final apiClient = ApiClient();
+  return BackendOwnerRevenueDashboardService(
     dio: apiClient.client,
     accessToken: accessToken,
   );
@@ -337,6 +350,8 @@ class AuthenticatedHome extends StatelessWidget {
         defaultOperatorApplicationServiceFactory,
     this.adminApprovalsServiceFactory = defaultAdminApprovalsServiceFactory,
     this.parkingLotServiceFactory = defaultParkingLotServiceFactory,
+    this.ownerRevenueDashboardServiceFactory =
+        defaultOwnerRevenueDashboardServiceFactory,
     this.operatorLotManagementServiceFactory =
         defaultOperatorLotManagementServiceFactory,
     this.driverCheckInServiceFactory = defaultDriverCheckInServiceFactory,
@@ -359,6 +374,7 @@ class AuthenticatedHome extends StatelessWidget {
   final OperatorApplicationServiceFactory operatorApplicationServiceFactory;
   final AdminApprovalsServiceFactory adminApprovalsServiceFactory;
   final ParkingLotServiceFactory parkingLotServiceFactory;
+  final OwnerRevenueDashboardServiceFactory ownerRevenueDashboardServiceFactory;
   final OperatorLotManagementServiceFactory operatorLotManagementServiceFactory;
   final DriverCheckInServiceFactory driverCheckInServiceFactory;
   final DriverBookingServiceFactory driverBookingServiceFactory;
@@ -407,6 +423,8 @@ class AuthenticatedHome extends StatelessWidget {
                 parkingLotService: parkingLotServiceFactory(
                   session.accessToken,
                 ),
+                ownerRevenueDashboardService:
+                    ownerRevenueDashboardServiceFactory(session.accessToken),
                 onSignOut: onSignOut,
               ),
             ),
@@ -440,6 +458,9 @@ class AuthenticatedHome extends StatelessWidget {
     if (_hasLotOwnerWorkspace) {
       return ParkingLotRegistrationScreen(
         parkingLotService: parkingLotServiceFactory(session.accessToken),
+        ownerRevenueDashboardService: ownerRevenueDashboardServiceFactory(
+          session.accessToken,
+        ),
         onSignOut: onSignOut,
       );
     }

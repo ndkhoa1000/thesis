@@ -21,6 +21,7 @@ import 'package:parking_app/src/features/operator_application/data/operator_appl
 import 'package:parking_app/src/features/operator_application/presentation/operator_application_screen.dart';
 import 'package:parking_app/src/features/operator_lot_management/data/operator_lot_management_service.dart';
 import 'package:parking_app/src/features/operator_lot_management/presentation/operator_lot_management_screen.dart';
+import 'package:parking_app/src/features/owner_revenue_dashboard/data/owner_revenue_dashboard_service.dart';
 import 'package:parking_app/src/features/parking_lot_registration/data/parking_lot_service.dart';
 import 'package:parking_app/src/features/parking_lot_registration/presentation/parking_lot_registration_screen.dart';
 import 'package:parking_app/src/features/vehicles/data/vehicle_service.dart';
@@ -629,6 +630,40 @@ class FakeParkingLotService implements ParkingLotService {
   }
 }
 
+class FakeOwnerRevenueDashboardService implements OwnerRevenueDashboardService {
+  FakeOwnerRevenueDashboardService({
+    Map<int, Map<OwnerRevenuePeriod, OwnerRevenueSummary>>? reportsByLot,
+  }) : _reportsByLot = reportsByLot ?? const {};
+
+  final Map<int, Map<OwnerRevenuePeriod, OwnerRevenueSummary>> _reportsByLot;
+
+  @override
+  Future<OwnerRevenueSummary> getOwnerRevenueSummary({
+    required int parkingLotId,
+    required OwnerRevenuePeriod period,
+  }) async {
+    final lotReports = _reportsByLot[parkingLotId];
+    if (lotReports != null && lotReports.containsKey(period)) {
+      return lotReports[period]!;
+    }
+
+    return OwnerRevenueSummary(
+      parkingLotId: parkingLotId,
+      parkingLotName: 'Bai xe Nguyen Hue',
+      period: period,
+      rangeStart: DateTime(2026, 3, 29),
+      rangeEnd: DateTime(2026, 3, 29),
+      leaseStatus: 'PENDING',
+      completedPaymentCount: 0,
+      completedSessionCount: 0,
+      hasData: false,
+      emptyReason: 'NO_ACCEPTED_LEASE',
+      emptyMessage:
+          'Bãi xe chưa có hợp đồng đã được operator chấp nhận nên chưa thể tổng hợp doanh thu.',
+    );
+  }
+}
+
 class FakeOperatorLotManagementService implements OperatorLotManagementService {
   FakeOperatorLotManagementService({
     List<OperatorManagedParkingLot>? initialLots,
@@ -638,7 +673,9 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   }) : _parkingLots = List<OperatorManagedParkingLot>.from(
          initialLots ?? const [],
        ),
-       _contracts = List<LeaseContractSummary>.from(initialContracts ?? const []),
+       _contracts = List<LeaseContractSummary>.from(
+         initialContracts ?? const [],
+       ),
        _attendantsByLot = {
          for (final entry
              in (attendantsByLot ??
@@ -672,7 +709,9 @@ class FakeOperatorLotManagementService implements OperatorLotManagementService {
   }
 
   @override
-  Future<LeaseContractSummary> acceptLeaseContract({required int leaseId}) async {
+  Future<LeaseContractSummary> acceptLeaseContract({
+    required int leaseId,
+  }) async {
     final index = _contracts.indexWhere((item) => item.leaseId == leaseId);
     final current = _contracts[index];
     final accepted = LeaseContractSummary(
@@ -1761,11 +1800,13 @@ void main() {
     WidgetTester tester,
   ) async {
     final parkingLotService = FakeParkingLotService();
+    final ownerRevenueDashboardService = FakeOwnerRevenueDashboardService();
 
     await tester.pumpWidget(
       MaterialApp(
         home: ParkingLotRegistrationScreen(
           parkingLotService: parkingLotService,
+          ownerRevenueDashboardService: ownerRevenueDashboardService,
           onSignOut: () async {},
         ),
       ),
@@ -1822,11 +1863,13 @@ void main() {
         ),
       ],
     );
+    final ownerRevenueDashboardService = FakeOwnerRevenueDashboardService();
 
     await tester.pumpWidget(
       MaterialApp(
         home: ParkingLotRegistrationScreen(
           parkingLotService: parkingLotService,
+          ownerRevenueDashboardService: ownerRevenueDashboardService,
           onSignOut: () async {},
         ),
       ),
@@ -1860,6 +1903,169 @@ void main() {
     expect(find.text('Tran Thi B'), findsWidgets);
     expect(find.text('Lease'), findsOneWidget);
     expect(find.text('PENDING'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Lot owner revenue dashboard shows metrics and period switching',
+    (WidgetTester tester) async {
+      final parkingLotService = FakeParkingLotService(
+        initialLots: const [
+          ParkingLotRegistration(
+            id: 7,
+            lotOwnerId: 1,
+            name: 'Bai xe Nguyen Hue',
+            address: '1 Nguyen Hue, Quan 1',
+            latitude: 10.7732,
+            longitude: 106.7041,
+            currentAvailable: 0,
+            status: 'APPROVED',
+            activeLeaseId: 88,
+            activeLeaseStatus: 'ACTIVE',
+            activeOperatorUserId: 9,
+            activeOperatorName: 'Tran Thi B',
+          ),
+        ],
+      );
+      final ownerRevenueDashboardService = FakeOwnerRevenueDashboardService(
+        reportsByLot: {
+          7: {
+            OwnerRevenuePeriod.day: OwnerRevenueSummary(
+              parkingLotId: 7,
+              parkingLotName: 'Bai xe Nguyen Hue',
+              period: OwnerRevenuePeriod.day,
+              rangeStart: DateTime(2026, 3, 29),
+              rangeEnd: DateTime(2026, 3, 29),
+              leaseStatus: 'ACTIVE',
+              operatorName: 'Tran Thi B',
+              revenueSharePercentage: 35,
+              leaseStartDate: DateTime(2026, 3, 1),
+              leaseEndDate: DateTime(2026, 9, 1),
+              completedPaymentCount: 2,
+              completedSessionCount: 2,
+              hasData: true,
+              grossRevenue: 400000,
+              ownerShare: 140000,
+              operatorShare: 260000,
+            ),
+            OwnerRevenuePeriod.week: OwnerRevenueSummary(
+              parkingLotId: 7,
+              parkingLotName: 'Bai xe Nguyen Hue',
+              period: OwnerRevenuePeriod.week,
+              rangeStart: DateTime(2026, 3, 23),
+              rangeEnd: DateTime(2026, 3, 29),
+              leaseStatus: 'ACTIVE',
+              operatorName: 'Tran Thi B',
+              revenueSharePercentage: 35,
+              leaseStartDate: DateTime(2026, 3, 1),
+              leaseEndDate: DateTime(2026, 9, 1),
+              completedPaymentCount: 5,
+              completedSessionCount: 5,
+              hasData: true,
+              grossRevenue: 900000,
+              ownerShare: 315000,
+              operatorShare: 585000,
+            ),
+          },
+        },
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ParkingLotRegistrationScreen(
+            parkingLotService: parkingLotService,
+            ownerRevenueDashboardService: ownerRevenueDashboardService,
+            onSignOut: () async {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Xem doanh thu'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dashboard doanh thu'), findsOneWidget);
+      expect(find.text('400000 VND'), findsOneWidget);
+      expect(find.text('140000 VND'), findsOneWidget);
+
+      await tester.tap(find.text('Tuần'));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('900000 VND'), findsOneWidget);
+      expect(find.text('315000 VND'), findsOneWidget);
+    },
+  );
+
+  testWidgets('Lot owner revenue dashboard shows empty state for expired lease', (
+    WidgetTester tester,
+  ) async {
+    final parkingLotService = FakeParkingLotService(
+      initialLots: const [
+        ParkingLotRegistration(
+          id: 9,
+          lotOwnerId: 1,
+          name: 'Bai xe Ben Thanh',
+          address: '45 Le Loi, Quan 1',
+          latitude: 10.7719,
+          longitude: 106.6983,
+          currentAvailable: 0,
+          status: 'APPROVED',
+          activeLeaseId: 91,
+          activeLeaseStatus: 'EXPIRED',
+          activeOperatorUserId: 12,
+          activeOperatorName: 'Le Van C',
+        ),
+      ],
+    );
+    final ownerRevenueDashboardService = FakeOwnerRevenueDashboardService(
+      reportsByLot: {
+        9: {
+          OwnerRevenuePeriod.day: OwnerRevenueSummary(
+            parkingLotId: 9,
+            parkingLotName: 'Bai xe Ben Thanh',
+            period: OwnerRevenuePeriod.day,
+            rangeStart: DateTime(2026, 3, 29),
+            rangeEnd: DateTime(2026, 3, 29),
+            leaseStatus: 'EXPIRED',
+            operatorName: 'Le Van C',
+            revenueSharePercentage: 35,
+            leaseStartDate: DateTime(2025, 9, 1),
+            leaseEndDate: DateTime(2026, 3, 28),
+            completedPaymentCount: 0,
+            completedSessionCount: 0,
+            hasData: false,
+            emptyReason: 'NO_COMPLETED_PAYMENTS',
+            emptyMessage:
+                'Không có phiên gửi xe đã thanh toán hoàn tất trong khoảng thời gian đã chọn.',
+          ),
+        },
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ParkingLotRegistrationScreen(
+          parkingLotService: parkingLotService,
+          ownerRevenueDashboardService: ownerRevenueDashboardService,
+          onSignOut: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Xem doanh thu'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('EXPIRED'), findsWidgets);
+    expect(find.text('Chưa có dữ liệu doanh thu'), findsOneWidget);
+    expect(
+      find.text(
+        'Không có phiên gửi xe đã thanh toán hoàn tất trong khoảng thời gian đã chọn.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Operator workspace can accept a pending lease contract', (
