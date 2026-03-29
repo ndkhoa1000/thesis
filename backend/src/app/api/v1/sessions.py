@@ -391,6 +391,16 @@ async def _store_walk_in_image(upload: UploadFile) -> MediaUploadResult:
     )
 
 
+async def _cleanup_media_uploads(*uploads: MediaUploadResult | None) -> None:
+    for upload in uploads:
+        if upload is None:
+            continue
+        try:
+            await cloudinary_service.delete_image(upload.public_id)
+        except Exception:
+            continue
+
+
 @router.get("/sessions", status_code=200)
 async def list_sessions(
     request: Request,
@@ -1059,21 +1069,33 @@ async def attendant_check_in_walk_in_vehicle(
     if parking_lot.current_available <= 0:
         raise BadRequestException("Lot is full - no available spots.")
 
-    plate_image_upload = await _store_walk_in_image(plate_image)
+    plate_image_upload: MediaUploadResult | None = None
+    overview_image_upload: MediaUploadResult | None = None
+    try:
+        plate_image_upload = await _store_walk_in_image(plate_image)
+        if overview_image is not None:
+            overview_image_upload = await _store_walk_in_image(overview_image)
 
-    previous_current_available = parking_lot.current_available
-    created_session = ParkingSession(
-        parking_lot_id=parking_lot.id,
-        license_plate=_build_walk_in_license_plate(),
-        attendant_checkin_id=attendant.id,
-        vehicle_type=normalized_vehicle_type,
-        checkin_image=plate_image_upload.secure_url,
-        checkin_image_public_id=plate_image_upload.public_id,
-    )
-    parking_lot.current_available -= 1
-    db.add(created_session)
-    await db.commit()
-    await db.refresh(created_session)
+        previous_current_available = parking_lot.current_available
+        created_session = ParkingSession(
+            parking_lot_id=parking_lot.id,
+            license_plate=_build_walk_in_license_plate(),
+            attendant_checkin_id=attendant.id,
+            vehicle_type=normalized_vehicle_type,
+            checkin_image=plate_image_upload.secure_url,
+            checkin_image_public_id=plate_image_upload.public_id,
+            overview_image=overview_image_upload.secure_url if overview_image_upload is not None else None,
+            overview_image_public_id=overview_image_upload.public_id if overview_image_upload is not None else None,
+        )
+        parking_lot.current_available -= 1
+        db.add(created_session)
+        await db.commit()
+        await db.refresh(created_session)
+    except Exception:
+        await db.rollback()
+        await _cleanup_media_uploads(plate_image_upload, overview_image_upload)
+        raise
+
     publish_lot_availability_update(
         parking_lot,
         previous_current_available=previous_current_available,

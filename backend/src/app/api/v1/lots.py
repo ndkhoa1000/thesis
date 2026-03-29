@@ -89,6 +89,13 @@ async def _upload_parking_lot_cover_image(upload: UploadFile) -> tuple[str, str]
     return media.secure_url, media.public_id
 
 
+async def _cleanup_cover_image(public_id: str | None) -> None:
+    try:
+        await cloudinary_service.delete_image(public_id)
+    except Exception:
+        return
+
+
 async def _expire_lease_and_contract_if_needed(db: AsyncSession, lease: LotLease) -> LotLease:
     lease_end = lease.end_date.date() if isinstance(lease.end_date, datetime) else lease.end_date
     if (
@@ -1055,24 +1062,30 @@ async def create_my_parking_lot(
 
     cover_image_url = payload.cover_image
     cover_image_public_id = None
-    if cover_image_file is not None:
-        cover_image_url, cover_image_public_id = await _upload_parking_lot_cover_image(cover_image_file)
+    try:
+        if cover_image_file is not None:
+            cover_image_url, cover_image_public_id = await _upload_parking_lot_cover_image(cover_image_file)
 
-    parking_lot = ParkingLot(
-        lot_owner_id=lot_owner.id,
-        name=payload.name,
-        address=payload.address,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
-        description=payload.description,
-        cover_image=cover_image_url,
-        cover_image_public_id=cover_image_public_id,
-        current_available=0,
-        status=ParkingLotStatus.PENDING.value,
-    )
-    db.add(parking_lot)
-    await db.commit()
-    await db.refresh(parking_lot)
+        parking_lot = ParkingLot(
+            lot_owner_id=lot_owner.id,
+            name=payload.name,
+            address=payload.address,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            description=payload.description,
+            cover_image=cover_image_url,
+            cover_image_public_id=cover_image_public_id,
+            current_available=0,
+            status=ParkingLotStatus.PENDING.value,
+        )
+        db.add(parking_lot)
+        await db.commit()
+        await db.refresh(parking_lot)
+    except Exception:
+        await db.rollback()
+        if cover_image_public_id is not None:
+            await _cleanup_cover_image(cover_image_public_id)
+        raise
     return _build_parking_lot_read(parking_lot)
 
 

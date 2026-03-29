@@ -75,6 +75,12 @@ class CloudinaryService:
             format=file_format if isinstance(file_format, str) else None,
         )
 
+    async def delete_image(self, public_id: str | None) -> None:
+        if not public_id or not self.is_configured:
+            return
+
+        await run_in_threadpool(self._delete_payload, public_id)
+
     async def _read_and_validate_image(self, upload: UploadFile) -> bytes:
         content_type = (upload.content_type or "").strip().lower()
         if not content_type.startswith("image/"):
@@ -107,6 +113,15 @@ class CloudinaryService:
             resource_type="image",
             filename_override=filename,
         )
+
+    def _delete_payload(self, public_id: str) -> None:
+        cloudinary.config(
+            cloud_name=self._cloud_name,
+            api_key=self._api_key,
+            api_secret=self._api_secret,
+            secure=True,
+        )
+        cloudinary.uploader.destroy(public_id, resource_type="image")
 
 
 cloudinary_service = CloudinaryService(

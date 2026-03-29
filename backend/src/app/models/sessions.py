@@ -45,6 +45,8 @@ class ParkingSession(Base):
     checkout_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     checkin_image: Mapped[str | None] = mapped_column(String(255), default=None)
     checkin_image_public_id: Mapped[str | None] = mapped_column(String(255), default=None)
+    overview_image: Mapped[str | None] = mapped_column(String(255), default=None)
+    overview_image_public_id: Mapped[str | None] = mapped_column(String(255), default=None)
     checkout_image: Mapped[str | None] = mapped_column(String(255), default=None)
     checkout_image_public_id: Mapped[str | None] = mapped_column(String(255), default=None)
     qr_code: Mapped[str | None] = mapped_column(String(100), unique=True, default=None)

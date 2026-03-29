@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_theme.dart';
+import '../../../shared/presentation/state_views.dart';
 
 class OperatorWorkspaceShell extends StatefulWidget {
   const OperatorWorkspaceShell({
@@ -187,35 +188,12 @@ class _ManagementPlaceholderScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.inventory_2_outlined,
-                size: 72,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                headline,
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(message, textAlign: TextAlign.center),
-              if (onOpenAlternateWorkspace != null &&
-                  alternateWorkspaceLabel != null) ...[
-                const SizedBox(height: 20),
-                OutlinedButton.icon(
-                  onPressed: onOpenAlternateWorkspace,
-                  icon: const Icon(Icons.swap_horiz),
-                  label: Text(alternateWorkspaceLabel!),
-                ),
-              ],
-            ],
-          ),
+        child: EmptyView(
+          icon: Icons.inventory_2_outlined,
+          title: headline,
+          message: message,
+          actionLabel: alternateWorkspaceLabel,
+          onAction: onOpenAlternateWorkspace,
         ),
       ),
     );

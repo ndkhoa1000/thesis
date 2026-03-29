@@ -1,6 +1,6 @@
 # Story 9.7: Media Storage & Backend Infrastructure
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -45,6 +45,12 @@ so that all business forms that require file or image paths can correctly upload
   - [x] Add backend tests for authorization, content-type validation, Cloudinary service integration boundaries, and persistence of returned URLs.
   - [x] Add Flutter tests for upload-service error handling and the selected integrated form.
   - [x] Verify with `cd backend && docker compose run --rm pytest` and `cd mobile && flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Media uploads are sent to Cloudinary before database commit, so failed writes can leave orphaned remote assets [backend/src/app/api/v1/lots.py:1059]
+- [x] [Review][Patch] Walk-in flow accepts and uploads an `overview_image` from mobile but never persists or returns it anywhere [backend/src/app/api/v1/sessions.py:1044]
+- [x] [Review][Patch] Legacy walk-in upload artifacts are still checked into the repository after the Cloudinary migration [backend/src/app/uploads/walk_in_check_in/20260327161711-GFcvqCJy.jpg]
 
 ## Dev Notes
 

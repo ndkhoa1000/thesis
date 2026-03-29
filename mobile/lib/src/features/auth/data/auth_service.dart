@@ -186,11 +186,21 @@ class BackendAuthService implements AuthService {
     }
 
     try {
-      return AuthSession.fromStoredPayload(
+      final storedSession = AuthSession.fromStoredPayload(
         accessToken: nextAccessToken,
         refreshToken: refreshToken,
         userPayload: userPayload,
       );
+      try {
+        return await _readCurrentSession(
+          accessToken: nextAccessToken,
+          refreshToken: refreshToken,
+          rememberSession: rememberSession,
+          sessionExpiresAt: sessionExpiresAt,
+        );
+      } on AuthException {
+        return storedSession;
+      }
     } on AuthException {
       await _tokenStore.clear();
       return null;
@@ -216,10 +226,24 @@ class BackendAuthService implements AuthService {
       nextAccessToken = await _refreshAccessToken(refreshToken);
     }
 
+    return _readCurrentSession(
+      accessToken: nextAccessToken,
+      refreshToken: refreshToken,
+      rememberSession: rememberSession,
+      sessionExpiresAt: sessionExpiresAt,
+    );
+  }
+
+  Future<AuthSession> _readCurrentSession({
+    required String accessToken,
+    required String refreshToken,
+    required bool rememberSession,
+    required String? sessionExpiresAt,
+  }) async {
     try {
       final response = await _client.get<dynamic>(
         '/auth/me',
-        options: Options(headers: {'Authorization': 'Bearer $nextAccessToken'}),
+        options: Options(headers: {'Authorization': 'Bearer $accessToken'}),
       );
       final responseData = response.data;
       if (responseData is! Map<String, dynamic>) {
@@ -232,7 +256,7 @@ class BackendAuthService implements AuthService {
       }
 
       final session = AuthSession.fromAuthResponse({
-        'access_token': nextAccessToken,
+        'access_token': accessToken,
         'refresh_token': refreshToken,
         'user': user,
       });

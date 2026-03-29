@@ -1,6 +1,6 @@
 # Story 9.5: Admin Workspace Shell
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -41,6 +41,10 @@ so that approvals, user management, and lot suspension are navigable from one pl
   - [x] Add Flutter tests for admin route landing, tab switching, and continued `AdminApprovalsScreen` rendering under the shell.
   - [x] Verify placeholder honesty and light-theme usage.
   - [x] Verify with `cd mobile && flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Admin placeholder tabs bypass the shared placeholder pattern required by Stories 9.5 and 9.6 [mobile/lib/src/features/admin_workspace/presentation/admin_workspace_shell.dart:76]
 
 ## Dev Notes
 

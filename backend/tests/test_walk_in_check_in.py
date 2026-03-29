@@ -101,6 +101,8 @@ class TestAttendantWalkInCheckIn:
         assert created_sessions[0].driver_id is None
         assert created_sessions[0].checkin_image == 'https://media.example/walk-in/plate.jpg'
         assert created_sessions[0].checkin_image_public_id == 'walk-in/plate-123'
+        assert created_sessions[0].overview_image == 'https://media.example/walk-in/plate.jpg'
+        assert created_sessions[0].overview_image_public_id == 'walk-in/plate-123'
         assert lot.current_available == 4
         mock_db.commit.assert_awaited_once()
 

@@ -1,6 +1,6 @@
 # Story 9.1: App Routing Foundation & Dual Theme System
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -52,6 +52,10 @@ so that all workspace screens consistently use correct themes and navigation fro
   - [x] Add Flutter tests for unauthenticated redirect, role-based route resolution, and multi-capability public-account routing.
   - [x] Add theme assertions proving Attendant uses dark styling while other workspaces use light styling.
   - [x] Verify with `cd mobile && flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Remembered sessions restore cached capabilities instead of refreshing them from `/auth/me` on app launch [mobile/lib/src/features/auth/data/auth_service.dart:148]
 
 ## Dev Notes
 

@@ -1,6 +1,6 @@
 # Story 9.4: Management Workspace Shells
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -47,6 +47,10 @@ so that I can navigate between lot management, financial, and operational tasks 
   - [x] Add Flutter tests for Operator and Lot Owner shell landing, tab switching, and placeholder rendering.
   - [x] Confirm current operator lot-management and lot-owner registration flows still work after shell wrapping.
   - [x] Verify with `cd mobile && flutter test`.
+
+### Review Findings
+
+- [x] [Review][Patch] Operator and Lot Owner placeholder tabs use bespoke placeholder widgets instead of the specified shared `EmptyView` pattern [mobile/lib/src/features/management_workspace/presentation/management_workspace_shell.dart:159]
 
 ## Dev Notes
 

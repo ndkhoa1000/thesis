@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_theme.dart';
+import '../../../shared/presentation/state_views.dart';
 
 class AdminWorkspaceShell extends StatefulWidget {
   const AdminWorkspaceShell({
@@ -100,26 +101,10 @@ class _AdminPlaceholderScreen extends StatelessWidget {
         ],
       ),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.admin_panel_settings_outlined,
-                size: 72,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                headline,
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              Text(message, textAlign: TextAlign.center),
-            ],
-          ),
+        child: EmptyView(
+          icon: Icons.admin_panel_settings_outlined,
+          title: headline,
+          message: message,
         ),
       ),
     );
