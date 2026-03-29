@@ -62,8 +62,6 @@ from ...schemas.parking_lot import (
     ParkingLotAnnouncementRead,
     ParkingLotCreate,
     ParkingLotDriverDetailRead,
-    ParkingLotLeaseBootstrapCreate,
-    ParkingLotLeaseBootstrapRead,
     ParkingLotPeakHourPointRead,
     ParkingLotPeakHoursRead,
     ParkingLotRead,
@@ -423,24 +421,6 @@ def _build_available_operator_read(manager: Manager, user: User) -> AvailableOpe
     )
 
 
-def _build_lease_bootstrap_read(lease: LotLease, user: User) -> ParkingLotLeaseBootstrapRead:
-    start_date = lease.start_date.date() if isinstance(lease.start_date, datetime) else lease.start_date
-    end_date = lease.end_date.date() if isinstance(lease.end_date, datetime) else lease.end_date
-    return ParkingLotLeaseBootstrapRead.model_validate(
-        {
-            "lease_id": lease.id,
-            "parking_lot_id": lease.parking_lot_id,
-            "manager_id": lease.manager_id,
-            "manager_user_id": user.id,
-            "operator_name": user.name,
-            "status": lease.status,
-            "monthly_fee": float(lease.monthly_fee),
-            "start_date": start_date,
-            "end_date": end_date,
-        }
-    )
-
-
 async def _get_latest_pricing(db: AsyncSession, parking_lot_id: int) -> Pricing | None:
     today = _utcnow().date()
     pricing_result = await db.execute(
@@ -744,52 +724,6 @@ async def list_available_operators(
     return [_build_available_operator_read(manager, user) for manager, user in operators_result.all()]
 
 
-@router.post(
-    "/user/me/parking-lots/{parking_lot_id}/lease-bootstrap",
-    response_model=ParkingLotLeaseBootstrapRead,
-    status_code=201,
-)
-async def bootstrap_parking_lot_lease(
-    request: Request,
-    parking_lot_id: int,
-    payload: ParkingLotLeaseBootstrapCreate,
-    current_user: Annotated[dict, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(async_get_db)],
-) -> ParkingLotLeaseBootstrapRead:
-    lot_owner = await _require_lot_owner_profile(db, current_user)
-    parking_lot = await _get_parking_lot(db, parking_lot_id)
-    if parking_lot is None or parking_lot.lot_owner_id != lot_owner.id:
-        raise NotFoundException("Parking lot not found")
-
-    if parking_lot.status != ParkingLotStatus.APPROVED.value:
-        raise BadRequestException("Only approved parking lots can bootstrap operator access")
-
-    existing_lease = await _get_latest_lease_snapshot(db, parking_lot_id)
-    if existing_lease is not None and existing_lease[0].status in {
-        LeaseStatus.PENDING.value,
-        LeaseStatus.ACTIVE.value,
-    }:
-        raise BadRequestException("Parking lot already has an active operator lease")
-
-    manager_pair = await _get_manager_user(db, payload.manager_user_id)
-    if manager_pair is None:
-        raise NotFoundException("Operator not found")
-
-    manager, operator_user = manager_pair
-    lease = LotLease(
-        parking_lot_id=parking_lot.id,
-        manager_id=manager.id,
-        monthly_fee=payload.monthly_fee,
-        start_date=_utcnow(),
-        status=LeaseStatus.ACTIVE.value,
-        approved_by=current_user["id"],
-    )
-    db.add(lease)
-    await db.commit()
-    await db.refresh(lease)
-    return _build_lease_bootstrap_read(lease, operator_user)
-
-
 @router.get("/operator/parking-lots", response_model=list[OperatorManagedParkingLotRead])
 async def read_operator_parking_lots(
     request: Request,
@@ -809,6 +743,9 @@ async def read_operator_parking_lots(
 
     managed_lots: list[OperatorManagedParkingLotRead] = []
     for lease, parking_lot in leases_result.all():
+        lease = await _expire_lease_and_contract_if_needed(db, lease)
+        if lease.status != LeaseStatus.ACTIVE.value:
+            continue
         latest_config = await _get_latest_parking_lot_config(db, parking_lot.id)
         latest_pricing = await _get_latest_pricing(db, parking_lot.id)
         occupied_count = await _count_active_sessions(db, parking_lot.id)

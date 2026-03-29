@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
+from src.app.api.v1 import lots
 from src.app.api.v1.lots import _get_latest_parking_lot_config, patch_operator_parking_lot, read_operator_parking_lots
 from src.app.core.exceptions.http_exceptions import BadRequestException, NotFoundException
 from src.app.models.enums import LeaseStatus, ParkingLotStatus, PricingMode, UserRole, VehicleTypeAll
@@ -158,6 +159,25 @@ class TestOperatorManagedLots:
         assert result[0].closing_time == time(hour=22, minute=0)
         assert result[0].pricing_mode == PricingMode.HOURLY
         assert result[0].price_amount == 15000
+
+    @pytest.mark.asyncio
+    async def test_read_operator_parking_lots_skips_expired_leases_after_refresh(self, mock_db, monkeypatch):
+        manager_result = MagicMock()
+        manager_result.scalar_one_or_none.return_value = _manager_profile()
+        leases_result = MagicMock()
+        lease = _active_lease()
+        leases_result.all.return_value = [(lease, _parking_lot())]
+        mock_db.execute = AsyncMock(side_effect=[manager_result, leases_result])
+
+        async def expire_lease(_db, current_lease):
+            current_lease.status = LeaseStatus.EXPIRED.value
+            return current_lease
+
+        monkeypatch.setattr(lots, "_expire_lease_and_contract_if_needed", expire_lease)
+
+        result = await read_operator_parking_lots(Mock(), _manager_user(), mock_db)
+
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_patch_operator_parking_lot_updates_details_and_capacity(self, mock_db):

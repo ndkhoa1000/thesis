@@ -283,27 +283,6 @@ class AvailableOperatorRead(BaseModel):
     verified_at: datetime | None = None
 
 
-class ParkingLotLeaseBootstrapCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    manager_user_id: int
-    monthly_fee: Annotated[float, Field(ge=0, le=1000000000, default=0)] = 0
-
-
-class ParkingLotLeaseBootstrapRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    lease_id: int
-    parking_lot_id: int
-    manager_id: int
-    manager_user_id: int
-    operator_name: str
-    status: str
-    monthly_fee: float
-    start_date: date | None = None
-    end_date: date | None = None
-
-
 class ParkingLotReview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -8,8 +8,8 @@ import pytest
 from src.app.api.v1 import reports
 from src.app.api.v1.reports import _build_period_window, get_owner_revenue_summary
 from src.app.core.exceptions.http_exceptions import NotFoundException
-from src.app.models.enums import LeaseStatus, ParkingLotStatus
-from src.app.models.leases import LotLease
+from src.app.models.enums import LeaseContractStatus, LeaseStatus, ParkingLotStatus
+from src.app.models.leases import LeaseContract, LotLease
 from src.app.models.parking import ParkingLot
 from src.app.models.user import User
 from src.app.models.users import LotOwner
@@ -68,6 +68,14 @@ def _operator_user() -> User:
     user.email = "operator@test.com"
     user.is_deleted = False
     return user
+
+
+def _contract(status: str = LeaseContractStatus.ACTIVE.value) -> LeaseContract:
+    contract = MagicMock(spec=LeaseContract)
+    contract.id = 22
+    contract.lease_id = 18
+    contract.status = status
+    return contract
 
 
 class TestOwnerRevenueReport:
@@ -157,10 +165,12 @@ class TestOwnerRevenueReport:
         parking_lot_result.scalar_one_or_none.return_value = _parking_lot()
         accepted_lease_result = MagicMock()
         accepted_lease_result.one_or_none.return_value = (expired_lease, _operator_user())
+        contract_result = MagicMock()
+        contract_result.scalar_one_or_none.return_value = _contract()
         totals_result = MagicMock()
         totals_result.one.return_value = (1, 100000, 1)
         mock_db.execute = AsyncMock(
-            side_effect=[owner_result, parking_lot_result, accepted_lease_result, totals_result]
+            side_effect=[owner_result, parking_lot_result, accepted_lease_result, contract_result, totals_result]
         )
         mock_db.commit = AsyncMock()
 
@@ -176,6 +186,35 @@ class TestOwnerRevenueReport:
         assert result.lease_status == LeaseStatus.EXPIRED.value
         assert result.owner_share == 35000
         mock_db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_owner_revenue_uses_shared_expiry_helper(self, mock_db, monkeypatch):
+        monkeypatch.setattr(reports, "_utcnow", lambda: datetime(2026, 3, 29, 10, 30, tzinfo=UTC))
+        expired_lease = _lease(end_date=datetime(2026, 3, 28, tzinfo=UTC))
+
+        owner_result = MagicMock()
+        owner_result.scalar_one_or_none.return_value = _lot_owner_profile()
+        parking_lot_result = MagicMock()
+        parking_lot_result.scalar_one_or_none.return_value = _parking_lot()
+        accepted_lease_result = MagicMock()
+        accepted_lease_result.one_or_none.return_value = (expired_lease, _operator_user())
+        totals_result = MagicMock()
+        totals_result.one.return_value = (1, 100000, 1)
+        mock_db.execute = AsyncMock(
+            side_effect=[owner_result, parking_lot_result, accepted_lease_result, totals_result]
+        )
+        expiry_helper = AsyncMock(return_value=expired_lease)
+        monkeypatch.setattr(reports, "_expire_lease_and_contract_if_needed", expiry_helper)
+
+        await get_owner_revenue_summary(
+            Mock(),
+            7,
+            OwnerRevenuePeriod.MONTH,
+            _owner_user(),
+            mock_db,
+        )
+
+        expiry_helper.assert_awaited_once_with(mock_db, expired_lease)
 
     @pytest.mark.asyncio
     async def test_rejects_revenue_request_for_foreign_lot(self, mock_db):

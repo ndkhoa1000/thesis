@@ -78,10 +78,10 @@ development_status:
   7-2-attendant-scans-pre-booked-check-in: done
   7-3-auto-expire-no-show-bookings: done
   epic-7-retrospective: done
-  epic-8: in-progress
-  8-1-create-lease-contract: review
-  8-2-owner-revenue-dashboard: review
-  8-3-operator-revenue-dashboard: review
+  epic-8: done
+  8-1-create-lease-contract: done
+  8-2-owner-revenue-dashboard: done
+  8-3-operator-revenue-dashboard: done
   epic-8-retrospective: optional
   epic-9: backlog
   9-1-app-routing-foundation-dual-theme-system: backlog

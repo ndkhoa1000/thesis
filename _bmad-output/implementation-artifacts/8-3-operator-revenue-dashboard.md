@@ -1,6 +1,6 @@
 # Story 8.3: Operator Revenue Dashboard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -152,6 +152,7 @@ GPT-5.4
 - Implemented an operator-only reports endpoint in `reports.py` that aggregates completed session payments for historical or active managed lots, computes operator and owner shares from canonical lease terms, derives period occupancy context from session overlap, and returns explicit `EXPIRED` lease visibility plus honest empty states.
 - Added a dedicated operator revenue dashboard sheet reachable from each managed lot card, with backend-driven day/week/month switching, operator-share metrics, and vehicle-type breakdown rendering inside the current operator workspace.
 - Validation completed with `cd backend && docker compose run --rm pytest python -m pytest tests/test_operator_revenue_reports.py tests/test_owner_revenue_reports.py tests/test_operator_lot_management.py`, `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/widget_test.dart`, and `cd mobile && flutter test`.
+- Post-review closure updated operator managed-lot reads to drop expired leases from active workspace surfaces, aligned reporting expiry behavior with shared contract-state transitions, and passed full backend/mobile regression.
 
 ### File List
 
@@ -170,3 +171,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 8.3 implementation artifact for operator-scoped revenue and performance reporting derived from accepted lease terms, finalized payments, and completed session data.
 - 2026-03-29: Implemented Story 8.3 with backend-owned operator revenue/performance reporting, operator workspace dashboard access, and focused plus full backend/mobile regression validation.
+- 2026-03-29: Closed review findings by fixing expired-lease workspace/report handling and re-validating the complete backend/mobile test suites.

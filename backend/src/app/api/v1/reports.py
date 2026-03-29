@@ -21,7 +21,14 @@ from ...schemas.report import (
     OwnerRevenuePeriod,
     OwnerRevenueSummaryRead,
 )
-from .lots import _get_latest_parking_lot_config, _get_parking_lot, _require_lot_owner_profile, _require_manager_profile, _utcnow
+from .lots import (
+    _expire_lease_and_contract_if_needed,
+    _get_latest_parking_lot_config,
+    _get_parking_lot,
+    _require_lot_owner_profile,
+    _require_manager_profile,
+    _utcnow,
+)
 
 router = APIRouter(tags=["reports"])
 
@@ -105,19 +112,6 @@ async def _get_operator_historical_lease(
     )
     snapshot = lease_result.one_or_none()
     return tuple(snapshot) if snapshot is not None else None
-
-
-async def _expire_lease_if_needed(db: AsyncSession, lease: LotLease) -> None:
-    lease_end = _as_date(lease.end_date)
-    if (
-        lease.status != LeaseStatus.ACTIVE.value
-        or lease_end is None
-        or lease_end >= _utcnow().date()
-    ):
-        return
-
-    lease.status = LeaseStatus.EXPIRED.value
-    await db.commit()
 
 
 def _build_empty_summary(
@@ -264,7 +258,7 @@ async def get_owner_revenue_summary(
         )
 
     lease, operator_user = accepted_lease_snapshot
-    await _expire_lease_if_needed(db, lease)
+    lease = await _expire_lease_and_contract_if_needed(db, lease)
 
     lease_start_date = _as_date(lease.start_date)
     lease_end_date = _as_date(lease.end_date)
@@ -367,7 +361,7 @@ async def get_operator_revenue_summary(
         raise NotFoundException("Parking lot not found")
 
     lease, parking_lot, owner_user = lease_snapshot
-    await _expire_lease_if_needed(db, lease)
+    lease = await _expire_lease_and_contract_if_needed(db, lease)
 
     range_start, range_end, range_start_at, range_end_before = _build_period_window(
         _utcnow(),

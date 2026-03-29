@@ -1,6 +1,6 @@
 # Story 8.1: Create Lease Contract
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -158,6 +158,7 @@ GPT-5.4
 - Replaced the owner-side temporary bootstrap interaction with a contract-draft flow in the current Lot Owner workspace and added an operator pending-contract review/acceptance surface in the current operator workspace.
 - Hardened lease reads so expired leases surface explicitly without leaving operator-managed flows looking actively assigned forever.
 - Validation completed with `cd backend && uv run pytest`, `cd mobile && flutter test`, focused owner/operator widget tests, and `cd backend && docker compose run --rm pytest python -m pytest tests/test_leases.py tests/test_parking_lots.py`.
+- Post-review closure removed the deprecated lease-bootstrap bypass, reconciled Alembic revision history before applying the new contract-number migration, and passed full backend plus mobile regression suites.
 
 ### File List
 
@@ -169,6 +170,7 @@ GPT-5.4
 - `backend/src/app/models/leases.py`
 - `backend/src/app/schemas/lease_contract.py`
 - `backend/src/migrations/versions/c1b2c3d4e5f6_add_lease_terms_fields.py`
+- `backend/src/migrations/versions/d4e5f6a7b8c9_expand_lease_contract_number_length.py`
 - `backend/tests/test_leases.py`
 - `mobile/lib/src/features/lease_contract/data/lease_contract_models.dart`
 - `mobile/lib/src/features/parking_lot_registration/data/parking_lot_service.dart`
@@ -182,3 +184,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 8.1 implementation artifact for replacing temporary lease bootstrap with a first-class lease contract lifecycle.
 - 2026-03-28: Implemented Story 8.1 with canonical lease commercial-term fields, backend contract draft/accept APIs, owner/operator workspace integration, and focused plus full regression validation.
+- 2026-03-29: Closed review findings by removing the legacy bootstrap path, applying contract-number schema fixes, reconciling Alembic history, and re-running full backend/mobile validation.

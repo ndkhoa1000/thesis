@@ -1,6 +1,6 @@
 # Story 8.2: Owner Revenue Dashboard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -150,6 +150,7 @@ GPT-5.4
 - Implemented an owner-only reports endpoint that aggregates completed session payments against accepted lease terms, preserves explicit `EXPIRED` lease visibility, and returns honest empty states when there is no accepted lease or no settled revenue in range.
 - Added a dedicated Flutter owner revenue dashboard feature reachable from approved lot cards, with backend-driven day/week/month switching and empty-state messaging instead of client-side zero-metric math.
 - Validation completed with `cd backend && docker compose run --rm pytest python -m pytest tests/test_owner_revenue_reports.py tests/test_leases.py`, `cd backend && docker compose run --rm pytest python -m pytest`, `cd mobile && flutter test test/widget_test.dart`, and `cd mobile && flutter test`.
+- Post-review closure aligned owner reporting with the shared lease-and-contract expiry helper and confirmed the final backend/mobile regression passes after Epic 8 fixes.
 
 ### File List
 
@@ -169,3 +170,4 @@ GPT-5.4
 
 - 2026-03-28: Created Story 8.2 implementation artifact for owner-scoped revenue reporting derived from accepted lease terms and finalized payment data.
 - 2026-03-29: Implemented Story 8.2 with backend-owned owner revenue reporting, dedicated mobile dashboard access from the Lot Owner workspace, and focused plus full regression validation.
+- 2026-03-29: Closed review findings by aligning report expiry behavior with shared lease state transitions and re-validating the full backend/mobile suites.

@@ -8,8 +8,8 @@ import pytest
 from src.app.api.v1 import reports
 from src.app.api.v1.reports import get_operator_revenue_summary
 from src.app.core.exceptions.http_exceptions import NotFoundException
-from src.app.models.enums import LeaseStatus, ParkingLotStatus
-from src.app.models.leases import LotLease
+from src.app.models.enums import LeaseContractStatus, LeaseStatus, ParkingLotStatus
+from src.app.models.leases import LeaseContract, LotLease
 from src.app.models.parking import ParkingLot, ParkingLotConfig
 from src.app.models.sessions import ParkingSession
 from src.app.models.user import User
@@ -50,6 +50,14 @@ def _owner_user() -> User:
     user.email = "owner@test.com"
     user.is_deleted = False
     return user
+
+
+def _contract(status: str = LeaseContractStatus.ACTIVE.value) -> LeaseContract:
+    contract = MagicMock(spec=LeaseContract)
+    contract.id = 22
+    contract.lease_id = 18
+    contract.status = status
+    return contract
 
 
 def _lease(
@@ -175,6 +183,8 @@ class TestOperatorRevenueReports:
             _parking_lot(),
             _owner_user(),
         )
+        contract_result = MagicMock()
+        contract_result.scalar_one_or_none.return_value = _contract()
         config_result = MagicMock()
         config_result.scalar_one_or_none.return_value = _capacity_config(10)
         paid_sessions_result = MagicMock()
@@ -186,7 +196,7 @@ class TestOperatorRevenueReports:
         breakdown_result = MagicMock()
         breakdown_result.all.return_value = [('CAR', 1)]
         mock_db.execute = AsyncMock(
-            side_effect=[manager_result, lease_result, config_result, paid_sessions_result, totals_result, breakdown_result]
+            side_effect=[manager_result, lease_result, contract_result, config_result, paid_sessions_result, totals_result, breakdown_result]
         )
         mock_db.commit = AsyncMock()
 

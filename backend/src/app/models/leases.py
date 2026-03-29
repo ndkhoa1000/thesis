@@ -34,7 +34,7 @@ class LeaseContract(Base):
     id: Mapped[int] = mapped_column(autoincrement=True, primary_key=True, init=False)
     # Required fields first
     lease_id: Mapped[int] = mapped_column(ForeignKey("lot_lease.id"), unique=True, index=True)
-    contract_number: Mapped[str] = mapped_column(String(20), unique=True)
+    contract_number: Mapped[str] = mapped_column(String(40), unique=True)
     # Optional / defaulted fields
     content: Mapped[str | None] = mapped_column(Text, default=None)
     generated_by: Mapped[int | None] = mapped_column(ForeignKey("user.id"), default=None)

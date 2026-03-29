@@ -101,41 +101,6 @@ class AvailableOperatorOption {
   }
 }
 
-class LeaseBootstrapAssignment {
-  const LeaseBootstrapAssignment({
-    required this.leaseId,
-    required this.parkingLotId,
-    required this.managerId,
-    required this.managerUserId,
-    required this.operatorName,
-    required this.status,
-    required this.monthlyFee,
-    this.startDate,
-  });
-
-  final int leaseId;
-  final int parkingLotId;
-  final int managerId;
-  final int managerUserId;
-  final String operatorName;
-  final String status;
-  final double monthlyFee;
-  final DateTime? startDate;
-
-  factory LeaseBootstrapAssignment.fromJson(Map<String, dynamic> json) {
-    return LeaseBootstrapAssignment(
-      leaseId: json['lease_id'] as int,
-      parkingLotId: json['parking_lot_id'] as int,
-      managerId: json['manager_id'] as int,
-      managerUserId: json['manager_user_id'] as int,
-      operatorName: json['operator_name'] as String,
-      status: json['status'] as String,
-      monthlyFee: (json['monthly_fee'] as num).toDouble(),
-      startDate: ParkingLotRegistration._parseDateTime(json['start_date']),
-    );
-  }
-}
-
 abstract class ParkingLotService {
   Future<List<ParkingLotRegistration>> getMyParkingLots();
 
@@ -148,12 +113,6 @@ abstract class ParkingLotService {
     required double revenueSharePercentage,
     required int termMonths,
     String? additionalTerms,
-  });
-
-  Future<LeaseBootstrapAssignment> bootstrapLease({
-    required int parkingLotId,
-    required int managerUserId,
-    double monthlyFee = 0,
   });
 
   Future<ParkingLotRegistration> createParkingLot({
@@ -208,7 +167,9 @@ class BackendParkingLotService implements ParkingLotService {
       );
       final raw = response.data;
       if (raw is! List) {
-        throw const ParkingLotException('Phản hồi danh sách operator không hợp lệ.');
+        throw const ParkingLotException(
+          'Phản hồi danh sách operator không hợp lệ.',
+        );
       }
       return raw
           .whereType<Map<String, dynamic>>()
@@ -242,34 +203,11 @@ class BackendParkingLotService implements ParkingLotService {
       );
       final raw = response.data;
       if (raw is! Map<String, dynamic>) {
-        throw const ParkingLotException('Phản hồi tạo hợp đồng thuê không hợp lệ.');
+        throw const ParkingLotException(
+          'Phản hồi tạo hợp đồng thuê không hợp lệ.',
+        );
       }
       return LeaseContractSummary.fromJson(raw);
-    } on DioException catch (error) {
-      throw ParkingLotException(_extractMessage(error));
-    }
-  }
-
-  @override
-  Future<LeaseBootstrapAssignment> bootstrapLease({
-    required int parkingLotId,
-    required int managerUserId,
-    double monthlyFee = 0,
-  }) async {
-    try {
-      final response = await _dio.post<dynamic>(
-        '/user/me/parking-lots/$parkingLotId/lease-bootstrap',
-        data: {
-          'manager_user_id': managerUserId,
-          'monthly_fee': monthlyFee,
-        },
-        options: _authOptions,
-      );
-      final raw = response.data;
-      if (raw is! Map<String, dynamic>) {
-        throw const ParkingLotException('Phản hồi kích hoạt operator không hợp lệ.');
-      }
-      return LeaseBootstrapAssignment.fromJson(raw);
     } on DioException catch (error) {
       throw ParkingLotException(_extractMessage(error));
     }

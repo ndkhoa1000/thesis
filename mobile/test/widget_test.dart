@@ -587,47 +587,6 @@ class FakeParkingLotService implements ParkingLotService {
       generatedAt: DateTime(2026, 3, 28),
     );
   }
-
-  @override
-  Future<LeaseBootstrapAssignment> bootstrapLease({
-    required int parkingLotId,
-    required int managerUserId,
-    double monthlyFee = 0,
-  }) async {
-    final operator = _operators.firstWhere(
-      (item) => item.userId == managerUserId,
-    );
-    final index = _parkingLots.indexWhere((lot) => lot.id == parkingLotId);
-    final current = _parkingLots[index];
-    _parkingLots[index] = ParkingLotRegistration(
-      id: current.id,
-      lotOwnerId: current.lotOwnerId,
-      name: current.name,
-      address: current.address,
-      latitude: current.latitude,
-      longitude: current.longitude,
-      currentAvailable: current.currentAvailable,
-      status: current.status,
-      description: current.description,
-      coverImage: current.coverImage,
-      createdAt: current.createdAt,
-      updatedAt: DateTime(2026, 3, 27),
-      activeLeaseId: 88,
-      activeLeaseStatus: 'ACTIVE',
-      activeOperatorUserId: operator.userId,
-      activeOperatorName: operator.name,
-    );
-    return LeaseBootstrapAssignment(
-      leaseId: 88,
-      parkingLotId: parkingLotId,
-      managerId: operator.managerId,
-      managerUserId: operator.userId,
-      operatorName: operator.name,
-      status: 'ACTIVE',
-      monthlyFee: monthlyFee,
-      startDate: DateTime(2026, 3, 27),
-    );
-  }
 }
 
 class FakeOwnerRevenueDashboardService implements OwnerRevenueDashboardService {
