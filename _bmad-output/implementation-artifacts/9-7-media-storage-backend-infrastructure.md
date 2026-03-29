@@ -124,6 +124,8 @@ GPT-5.4
 - Added shared backend Cloudinary media infrastructure, `public_id` persistence fields, and a migration so walk-in uploads and parking-lot cover images now store Cloudinary-backed references instead of local-disk paths or manual text URLs.
 - Reworked the parking-lot registration form to use a native compressed image picker and multipart upload flow through FastAPI, backed by focused service/widget tests.
 - Validation completed with `cd backend && docker compose run --rm pytest` passing 201 tests and `cd mobile && flutter test` passing 85 tests.
+- Verified the live Cloudinary-backed parking-lot registration flow with a manual multipart API smoke test that returned `201`, persisted a real `cover_image` URL plus `cover_image_public_id`, and then cleaned up the temporary DB row and Cloudinary asset.
+- Added a merge migration to collapse the two Alembic heads created during parallel story work and upgraded the database to the single merge head from a Compose-connected container.
 
 ### File List
 
@@ -137,6 +139,7 @@ GPT-5.4
 - `backend/src/app/api/v1/sessions.py`
 - `backend/src/app/api/v1/lots.py`
 - `backend/src/migrations/versions/e7c9a1b2d3f4_add_media_public_ids.py`
+- `backend/src/migrations/versions/952252659544_merge_operator_and_media_heads.py`
 - `backend/tests/test_walk_in_check_in.py`
 - `backend/tests/test_parking_lots.py`
 - `mobile/lib/src/features/parking_lot_registration/data/parking_lot_service.dart`
@@ -148,3 +151,4 @@ GPT-5.4
 ### Change Log
 
 - 2026-03-29: Completed Story 9.7 by adding Cloudinary-backed media storage infrastructure, migrating walk-in and parking-lot cover-image uploads to the shared multipart pipeline, persisting Cloudinary public IDs, and validating with full backend/mobile regression suites.
+- 2026-03-29: Verified the end-to-end parking-lot upload flow against the live backend/Cloudinary environment, cleaned up the temporary smoke-test artifacts, created merge migration `952252659544`, and upgraded the database to the unified Alembic head.
